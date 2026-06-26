@@ -1,0 +1,1 @@
+export { AdminAssessmentsManagementPage as AdminAssessmentsPage } from './AssessmentsManagementPage'

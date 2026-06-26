@@ -1,0 +1,1 @@
+export { AdminQuestionBankOverviewPage as AdminQuestionBankPage } from './QuestionBankOverviewPage'

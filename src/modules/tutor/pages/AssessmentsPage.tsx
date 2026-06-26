@@ -1,0 +1,1 @@
+export { AssessmentsPage as TutorAssessmentsPage } from '@/components/academic/AssessmentsPage'

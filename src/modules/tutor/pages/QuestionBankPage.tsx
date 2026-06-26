@@ -1,0 +1,1 @@
+export { QuestionBankPage as TutorQuestionBankPage } from '@/components/academic/QuestionBankPage'

@@ -1,0 +1,452 @@
+SWOTIFY PLUS
+Academic Intelligence Platform
+for Schools, Tuition Centers & Coaching Institutes
+Business Requirements Document
+Consolidated & Board / Grade-Aware Edition  •  Version 4.0
+Product
+Swotify Plus — Academic Intelligence Platform
+Document
+Business Requirements Document (BRD)
+Version
+4.0 — Consolidates BRD v1–v3 + Board/Grade foundation
+Status
+For Review
+Date
+25 June 2026
+Prepared by
+Palani — Stackrack Tech India Pvt. Ltd.
+Table of Contents
+Document Control
+Version History
+Version
+Date
+Summary of Change
+Author
+1.0
+Initial
+Core platform: assessment engine, diagnostics, readiness, parent & tutor modules.
+Palani
+2.0
+Initial
+Added AI layer: diagnosis, tutor copilot, parent explanation engine.
+Palani
+3.0
+Initial
+Advanced intelligence: recovery plans, readiness prediction, teacher & institution analytics.
+Palani
+4.0
+25 Jun 2026
+Board & Grade promoted into the academic foundation; all modules, AI features, reports and the data model made Board/Grade-aware. Consolidated single source of truth.
+Palani
+Version 4.0 is the authoritative BRD. It supersedes the v1–v3 narrative and the separate Board/Grade addendum by folding both into one structure.
+1. Executive Summary & Vision
+The Academic Intelligence Platform turns every test a student takes into personalised guidance. Rather than reporting a single mark, the platform identifies weak topics, explains why performance is low, and recommends exactly what the student should study next — all aligned to the student’s board and grade.
+Vision
+Build an Academic Intelligence Platform that helps:
+Students improve marks with clear, daily, topic-level guidance.
+Tutors know exactly what to teach and reteach next.
+Parents clearly see improvement and receive early warnings.
+Institute owners prove results, improve retention, and differentiate on admissions.
+Core Value Proposition
+Every test automatically identifies weak topics,
+explains why performance is low, and recommends
+exactly what the student should study next —
+mapped to the correct Board and Grade.
+This positioning is materially stronger than “Online Test Platform” or “AI Test Platform” because it speaks to the outcomes parents and institutes are willing to pay for.
+2. Stakeholders & Needs
+Four stakeholder groups drive every requirement in this document. Each module is justified by the value it delivers to one or more of them.
+Stakeholder
+What they need
+Students
+Clear view of strengths and weaknesses, daily guidance, and motivation through visible progress.
+Parents
+Proof of improvement, early warning signals, and simple guidance on how to help their child.
+Tutors
+Fast student diagnostics, batch-level insight, and suggested revision plans.
+Institute Owners
+Better outcomes, parent retention, teacher-effectiveness tracking, and admissions differentiation.
+3. Academic Data Foundation
+This is the backbone of the platform. Without a disciplined academic hierarchy and complete question tagging, no meaningful analytics, diagnostics, readiness scores, or AI plans can be produced.
+3.1 Academic Structure Hierarchy
+Board and Grade are now first-class levels of the hierarchy — not optional fields. The same topic is taught differently across boards and grades, so analytics must be anchored to both.
+Board → Grade → Subject → Chapter → Topic → Question
+Illustrative hierarchy
+CBSE
+ └─ Grade 8
+      └─ Mathematics
+          └─ Algebra
+              └─ Linear Equations
+                  └─ Questions
+ 
+State Board
+ └─ Grade 8
+      └─ Mathematics  (different syllabus / sequencing)
+The same topic (e.g. Linear Equations) can appear at different grades with different difficulty, and across boards with different syllabus coverage. Anchoring to Board + Grade keeps every score comparable and curriculum-accurate.
+3.2 Question Tagging (Mandatory)
+Every question must carry the following tags. This is the non-negotiable minimum for analytics to function.
+Field
+Required
+Notes
+Board
+Yes
+CBSE, ICSE, State Board, IB, IGCSE, etc.
+Grade
+Yes
+Curriculum grade / standard.
+Subject
+Yes
+e.g. Mathematics, Science.
+Chapter
+Yes
+Syllabus chapter.
+Topic
+Yes
+Granular concept — the unit of analytics.
+Difficulty Level
+Yes
+Easy / Medium / Hard.
+Marks
+Yes
+Weight of the question.
+Question Type
+Yes
+MCQ, application, word problem, etc.
+Learning Outcome
+Recommended
+Curriculum learning outcome (V2+).
+Without Board, Grade, and Topic mapping, no board-specific readiness or meaningful diagnostics can be generated.
+3.3 Student Master Profile
+Every student is anchored to a board, grade, batch and academic year so that all scores are interpreted against the correct curriculum.
+Field
+Required
+Student Name
+Yes
+Grade
+Yes
+Board
+Yes
+School Name
+Optional
+Batch
+Yes
+Academic Year
+Yes
+Example profile
+Student : Arjun
+Board   : CBSE
+Grade   : 8
+Batch   : Evening Batch A
+3.4 Question Authoring & Bulk Excel Upload
+Questions can be created individually, but the primary set-up path is a bulk Excel upload. Both Admin and Tutor roles can upload, so a tutor can rapidly build a question bank for their own batches without waiting on central admin.
+The platform provides a downloadable Excel template whose columns map exactly to the mandatory question tags. Each row is one question: the tutor fills the sheet, uploads it, and the platform validates, previews, and then commits the questions to the bank.
+Excel Template Columns
+Column
+Required
+Example / Notes
+Board
+Yes
+CBSE, ICSE, State Board, IB, IGCSE …
+Grade
+Yes
+8
+Subject
+Yes
+Mathematics
+Chapter
+Yes
+Algebra
+Topic
+Yes
+Linear Equations
+Difficulty
+Yes
+Easy / Medium / Hard
+Marks
+Yes
+1
+Question Type
+Yes
+MCQ, Application, Word Problem …
+Question Text
+Yes
+The full question.
+Option A – D
+MCQ
+Answer choices (A & B required; C, D optional).
+Correct Answer
+Yes
+Must match a supplied option (e.g. B).
+Learning Outcome
+Optional
+Curriculum outcome (V2+).
+Solution / Explanation
+Optional
+Feeds AI diagnosis & student feedback.
+Template row (illustrative)
+Board=CBSE  Grade=8  Subject=Mathematics  Chapter=Algebra
+Topic=Linear Equations  Difficulty=Medium  Marks=1  Type=MCQ
+Question: Solve 2x + 3 = 11
+  A) 2   B) 4   C) 5   D) 7        Correct Answer: B
+Upload Workflow
+Download the standard Excel template from the Question Bank screen.
+Fill one question per row, completing all mandatory tag columns.
+Upload the file; the platform validates every row.
+Review the validation preview — valid rows are listed alongside any errors.
+Fix the flagged rows, re-upload, then commit the valid questions to the bank.
+Validation & Error Handling
+Uploads are validated row-by-row, so a single bad row never blocks the rest of the file.
+Every mandatory tag (Board, Grade, Subject, Chapter, Topic, Difficulty, Marks, Question Type) must be present on each row.
+Board / Grade / Subject / Chapter / Topic must match the academic master; unmatched values are flagged for creation or correction.
+Difficulty and Question Type must use allowed values, and Correct Answer must reference one of the supplied options.
+Duplicate questions are detected within the file and against the existing bank.
+Invalid rows are returned in a row-level error report; valid rows can still be committed immediately.
+4. Platform Modules
+Eleven modules form the functional core. Each is Board/Grade-aware: scores are computed and displayed against the student’s curriculum.
+Module 1 — Assessment Engine
+Delivers and captures the tests that feed every downstream analytic.
+Features:  Online MCQ tests; subject-, chapter-, and topic-wise tests; Practice Mode and Assessment Mode; time tracking; question-attempt tracking.
+Data captured:  Correct / incorrect, time taken, skipped questions, multiple attempts, and per-topic performance.
+Module 2 — Student Diagnostic Engine
+Moves beyond marks to expose actual learning gaps at topic level, framed by board and grade.
+Instead of:  Score = 72%
+ 
+CBSE Grade 8  ·  Mathematics
+  Algebra      = 85%
+  Geometry     = 40%
+  Mensuration  = 35%
+  Statistics   = 70%
+Student insights:  strong topics, weak topics, accuracy %, speed analysis, and consistency analysis.
+Module 3 — Academic Health Score
+A single, understandable score (out of 100) built from accuracy, consistency, topic coverage and improvement trend.
+Academic Health Score :  78 / 100
+ 
+Strong Areas        Needs Attention
+  Algebra             Geometry
+  Arithmetic          Mensuration
+Module 4 — Grade Readiness Engine (Board-Aware)
+Measures how ready a student is for upcoming school exams and for the next grade, against the specific board curriculum. Readiness is always shown with its board and grade context.
+CBSE Grade 8  ·  Mathematics
+  Fractions   = 80%
+  Decimals    = 75%
+  Ratio       = 60%
+  Percentage  = 85%
+ 
+Grade Readiness = 75%   →  Ready for Grade 8 Annual Exam
+Risk Areas      :  Ratio, Decimals
+Module 5 — Improvement Tracking
+Shows visible progress over time — the single most powerful retention lever for parents.
+January  = 35%
+February = 48%
+March    = 61%
+April    = 78%
+Value:  parents see proof of improvement, the institute demonstrates results, and the student stays motivated.
+Module 6 — Comparative Analytics
+Healthy, board-aware benchmarking that avoids demotivating rank. Students are compared against peers on the same board and grade.
+Compared with CBSE Grade 8 students
+  Student Average   = 82%
+  Institute Average = 73%
+ 
+Banding:  Top 20% / Top 40% / Top 60%
+Avoid  :  Rank 25 / 30
+Module 7 — Batch Intelligence (Tutor)
+Tells the tutor what to reteach next, scoped to board and grade.
+CBSE Grade 8  ·  Batch A     Average = 76%
+ 
+Weak Topics       Suggested Next Class
+  1. Geometry       Mensuration Revision
+  2. Mensuration    Expected improvement +8%
+  3. Probability
+Module 8 — At-Risk Student Detection
+Flags students who need early intervention, with the reasons behind the flag.
+At Risk:  Student A, Student B, Student C
+ 
+Reason:  weak topics (Fractions, Ratio)
+         performance trend declining
+Module 9 — Parent Progress Center
+A monthly academic report a parent can understand in under 30 seconds — expressed in grades and boards they already relate to.
+Student : Arjun   ·   CBSE Grade 8
+ 
+Academic Health   : 78 / 100  (Above Average)
+Improvement       : +12%
+Predicted Readiness: 85%
+ 
+Sections: Strengths · Weak Areas · Trend · Recommended Action
+Module 10 — Parent Early Warning System
+Proactive alerts when something needs attention, in plain language.
+Algebra performance dropped
+  72%  →  48%   over the last 3 tests.
+ 
+Alert types: Score Drop · Consistency Drop ·
+             Readiness Risk · Missed Practice
+Module 11 — Parent–Tutor Meeting Report
+A one-click PDF that saves tutor preparation time before meetings.
+Current score and Academic Health Score
+Improvement trend and weak areas
+Tutor recommendation and action plan
+5. AI Features (The “Wow” Layer)
+AI generates insight — it does not chat. Every AI output is grade- and board-aware and follows the board syllabus sequence.
+AI 1 — Academic Diagnosis (Root Cause)
+After every test, AI explains the cause behind a weak score, not just the score.
+Geometry: understands formulas, but struggles
+with application-based questions.
+Likely cause   : weak visualisation.
+Recommendation : 15 diagram-based questions.
+AI 2 — Tutor Copilot (Grade + Board)
+Auto-generates a class summary and the recommended next class, scoped to board and grade.
+CBSE Grade 8  ·  Mathematics  ·  35 students
+ 
+Strong : Algebra, Fractions
+Weak   : Geometry, Mensuration
+Next class: Mensuration Revision  (expected +8%)
+AI 3 — Parent Explanation Engine
+Translates technical analytics into plain language a parent can act on.
+Your child can solve direct geometry questions
+but struggles when multiple concepts are combined.
+Focus on: Triangles, Angles, Area Problems.
+AI 4 — Personalised Study Plan (Grade-Aware)
+Builds a day-by-day plan from the student’s weak topics, target exam, available days, daily study time and target score — sequenced to the board syllabus.
+Inputs : Board CBSE · Grade 8 · Half-Yearly ·
+         21 days · target 60% → 80%
+ 
+21-Day Recovery Plan
+  Priority: 1. Ratio  2. Linear Equations  3. Mensuration
+  Day 1  Fractions Revision
+  Day 2  Fractions Practice
+  Day 3  Decimals Revision   ...
+  Expected readiness: 82%
+AI 5 — Adaptive Replanning
+The plan updates itself as the student improves.
+Focus: Geometry  →  Quiz result 95%
+AI update: Geometry mastered.
+Next focus: Mensuration.
+AI 6 — Readiness Prediction
+Predicts an expected score range, always presented as an estimate.
+Math Readiness = 82%
+Expected score range: 80–90
+AI 7 — Marks Drop Analysis
+Explains why an average fell, pinpointing the topic responsible.
+Previous average = 78%   Current average = 62%
+Main reason: Word Problems
+Accuracy dropped 74%  →  38%
+AI 8 — Institution Intelligence
+Aggregates across all students to surface the hardest topics and questions.
+Most difficult topics:
+  1. Geometry  2. Mensuration  3. Reading Comprehension
+ 
+Most difficult question: Q17  (correct rate 12%)
+6. Board & Grade Differentiators
+These board-aware capabilities are the platform’s competitive moat — the things parents and institutes ask for that most test platforms do not offer.
+6.1 Promotion Readiness Score
+Answers the question every parent asks: “Is my child ready for the next grade?”
+Board: CBSE   Current Grade: 8
+Promotion Readiness = 84%
+ 
+Strong                Reinforce before Grade 9
+  Algebra               Linear Equations
+  Arithmetic            Geometry
+6.2 Board Coverage Score
+Directly answers “Has my child completed the syllabus?” — a major selling point.
+CBSE Grade 8  ·  Mathematics
+  Topics Covered  = 85%
+  Topics Mastered = 72%
+  Topics Pending  = 15%
+6.3 Syllabus Completion Tracker (Institute)
+Lets management monitor batch coverage by subject.
+CBSE Grade 10  ·  Science
+  Physics   = 90% completed
+  Chemistry = 82% completed
+  Biology   = 95% completed
+6.4 School Exam Readiness
+Parents care more about school exams than platform scores — so readiness is predicted per upcoming school exam.
+Upcoming: Quarterly Exam  ·  CBSE Grade 8
+Predicted Readiness:
+  Mathematics = 82%
+  Science     = 75%
+  English     = 88%
+7. User Experience Requirements
+7.1 Student Experience
+Focused, low-friction, motivating. The home screen always shows today’s single focus.
+Home
+Today’s Focus:  Geometry
+  10 Questions · 8 Minutes        [ Start ]
+Practice Mode — flash-card style: one question, one action, immediate feedback.
+Assessment Mode — exam style: one question per screen, progress indicator, timer.
+Post-test — readiness score, strengths, weak areas, and an AI recovery plan.
+7.2 Parent Experience
+Simple and actionable. Expressed in grades, boards and improvement — not technical metrics.
+Show:  improvement, readiness, weak areas, recommended actions.
+Avoid:  complex charts and technical metrics.
+7.3 Tutor Experience
+A working dashboard built around action.
+Batch heatmap
+At-risk students
+Suggested revision topics
+AI tutor summary
+Set-up is fast too: tutors build their own question bank in bulk from the standard Excel template (see 3.4).
+8. Institution Dashboard & Owner Analytics
+For institute owners and management — the layer that proves results and supports retention and admissions decisions, broken down by board and grade.
+8.1 Institution Overview
+Total Students : 2,500
+  CBSE        : 1,600
+  State Board :   700
+  ICSE        :   200
+8.2 Grade Performance
+CBSE Grade 8
+  Average Score : 76%
+  At Risk       : 18 students
+  Top Weak Topics: Geometry, Ratio, Mensuration
+8.3 Teacher Impact Analytics (Grade-Wise) — V3
+Measures teacher effectiveness through student improvement, batch performance, retention and completion.
+Teacher: Mrs. Priya   ·   CBSE Grade 8   ·   120 students
+  Students Improved   : 87%
+  Average Growth      : +15%
+  Readiness Increase  : +11%
+9. Core Data Model
+The mandatory question schema below is the backbone of all analytics, AI diagnosis, readiness scores, study plans and board-specific reporting.
+Field
+Required
+Board
+Yes
+Grade
+Yes
+Subject
+Yes
+Chapter
+Yes
+Topic
+Yes
+Difficulty
+Yes
+Marks
+Yes
+Question Type
+Yes
+Learning Outcome
+Recommended
+10. Release Roadmap
+Delivery is phased so the institute sees value early, with AI and advanced intelligence layered on top of a solid Board/Grade foundation.
+Release
+Scope
+MVP — V1
+Admin: boards, grades, subjects, chapters, topics, question bank, tests. Tutor: build questions via bulk Excel upload, schedule tests, student & batch reports. Student: attend tests, view diagnostics and weak topics. Parent: monthly progress report.
+V2 — AI
+Academic Diagnosis, Tutor Copilot, Parent Explanation Engine. Learning Outcome tagging recommended.
+V3 — Advanced
+Personalised recovery plans, readiness prediction, adaptive study plans, teacher effectiveness, institution intelligence.
+Board and Grade are foundational and therefore present from V1 — they are not deferred to a later release.
+11. Success Metrics
+Each stakeholder has one plain-language statement that defines success.
+Stakeholder
+Success looks like
+Students
+“I know exactly what to study next.”
+Parents
+“I can clearly see my child’s improvement.”
+Tutors
+“I know exactly what to teach next.”
+Institute Owners
+“I can prove results and retain more students.”
+12. Positioning Statement
+Academic Intelligence Platform for Schools, Tuition Centers & Coaching Institutes
+Analyze every test by Board, Grade, Subject, Chapter and Topic to automatically generate diagnostics, readiness scores, parent reports, tutor insights, and personalised AI recovery plans that improve academic outcomes.
+This outcome-led positioning directly addresses what parents and coaching institutes are willing to pay for, and is materially stronger than a generic “test platform”.

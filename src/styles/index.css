@@ -1,0 +1,221 @@
+@import "tailwindcss";
+
+/* ─── Learnova: bold settled navy + CSC gold (see LEARNOVA_DESIGN_SYSTEM.md) ─── */
+@theme {
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Navy blue — primary (boldened, same hue) */
+  --color-blue-50: #edf4ff;
+  --color-blue-100: #d4e6fc;
+  --color-blue-200: #a8c8f0;
+  --color-blue-300: #7aade6;
+  --color-blue-400: #5290da;
+  --color-blue-500: #3575c4;
+  --color-blue-600: #2a60a8;
+  --color-blue-700: #1e4a82;
+  --color-blue-800: #163a66;
+  --color-blue-900: #0c2238;
+
+  /* CSC gold — action / accent (boldened, same hue) */
+  --color-yellow-50: #fff9e6;
+  --color-yellow-100: #ffecb3;
+  --color-yellow-200: #ffd966;
+  --color-yellow-300: #f5c830;
+  --color-yellow-400: #e8b820;
+  --color-yellow-500: #d4a008;
+  --color-yellow-600: #b8860b;
+  --color-yellow-700: #966f00;
+
+  /* Alias brand → blue for shared components */
+  --color-brand-50: #edf4ff;
+  --color-brand-100: #d4e6fc;
+  --color-brand-200: #a8c8f0;
+  --color-brand-300: #7aade6;
+  --color-brand-400: #5290da;
+  --color-brand-500: #3575c4;
+  --color-brand-600: #2a60a8;
+  --color-brand-700: #1e4a82;
+  --color-brand-800: #163a66;
+  --color-brand-900: #0c2238;
+
+  /* Surfaces — warm golden neutrals (Swotify-style) */
+  --color-surface: #ffffff;
+  --color-surface-0: #ffffff;
+  --color-surface-50: #fffbf0;
+  --color-surface-100: #fef3d6;
+  --color-surface-200: #f5e8c8;
+  --color-surface-300: #ead9b0;
+
+  /* Text */
+  --color-text-primary: #163a66;
+  --color-text-secondary: #466080;
+  --color-text-muted: #6e8499;
+  --color-text-faint: #a3b5c8;
+
+  /* Semantic */
+  --color-indigo-50: #eef2ff;
+  --color-indigo-100: #e0e7ff;
+  --color-indigo-500: #6366f1;
+  --color-indigo-600: #4f46e5;
+  --color-indigo-700: #4338ca;
+
+  /* App shell — light golden paper + navy ink + gold accent */
+  --color-background: #fffaeb;
+  --color-foreground: #163a66;
+  --color-card: #ffffff;
+  --color-border: #ede4cc;
+  --color-secondary: #fef3d6;
+  --color-muted-foreground: #6e8499;
+  --color-accent: #e8b820;
+  --color-accent-foreground: #0c2238;
+  --color-ink: #163a66;
+  --color-paper: #fffaeb;
+  --color-leaf: #059669;
+  --color-rose: #e11d48;
+
+  --radius-card: 14px;
+  --radius-btn: 8px;
+  --radius-input: 10px;
+  --radius-badge: 20px;
+  --sidebar-w: 260px;
+  --header-h: 64px;
+}
+
+@layer base {
+  * {
+    @apply border-surface-200;
+  }
+
+  html {
+    @apply antialiased scroll-smooth;
+    background-color: var(--color-background);
+  }
+
+  body {
+    @apply text-foreground font-sans text-[13px];
+    min-height: 100dvh;
+    background-color: var(--color-background);
+    background-image:
+      radial-gradient(ellipse 90% 55% at 50% -15%, rgba(232, 184, 32, 0.14), transparent 55%),
+      radial-gradient(ellipse 55% 45% at 100% 0%, rgba(255, 236, 179, 0.42), transparent 50%),
+      radial-gradient(ellipse 45% 40% at 0% 100%, rgba(254, 243, 214, 0.55), transparent 55%),
+      linear-gradient(180deg, #fffaeb 0%, #fff8e6 48%, #fffbf0 100%);
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+
+  ::selection {
+    @apply bg-yellow-100 text-blue-900;
+  }
+}
+
+@layer utilities {
+  .font-display { font-family: var(--font-display); }
+  .font-mono-data { font-family: var(--font-mono); }
+
+  .gradient-dark {
+    background: linear-gradient(to bottom right, #0c2238, #1e4a82, #0c2238);
+  }
+
+  .gradient-brand-icon {
+    background: linear-gradient(135deg, #f5c830 0%, #e8b820 100%);
+  }
+
+  .gradient-mesh,
+  .app-page-bg {
+    background-color: var(--color-background);
+    background-image:
+      radial-gradient(ellipse 90% 55% at 50% -15%, rgba(232, 184, 32, 0.14), transparent 55%),
+      radial-gradient(ellipse 55% 45% at 100% 0%, rgba(255, 236, 179, 0.42), transparent 50%),
+      radial-gradient(ellipse 45% 40% at 0% 100%, rgba(254, 243, 214, 0.55), transparent 55%),
+      linear-gradient(180deg, #fffaeb 0%, #fff8e6 48%, #fffbf0 100%);
+  }
+
+  /* Subtle grid on light panels */
+  .paper-grid {
+    background-image:
+      linear-gradient(to right, rgba(232, 184, 32, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(232, 184, 32, 0.05) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #1e4a82, #e8b820);
+  }
+
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(22, 58, 102, 0.1);
+  }
+
+  .accent-blue { border-left: 3px solid var(--color-blue-500); }
+  .accent-yellow { border-left: 3px solid var(--color-yellow-400); }
+  .accent-emerald { border-left: 3px solid #34c997; }
+  .accent-rose { border-left: 3px solid #f4728a; }
+  .accent-indigo { border-left: 3px solid var(--color-indigo-500); }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #f0dfa8 transparent;
+  }
+
+  .ai-pulse {
+    animation: ai-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes ai-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(123, 140, 222, 0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(123, 140, 222, 0); }
+  }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.4s ease forwards;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  aside,
+  nav,
+  .report-toolbar {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+
+  .report-paper {
+    box-shadow: none !important;
+    max-width: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+}
