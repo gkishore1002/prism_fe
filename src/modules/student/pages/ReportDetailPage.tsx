@@ -1,6 +1,7 @@
 import { Navigate, useParams } from 'react-router-dom'
 import { Download, Printer } from 'lucide-react'
 import { PageHeader } from '@/components/layout/AppShell'
+import { btnClass } from '@/components/ui/Button'
 import { findMonthBySlug, StudentFullReportView } from '../components/StudentFullReportView'
 
 export function StudentReportDetailPage() {
@@ -25,14 +26,14 @@ export function StudentReportDetailPage() {
               <button
                 type="button"
                 onClick={handlePrint}
-                className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-md border border-border hover:bg-secondary"
+                className={`${btnClass.secondary} gap-1.5 px-4 py-2 text-sm`}
               >
                 <Printer className="w-4 h-4" /> Print
               </button>
               <button
                 type="button"
                 onClick={handlePrint}
-                className="inline-flex items-center gap-2 bg-ink text-paper px-4 py-2 rounded-md text-sm font-semibold hover:opacity-90"
+                className={`${btnClass.primary} gap-2 px-4 py-2 text-sm font-semibold`}
               >
                 <Download className="w-4 h-4" /> PDF
               </button>

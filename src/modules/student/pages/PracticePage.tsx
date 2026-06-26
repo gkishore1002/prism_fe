@@ -151,7 +151,7 @@ export function StudentPracticePage() {
                 type="button"
                 onClick={submit}
                 disabled={picked === null}
-                className="bg-ink text-paper px-6 py-2.5 rounded-md disabled:opacity-40 inline-flex items-center gap-2 font-display font-medium"
+                className="btn btn-primary px-6 py-2.5 disabled:opacity-40 gap-2 font-display font-medium"
               >
                 Check answer
               </button>

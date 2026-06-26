@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/cn'
+import { btnClass } from '@/components/ui/Button'
 
 export type QuestionGridStatus = 'current' | 'answered' | 'unanswered'
 
@@ -154,7 +155,7 @@ export function AssessmentExamLayout({
         </div>
         <button
           type="button"
-          className="w-full flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-muted-foreground hover:text-ink hover:bg-secondary transition-colors"
+          className="w-full btn btn-secondary gap-2 px-3 py-2.5 text-sm"
         >
           <LifeBuoy className="w-4 h-4" />
           Support
@@ -169,7 +170,7 @@ export function AssessmentExamLayout({
         <button
           type="button"
           onClick={() => onPaletteOpenChange(!paletteOpen)}
-          className="shrink-0 rounded-md bg-accent text-ink px-3 py-1.5 text-xs font-bold"
+          className="shrink-0 btn btn-action px-3 py-1.5 text-xs font-bold"
         >
           Q{currentIndex + 1}/{totalQuestions}
         </button>
@@ -273,7 +274,7 @@ export function AssessmentExamLayout({
                 type="button"
                 onClick={onNext}
                 disabled={!canNext}
-                className="inline-flex items-center gap-2 bg-ink hover:opacity-90 text-paper px-5 sm:px-8 py-3 rounded-lg text-sm font-bold disabled:opacity-40 transition-colors"
+                className={`${btnClass.primary} gap-2 px-5 sm:px-8 py-3 text-sm font-bold disabled:opacity-40`}
               >
                 {nextLabel}
                 <ChevronRight className="w-4 h-4" />
@@ -302,7 +303,7 @@ export function ExamQuestionCard({
   children,
 }: QuestionCardProps) {
   return (
-    <div className="w-full text-left bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="w-full text-left bg-card rounded-xl border border-border shadow-card overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-3.5 border-b border-border bg-secondary/30">
         <span className="inline-flex items-center rounded-md bg-accent/90 text-ink text-xs font-bold px-3 py-1 uppercase tracking-wide">
           Question {questionNumber} of {totalQuestions}
@@ -311,10 +312,10 @@ export function ExamQuestionCard({
           type="button"
           onClick={onToggleFlag}
           className={cn(
-            'inline-flex items-center gap-1.5 text-xs sm:text-sm px-3 py-1.5 rounded-lg font-semibold transition-colors shrink-0',
+            'btn shrink-0 gap-1.5 text-xs sm:text-sm px-3 py-1.5 font-semibold',
             isFlagged
-              ? 'bg-rose/15 text-rose border border-rose/30'
-              : 'bg-card text-muted-foreground hover:text-ink border border-border hover:bg-secondary',
+              ? 'bg-rose/15 text-rose border border-rose/30 shadow-card'
+              : 'btn-secondary',
           )}
         >
           <Flag className="w-3.5 h-3.5" />

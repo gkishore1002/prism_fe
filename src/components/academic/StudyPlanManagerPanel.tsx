@@ -166,7 +166,7 @@ export function StudyPlanManagerPanel() {
               </p>
             )}
             <div className="md:col-span-2 flex gap-2">
-              <button type="submit" className="bg-ink text-paper px-4 py-2 rounded-md text-sm">
+              <button type="submit" className="btn btn-primary px-4 py-2 text-sm">
                 Create & assign
               </button>
               <button
@@ -291,7 +291,7 @@ export function StudyPlanManagerPanel() {
                   <button
                     type="button"
                     onClick={() => updateStudyPlan(selected.id, { status: 'active' })}
-                    className="text-sm bg-ink text-paper px-4 py-2 rounded-md"
+                    className="text-sm btn btn-primary px-4 py-2"
                   >
                     Publish plan
                   </button>

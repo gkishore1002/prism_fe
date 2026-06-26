@@ -25,7 +25,7 @@ export function TutorMeetingReportPage() {
         actions={
           <button
             type="button"
-            className="inline-flex items-center gap-2 bg-ink text-paper px-4 py-2 rounded-md text-sm"
+            className="btn btn-primary gap-2 px-4 py-2 text-sm"
           >
             <Download className="w-4 h-4" /> Export PDF
           </button>

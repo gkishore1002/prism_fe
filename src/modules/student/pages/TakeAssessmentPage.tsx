@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check, X, Sparkles, ArrowRight, FlaskConical } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
+import { btnClass } from '@/components/ui/Button'
 import {
   AssessmentExamLayout,
   ExamQuestionCard,
@@ -264,14 +265,14 @@ export function StudentTakeAssessmentPage() {
           <div className="flex flex-wrap gap-3">
             <Link
               to="/student/reports"
-              className="inline-flex items-center gap-2 bg-ink text-paper px-4 py-2 rounded-md text-sm"
+              className={`${btnClass.primary} gap-2 px-4 py-2 text-sm`}
             >
               View reports <ArrowRight className="w-4 h-4" />
             </Link>
             <button
               type="button"
               onClick={() => navigate('/student/assessments')}
-              className="text-sm px-4 py-2 rounded-md border border-border hover:bg-secondary"
+              className={`${btnClass.secondary} text-sm px-4 py-2`}
             >
               Back to assessments
             </button>
@@ -347,7 +348,7 @@ export function StudentTakeAssessmentPage() {
                 onClick={() => selectOption(opt.key)}
                 className={cn(
                   'w-full flex items-start gap-4 text-left px-5 py-4 sm:py-5 rounded-xl border-2 bg-card transition-all',
-                  selected && !showResult && 'border-ink bg-ink/5 ring-1 ring-ink/20 shadow-sm',
+                  selected && !showResult && 'border-ink bg-ink/5 ring-1 ring-ink/20 shadow-card',
                   showResult && isRight && 'border-leaf bg-leaf/10',
                   showResult && selected && !isRight && 'border-rose bg-rose/10',
                   !selected && !showResult && 'border-border hover:border-ink/40 hover:bg-secondary/40',

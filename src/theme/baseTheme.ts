@@ -8,16 +8,16 @@ export const baseTheme = {
   input:
     'w-full rounded-[10px] border border-surface-200 bg-surface-0 px-3.5 py-2.5 text-[13px] text-text-primary outline-none transition focus:border-blue-400 focus:ring-[3px] focus:ring-blue-400/12 font-sans',
   buttonPrimary:
-    'inline-flex items-center justify-center gap-2 rounded-[8px] bg-blue-800 text-white px-[18px] py-2 text-xs font-display font-medium transition hover:bg-blue-700 active:scale-[0.97]',
+    'btn btn-primary px-[18px] py-2 text-xs',
   buttonAction:
-    'inline-flex items-center justify-center gap-2 rounded-[8px] bg-yellow-300 text-blue-900 px-[18px] py-2 text-xs font-display font-semibold transition hover:bg-yellow-400 active:scale-[0.97]',
+    'btn btn-action px-[18px] py-2 text-xs',
   buttonSecondary:
-    'inline-flex items-center justify-center gap-2 rounded-[8px] border border-surface-200 bg-transparent text-text-primary px-[18px] py-2 text-xs font-display font-medium transition hover:bg-surface-50',
+    'btn btn-secondary px-[18px] py-2 text-xs',
   buttonGhost:
-    'inline-flex items-center justify-center gap-2 rounded-[8px] bg-blue-50 text-blue-700 px-[18px] py-2 text-xs font-display font-medium transition hover:bg-blue-100',
+    'btn btn-ghost px-[18px] py-2 text-xs',
   chip: 'inline-flex items-center gap-1 rounded-[20px] px-2.5 py-[3px] text-[10.5px] font-display font-medium',
   statCard: 'rounded-[14px] border border-surface-200 bg-surface-0 p-5 border-l-[4px]',
-  cardHover: 'transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(30,58,95,0.08)]',
+  cardHover: 'transition-all duration-200 hover:-translate-y-0.5 shadow-card hover:shadow-card-raised',
 } as const
 
 export const toneStyles = {

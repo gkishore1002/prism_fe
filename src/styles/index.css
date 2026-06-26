@@ -157,7 +157,21 @@
   }
   .card-hover:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(22, 58, 102, 0.1);
+    box-shadow:
+      0 4px 12px rgba(184, 134, 11, 0.08),
+      0 12px 28px rgba(22, 58, 102, 0.1);
+  }
+
+  .shadow-card {
+    box-shadow:
+      0 1px 2px rgba(184, 134, 11, 0.05),
+      0 2px 10px rgba(22, 58, 102, 0.06);
+  }
+
+  .shadow-card-raised {
+    box-shadow:
+      0 2px 4px rgba(184, 134, 11, 0.06),
+      0 8px 24px rgba(22, 58, 102, 0.1);
   }
 
   .accent-blue { border-left: 3px solid var(--color-blue-500); }
@@ -187,6 +201,113 @@
 
   .animate-fade-in-up {
     animation: fade-in-up 0.4s ease forwards;
+  }
+}
+
+@layer components {
+  /* ─── Button elevation system (navy + gold theme) ─── */
+  .btn {
+    @apply inline-flex items-center justify-center font-display font-medium rounded-[8px];
+    @apply transition-all duration-200 ease-out;
+    @apply focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/30;
+    @apply disabled:opacity-50 disabled:pointer-events-none disabled:shadow-none disabled:translate-y-0 disabled:scale-100;
+  }
+
+  .btn-primary {
+    @apply bg-ink text-paper;
+    box-shadow:
+      0 1px 2px rgba(12, 34, 56, 0.12),
+      0 3px 10px rgba(22, 58, 102, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  .btn-primary:hover:not(:disabled) {
+    box-shadow:
+      0 2px 4px rgba(12, 34, 56, 0.14),
+      0 8px 22px rgba(22, 58, 102, 0.3);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+    box-shadow:
+      0 1px 2px rgba(12, 34, 56, 0.1),
+      0 2px 6px rgba(22, 58, 102, 0.16);
+  }
+
+  .btn-action {
+    @apply bg-accent text-ink font-semibold;
+    box-shadow:
+      0 1px 2px rgba(184, 134, 11, 0.15),
+      0 3px 12px rgba(232, 184, 32, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+  .btn-action:hover:not(:disabled) {
+    @apply bg-yellow-300;
+    box-shadow:
+      0 2px 4px rgba(184, 134, 11, 0.18),
+      0 8px 22px rgba(232, 184, 32, 0.4);
+    transform: translateY(-1px);
+  }
+  .btn-action:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 1px 2px rgba(184, 134, 11, 0.12), 0 2px 8px rgba(232, 184, 32, 0.25);
+  }
+
+  .btn-secondary {
+    @apply bg-card text-ink border border-border;
+    box-shadow:
+      0 1px 2px rgba(184, 134, 11, 0.04),
+      0 2px 6px rgba(22, 58, 102, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    @apply bg-secondary border-border;
+    box-shadow:
+      0 2px 4px rgba(184, 134, 11, 0.06),
+      0 6px 16px rgba(22, 58, 102, 0.08);
+    transform: translateY(-1px);
+  }
+  .btn-secondary:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 1px 2px rgba(184, 134, 11, 0.04);
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-muted-foreground;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    @apply bg-secondary/80 text-ink;
+    box-shadow: 0 1px 4px rgba(184, 134, 11, 0.06);
+  }
+
+  .btn-danger {
+    @apply bg-rose text-white;
+    box-shadow:
+      0 1px 2px rgba(190, 18, 60, 0.15),
+      0 3px 10px rgba(225, 29, 72, 0.25);
+  }
+  .btn-danger:hover:not(:disabled) {
+    @apply bg-rose/90;
+    box-shadow: 0 2px 4px rgba(190, 18, 60, 0.18), 0 8px 20px rgba(225, 29, 72, 0.3);
+    transform: translateY(-1px);
+  }
+  .btn-danger:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+  }
+
+  .btn-gradient {
+    @apply text-ink font-semibold;
+    background: linear-gradient(135deg, #f5c830 0%, #e8b820 100%);
+    box-shadow:
+      0 1px 2px rgba(184, 134, 11, 0.12),
+      0 3px 12px rgba(232, 184, 32, 0.3);
+  }
+  .btn-gradient:hover:not(:disabled) {
+    box-shadow: 0 2px 4px rgba(184, 134, 11, 0.15), 0 8px 22px rgba(232, 184, 32, 0.38);
+    transform: translateY(-1px);
+    @apply opacity-95;
+  }
+  .btn-gradient:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
   }
 }
 

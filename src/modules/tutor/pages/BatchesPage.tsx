@@ -43,7 +43,7 @@ export function TutorBatchesPage() {
               </div>
               <Link
                 to="/tutor/students"
-                className="text-sm bg-ink text-paper px-4 py-2 rounded-md hover:opacity-90"
+                className="text-sm btn btn-primary px-4 py-2"
               >
                 Open
               </Link>

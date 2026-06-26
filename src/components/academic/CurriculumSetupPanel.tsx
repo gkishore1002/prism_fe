@@ -62,7 +62,7 @@ function InlineAddForm({
       <div className="flex gap-2">
         <button
           type="submit"
-          className="text-xs bg-ink text-paper px-2 py-1 rounded-md"
+          className="text-xs btn btn-primary px-2 py-1"
         >
           Save
         </button>
@@ -536,7 +536,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                 placeholder="No subject"
               />
               <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-1">
-                <button type="submit" className="bg-ink text-paper px-4 py-2 rounded-md text-sm">
+                <button type="submit" className="btn btn-primary px-4 py-2 text-sm">
                   Save batch
                   {createStudentCount > 0 ? ` (${createStudentCount} students)` : ''}
                 </button>
@@ -751,7 +751,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                       <button
                         type="submit"
                         disabled={!newStudentName.trim()}
-                        className="bg-ink text-paper px-4 py-2 rounded-md text-sm disabled:opacity-40 shrink-0"
+                        className="btn btn-primary px-4 py-2 text-sm disabled:opacity-40 shrink-0"
                       >
                         Add to batch
                       </button>

@@ -29,7 +29,7 @@ export function Card({ className, hover, padding = 'md', accent = 'none', childr
   return (
     <div
       className={cn(
-        'bg-surface rounded-[14px] border border-surface-200 overflow-hidden',
+        'bg-surface rounded-[14px] border border-surface-200 overflow-hidden shadow-card',
         paddingMap[padding],
         accentMap[accent],
         hover && 'card-hover cursor-pointer',

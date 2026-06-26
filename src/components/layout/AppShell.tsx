@@ -173,7 +173,7 @@ export function AppShell({ module }: AppShellProps) {
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 rounded-md border border-border hover:bg-secondary text-muted-foreground"
+            className="lg:hidden btn btn-secondary p-2 text-muted-foreground"
             aria-label="Open menu"
           >
             <Menu className="w-4 h-4" />
@@ -190,7 +190,7 @@ export function AppShell({ module }: AppShellProps) {
             </div>
             <button
               type="button"
-              className="p-2 rounded-md border border-transparent hover:border-border/60 hover:bg-background hover:shadow-sm text-muted-foreground transition-all"
+              className="btn btn-ghost p-2 text-muted-foreground"
             >
               <Bell className="w-4 h-4" />
             </button>
@@ -356,7 +356,7 @@ export function PageHeader({
 
 export function AppCard({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('bg-card border border-border rounded-lg p-4 sm:p-5', className)}>
+    <div className={cn('bg-card border border-border rounded-lg p-4 sm:p-5 shadow-card', className)}>
       {children}
     </div>
   )

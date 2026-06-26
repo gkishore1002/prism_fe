@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Download } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
+import { btnClass } from '@/components/ui/Button'
 import { HealthBadge } from '@/components/ui/HealthBadge'
 import { getStudentWiseReport, monthlyReports } from '@/data/mock'
 import { useAuth } from '@/hooks/useAuth'
@@ -63,13 +64,13 @@ export function StudentReportsPage() {
             <div className="flex gap-2 shrink-0">
               <Link
                 to={`/student/reports/${monthToSlug(r.month)}`}
-                className="text-sm font-medium px-4 py-2 rounded-lg border border-border hover:bg-secondary"
+                className={`${btnClass.secondary} text-sm font-medium px-4 py-2`}
               >
                 View report
               </Link>
               <button
                 type="button"
-                className="text-sm font-semibold inline-flex items-center gap-1.5 bg-ink text-paper px-4 py-2 rounded-lg hover:opacity-90"
+                className={`${btnClass.primary} text-sm font-semibold gap-1.5 px-4 py-2`}
               >
                 <Download className="w-3.5 h-3.5" /> PDF
               </button>

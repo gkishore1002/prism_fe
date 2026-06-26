@@ -47,7 +47,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        'relative bg-surface rounded-[14px] border border-surface-200 p-5',
+        'relative bg-surface rounded-[14px] border border-surface-200 p-5 shadow-card',
         'border-l-[4px]',
         accentBorder[accent],
         className,
