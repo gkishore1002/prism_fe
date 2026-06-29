@@ -57,12 +57,6 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Calendar,
 }
 
-const VIEW_AS: { role: ModuleId; path: string }[] = [
-  { role: 'student', path: '/student' },
-  { role: 'tutor', path: '/tutor' },
-  { role: 'admin', path: '/admin' },
-]
-
 function detectModule(pathname: string): ModuleId {
   if (pathname.startsWith('/tutor')) return 'tutor'
   if (pathname.startsWith('/admin')) return 'admin'
@@ -86,29 +80,6 @@ export function AppShell({ module }: AppShellProps) {
 
   const sidebarContent = (
     <>
-      <div className="shrink-0 px-3 py-3 border-b border-border">
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground px-2 mb-2">
-          View as
-        </div>
-        <div className="grid grid-cols-2 gap-1">
-          {VIEW_AS.map(({ role, path }) => (
-            <Link
-              key={role}
-              to={path}
-              onClick={() => setSidebarOpen(false)}
-              className={cn(
-                'text-xs px-2 py-1.5 rounded-md capitalize text-center transition',
-                moduleId === role
-                  ? 'bg-ink text-paper'
-                  : 'hover:bg-secondary text-muted-foreground',
-              )}
-            >
-              {role}
-            </Link>
-          ))}
-        </div>
-      </div>
-
       <nav className="flex-1 min-h-0 px-3 py-4 space-y-0.5 overflow-y-auto scrollbar-thin">
         {nav.map((item) => (
           <NavLinkItem
