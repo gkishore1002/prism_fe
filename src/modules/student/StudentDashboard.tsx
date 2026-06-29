@@ -6,6 +6,7 @@ import { StudentTakeAssessmentPage } from './pages/TakeAssessmentPage'
 import { StudentReportsPage } from './pages/ReportsPage'
 import { StudentReportDetailPage } from './pages/ReportDetailPage'
 import { StudentStudyPlanPage } from './pages/StudyPlanPage'
+import { NotificationsPage } from '@/components/notifications/NotificationsPage'
 
 export function StudentDashboard() {
   return (
@@ -17,6 +18,7 @@ export function StudentDashboard() {
         <Route path="assessments" element={<StudentAssessmentsPage />} />
         <Route path="reports" element={<StudentReportsPage />} />
         <Route path="reports/:period" element={<StudentReportDetailPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="today" element={<Navigate to="/student" replace />} />
         <Route path="practice" element={<Navigate to="/student/assessments" replace />} />
         <Route path="diagnostics" element={<Navigate to="/student/reports" replace />} />

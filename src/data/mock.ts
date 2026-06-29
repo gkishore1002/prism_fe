@@ -1,6 +1,7 @@
 import type {
   User,
   Institution,
+  AppNotification,
   AcademicHealth,
   TopicMastery,
   LearningGap,
@@ -103,6 +104,71 @@ export const currentAdmin: User = {
   role: 'admin',
   institutionId: 'inst-1',
 }
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export const notifications: AppNotification[] = [
+  {
+    id: 'n-1',
+    role: 'student',
+    kind: 'warning',
+    title: 'Practice streak at risk',
+    message: 'Complete 10 minutes of Algebra practice today to keep your streak.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+    read: false,
+    href: '/student/assessments',
+  },
+  {
+    id: 'n-2',
+    role: 'student',
+    kind: 'ai',
+    title: 'AI tip for Linear Equations',
+    message: 'Try isolating the variable using inverse operations step-by-step.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
+    read: false,
+    href: '/student/reports',
+  },
+  {
+    id: 'n-3',
+    role: 'tutor',
+    kind: 'info',
+    title: 'New assessment submissions',
+    message: 'Batch A: 12 students completed “Topic Quiz — Linear Equations”.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    read: false,
+    href: '/tutor/assessments',
+  },
+  {
+    id: 'n-4',
+    role: 'tutor',
+    kind: 'risk',
+    title: 'At-risk alert',
+    message: '3 students are trending down in Algebra. Review gaps and assign recovery steps.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 7).toISOString(),
+    read: true,
+    href: '/tutor/students',
+  },
+  {
+    id: 'n-5',
+    role: 'admin',
+    kind: 'success',
+    title: 'Attendance sync complete',
+    message: 'Assessment attendance is updated for the last 7 days.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+    read: false,
+    href: '/admin/assessments',
+  },
+  {
+    id: 'n-6',
+    role: 'admin',
+    kind: 'info',
+    title: 'Board performance updated',
+    message: 'New monthly performance metrics are available in Reports.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
+    read: true,
+    href: '/admin/reports',
+  },
+]
 
 // ─── Student Intelligence ───────────────────────────────────────────────────
 

@@ -14,6 +14,7 @@ import { AdminQuestionBankPage } from './pages/QuestionBankPage'
 import { AdminBankQuestionPaperPage } from './pages/BankQuestionPaperPage'
 import { AdminAssessmentsPage } from './pages/AssessmentsPage'
 import { AdminAssessmentAttendancePage } from './pages/AssessmentAttendancePage'
+import { NotificationsPage } from '@/components/notifications/NotificationsPage'
 
 export function AdminDashboard() {
   return (
@@ -30,6 +31,7 @@ export function AdminDashboard() {
         <Route path="boards" element={<AdminBoardsPage />} />
         <Route path="reports" element={<AdminSubjectReportsPage />} />
         <Route path="setup" element={<AdminCurriculumSetupPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="teachers" element={<AdminTeachersPage />} />
         <Route path="syllabus" element={<AdminSyllabusPage />} />
         <Route path="intelligence" element={<AdminIntelligencePage />} />

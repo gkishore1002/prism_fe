@@ -155,6 +155,21 @@ export interface Institution {
   tutorCount: number
 }
 
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export type NotificationKind = 'info' | 'success' | 'warning' | 'risk' | 'ai'
+
+export interface AppNotification {
+  id: string
+  role: UserRole
+  kind: NotificationKind
+  title: string
+  message: string
+  createdAt: string // ISO string
+  read: boolean
+  href?: string
+}
+
 // ─── Tutor Intelligence ──────────────────────────────────────────────────────
 
 export interface StudentSummary {

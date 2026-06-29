@@ -8,6 +8,7 @@ import { TutorCurriculumSetupPage } from './pages/CurriculumSetupPage'
 import { TutorStudyPlansPage } from './pages/StudyPlansPage'
 import { TutorQuestionPaperPage } from './pages/QuestionPaperPage'
 import { BankQuestionPaperPage } from './pages/BankQuestionPaperPage'
+import { NotificationsPage } from '@/components/notifications/NotificationsPage'
 
 export function TutorDashboard() {
   return (
@@ -21,6 +22,7 @@ export function TutorDashboard() {
         <Route path="question-bank" element={<TutorQuestionBankPage />} />
         <Route path="question-bank/papers/:paperId" element={<BankQuestionPaperPage />} />
         <Route path="curriculum" element={<TutorCurriculumSetupPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="setup" element={<Navigate to="/tutor/curriculum" replace />} />
         <Route path="batches" element={<Navigate to="/tutor/curriculum" replace />} />
         <Route path="meeting-report" element={<Navigate to="/tutor/curriculum" replace />} />

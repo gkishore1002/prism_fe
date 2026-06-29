@@ -30,6 +30,7 @@ import {
 import { useState, type ReactNode } from 'react'
 import { moduleRegistry, type ModuleId } from '@/lib/modules'
 import { useAuth } from '@/hooks/useAuth'
+import { useNotifications } from '@/hooks/useNotifications'
 import { APP_NAME } from '@/lib/constants'
 import { getSidebarProfile } from '@/lib/roleProfile'
 import { cn } from '@/lib/cn'
@@ -71,12 +72,14 @@ export function AppShell({ module }: AppShellProps) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { logout, user } = useAuth()
+  const { unreadCount } = useNotifications()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const moduleId = module ?? detectModule(pathname)
   const config = moduleRegistry[moduleId]
   const profile = getSidebarProfile(moduleId, user)
   const nav = config.nav
   const homePath = `/${moduleId}`
+  const unread = unreadCount(moduleId)
 
   const sidebarContent = (
     <>
@@ -161,9 +164,16 @@ export function AppShell({ module }: AppShellProps) {
             </div>
             <button
               type="button"
-              className="btn btn-ghost p-2 text-muted-foreground"
+              onClick={() => navigate(`${homePath}/notifications`)}
+              className="relative btn btn-ghost p-2 text-muted-foreground"
+              aria-label="Notifications"
             >
               <Bell className="w-4 h-4" />
+              {unread > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-rose text-white text-[10px] font-bold grid place-items-center shadow-card">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
             </button>
           </div>
         </header>
