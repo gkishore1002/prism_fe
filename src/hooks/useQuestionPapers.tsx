@@ -6,140 +6,110 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { questionPapers as seedPapers, questionBank as seedBank } from '@/data/mock'
+import { useAuth } from '@/hooks/useAuth'
+import * as questionsApi from '@/lib/api/questionsApi'
 import type { QuestionBankEntry, QuestionPaper, QuestionUploadRow } from '@/types'
 import { boardsMatch, gradesMatch } from '@/lib/academicScope'
-import { totalMarksForQuestions, uniqueTopics } from '@/lib/questionPaperUtils'
-
-function normalizeGrade(grade: string): string {
-  return grade.startsWith('Grade') ? grade : `Grade ${grade}`
-}
-
-function normalizeDifficulty(value: string): QuestionBankEntry['difficulty'] {
-  const d = value.toLowerCase()
-  if (d === 'easy' || d === 'medium' || d === 'hard') return d
-  return 'medium'
-}
-
-function rowToQuestion(row: QuestionUploadRow, id: string): QuestionBankEntry {
-  return {
-    id,
-    board: row.board,
-    grade: normalizeGrade(row.grade),
-    subject: row.subject,
-    chapter: row.chapter,
-    topic: row.topic,
-    difficulty: normalizeDifficulty(row.difficulty),
-    marks: row.marks,
-    questionType: row.questionType.toLowerCase().includes('short') ? 'short' : 'mcq',
-    text: row.text,
-    status: 'active',
-  }
-}
-
-function withTopics(paper: Omit<QuestionPaper, 'topics'> & { topics?: string[] }, bank: QuestionBankEntry[]): QuestionPaper {
-  const qs = bank.filter((q) => paper.questionIds.includes(q.id))
-  return {
-    ...paper,
-    topics: paper.topics ?? uniqueTopics(qs),
-    totalMarks: totalMarksForQuestions(qs),
-  }
-}
 
 interface QuestionPaperContextValue {
   questions: QuestionBankEntry[]
   questionPapers: QuestionPaper[]
-  addPaperFromUpload: (
+  loading: boolean
+  error: string | null
+  ensureLoaded: () => Promise<void>
+  addPaperFromUpload: (name: string, rows: QuestionUploadRow[], createdBy?: string) => Promise<QuestionPaper>
+  addPaperFromManualQuestions: (
     name: string,
-    rows: QuestionUploadRow[],
-    createdBy?: string,
-  ) => QuestionPaper
+    questions: questionsApi.ManualQuestionInput[],
+  ) => Promise<QuestionPaper>
   createCustomPaper: (
     name: string,
     parentPaperId: string,
     questionIds: string[],
     createdBy?: string,
-  ) => QuestionPaper | null
+  ) => Promise<QuestionPaper | null>
   getPaper: (id: string) => QuestionPaper | undefined
   getPapersForScope: (board: string, grade: string, subject: string) => QuestionPaper[]
+  papersForAssessment: (board: string, grade: string, subject: string) => QuestionPaper[]
   getQuestionsByIds: (ids: string[]) => QuestionBankEntry[]
+  removePaper: (paperId: string) => Promise<void>
+  removeQuestion: (questionId: string) => Promise<void>
+  refresh: () => Promise<void>
 }
 
 const QuestionPaperContext = createContext<QuestionPaperContextValue | null>(null)
 
 export function QuestionPaperProvider({ children }: { children: ReactNode }) {
-  const [questions, setQuestions] = useState<QuestionBankEntry[]>(() => [...seedBank])
-  const [questionPapers, setQuestionPapers] = useState<QuestionPaper[]>(() =>
-    seedPapers.map((p) => withTopics({ ...p, source: p.source ?? 'upload' }, seedBank)),
+  const { isAuthenticated } = useAuth()
+  const [questions, setQuestions] = useState<QuestionBankEntry[]>([])
+  const [questionPapers, setQuestionPapers] = useState<QuestionPaper[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
+
+  const refresh = useCallback(async () => {
+    if (!isAuthenticated) return
+    setLoading(true)
+    setError(null)
+    try {
+      const [qs, papers] = await Promise.all([
+        questionsApi.fetchQuestions(),
+        questionsApi.fetchQuestionPapers(),
+      ])
+      setQuestions(qs)
+      setQuestionPapers(papers.map((p) => questionsApi.enrichPaper(p, qs)))
+      setLoaded(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load questions')
+    } finally {
+      setLoading(false)
+    }
+  }, [isAuthenticated])
+
+  const ensureLoaded = useCallback(async () => {
+    if (loaded || loading) return
+    await refresh()
+  }, [loaded, loading, refresh])
+
+  const addPaperFromManualQuestions = useCallback(
+    async (name: string, inputs: questionsApi.ManualQuestionInput[]) => {
+      const paper = await questionsApi.createPaperFromManualQuestions(name, inputs)
+      await refresh()
+      return paper
+    },
+    [refresh],
   )
 
   const addPaperFromUpload = useCallback(
-    (name: string, rows: QuestionUploadRow[], createdBy = 'tut-1') => {
-      const valid = rows.filter((r) => r.valid)
-      const newQuestions = valid.map((row, i) =>
-        rowToQuestion(row, `q-up-${Date.now()}-${i}`),
-      )
-      setQuestions((prev) => [...prev, ...newQuestions])
-
-      const board = newQuestions[0]?.board ?? 'CBSE'
-      const grade = newQuestions[0]?.grade ?? 'Grade 8'
-      const subject = newQuestions[0]?.subject ?? 'Mathematics'
-      const ids = newQuestions.map((q) => q.id)
-      const topics = uniqueTopics(newQuestions)
-
-      const paper: QuestionPaper = {
-        id: `qp-${Date.now()}`,
-        name,
-        board,
-        grade,
-        subject,
-        questionIds: ids,
-        topics,
-        totalMarks: totalMarksForQuestions(newQuestions),
-        createdAt: new Date().toISOString().slice(0, 10),
-        createdBy,
-        source: 'upload',
-      }
-      setQuestionPapers((prev) => [paper, ...prev])
+    async (name: string, rows: QuestionUploadRow[], _createdBy = 'tut-1') => {
+      const paper = await questionsApi.createPaperFromUpload(name, rows)
+      await refresh()
       return paper
     },
-    [],
+    [refresh],
   )
 
   const createCustomPaper = useCallback(
-    (name: string, parentPaperId: string, questionIds: string[], createdBy = 'tut-1') => {
-      const parent = questionPapers.find((p) => p.id === parentPaperId)
-      if (!parent || questionIds.length === 0) return null
-
-      const subset = questions.filter(
-        (q) => parent.questionIds.includes(q.id) && questionIds.includes(q.id),
-      )
-      if (subset.length === 0) return null
-
-      const paper: QuestionPaper = {
-        id: `qp-${Date.now()}`,
-        name,
-        board: parent.board,
-        grade: parent.grade,
-        subject: parent.subject,
-        questionIds: subset.map((q) => q.id),
-        topics: uniqueTopics(subset),
-        totalMarks: totalMarksForQuestions(subset),
-        createdAt: new Date().toISOString().slice(0, 10),
-        createdBy,
-        source: 'custom',
-        parentPaperId,
-      }
-      setQuestionPapers((prev) => [paper, ...prev])
+    async (name: string, parentPaperId: string, questionIds: string[], _createdBy = 'tut-1') => {
+      if (questionIds.length === 0) return null
+      const paper = await questionsApi.createCustomPaperApi(name, parentPaperId, questionIds)
+      await refresh()
       return paper
     },
-    [questionPapers, questions],
+    [refresh],
   )
 
-  const getPaper = useCallback(
-    (id: string) => questionPapers.find((p) => p.id === id),
-    [questionPapers],
-  )
+  const removePaper = useCallback(async (paperId: string) => {
+    await questionsApi.deleteQuestionPaper(paperId)
+    await refresh()
+  }, [refresh])
+
+  const removeQuestion = useCallback(async (questionId: string) => {
+    await questionsApi.deleteQuestion(questionId)
+    await refresh()
+  }, [refresh])
+
+  const getPaper = useCallback((id: string) => questionPapers.find((p) => p.id === id), [questionPapers])
 
   const getPapersForScope = useCallback(
     (board: string, grade: string, subject: string) =>
@@ -147,9 +117,19 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
         (p) =>
           boardsMatch(p.board, board) &&
           gradesMatch(p.grade, grade) &&
-          p.subject === subject,
+          p.subject.trim().toLowerCase() === subject.trim().toLowerCase(),
       ),
     [questionPapers],
+  )
+
+  const papersForAssessment = useCallback(
+    (board: string, grade: string, subject: string) => {
+      const scoped = getPapersForScope(board, grade, subject)
+      const scopedIds = new Set(scoped.map((p) => p.id))
+      const rest = questionPapers.filter((p) => !scopedIds.has(p.id))
+      return [...scoped, ...rest]
+    },
+    [questionPapers, getPapersForScope],
   )
 
   const getQuestionsByIds = useCallback(
@@ -161,20 +141,36 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
     () => ({
       questions,
       questionPapers,
+      loading,
+      error,
+      ensureLoaded,
       addPaperFromUpload,
+      addPaperFromManualQuestions,
       createCustomPaper,
       getPaper,
       getPapersForScope,
+      papersForAssessment,
       getQuestionsByIds,
+      removePaper,
+      removeQuestion,
+      refresh,
     }),
     [
       questions,
       questionPapers,
+      loading,
+      error,
+      ensureLoaded,
       addPaperFromUpload,
+      addPaperFromManualQuestions,
       createCustomPaper,
       getPaper,
       getPapersForScope,
+      papersForAssessment,
       getQuestionsByIds,
+      removePaper,
+      removeQuestion,
+      refresh,
     ],
   )
 

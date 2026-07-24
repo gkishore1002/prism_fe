@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { RouterRoot } from '@/components/layout/RouteTransitionOverlay'
 import { LoginPage } from '@/modules/auth/pages/LoginPage'
-import { GuestRoute, ProtectedRoute } from '@/modules/auth/components/ProtectedRoute'
+import { GuestRoute, RoleProtectedRoute } from '@/modules/auth/components/ProtectedRoute'
 import { StudentDashboard } from '@/modules/student/StudentDashboard'
 import { TutorDashboard } from '@/modules/tutor/TutorDashboard'
 import { AdminDashboard } from '@/modules/admin/AdminDashboard'
@@ -17,47 +18,52 @@ function HomeRedirect() {
 
 export const router = createBrowserRouter([
   {
-    path: '/',
-    element: <HomeRedirect />,
-  },
-  {
-    path: '/login',
-    element: (
-      <GuestRoute>
-        <LoginPage />
-      </GuestRoute>
-    ),
-  },
-  {
-    path: '/student/*',
-    element: (
-      <ProtectedRoute>
-        <StudentDashboard />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/parent/*',
-    element: <Navigate to="/student" replace />,
-  },
-  {
-    path: '/tutor/*',
-    element: (
-      <ProtectedRoute>
-        <TutorDashboard />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/admin/*',
-    element: (
-      <ProtectedRoute>
-        <AdminDashboard />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '*',
-    element: <Navigate to="/" replace />,
+    element: <RouterRoot />,
+    children: [
+      {
+        path: '/',
+        element: <HomeRedirect />,
+      },
+      {
+        path: '/login',
+        element: (
+          <GuestRoute>
+            <LoginPage />
+          </GuestRoute>
+        ),
+      },
+      {
+        path: '/student/*',
+        element: (
+          <RoleProtectedRoute allowed="student">
+            <StudentDashboard />
+          </RoleProtectedRoute>
+        ),
+      },
+      {
+        path: '/parent/*',
+        element: <Navigate to="/student" replace />,
+      },
+      {
+        path: '/tutor/*',
+        element: (
+          <RoleProtectedRoute allowed="tutor">
+            <TutorDashboard />
+          </RoleProtectedRoute>
+        ),
+      },
+      {
+        path: '/admin/*',
+        element: (
+          <RoleProtectedRoute allowed="admin">
+            <AdminDashboard />
+          </RoleProtectedRoute>
+        ),
+      },
+      {
+        path: '*',
+        element: <Navigate to="/" replace />,
+      },
+    ],
   },
 ])

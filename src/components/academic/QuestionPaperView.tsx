@@ -1,8 +1,11 @@
-import { Download, Printer } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Download, Printer, Trash2 } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { useAssessments } from '@/hooks/useAssessments'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
-import type { QuestionBankEntry } from '@/types'
+import { fetchAssessment } from '@/lib/api/assessmentsApi'
+import { useConfirmModal } from '@/components/ui/AppModal'
+import type { QuestionBankEntry, TutorAssessmentSchedule } from '@/types'
 
 function groupQuestionsByTopic(items: QuestionBankEntry[]) {
   const groups = new Map<string, QuestionBankEntry[]>()
@@ -41,16 +44,57 @@ function renderOptions(q: QuestionBankEntry) {
 }
 
 type QuestionPaperViewProps =
-  | { assessmentId: string; paperId?: never; showHeader?: boolean }
-  | { paperId: string; assessmentId?: never; showHeader?: boolean }
+  | { assessmentId: string; paperId?: never; showHeader?: boolean; editable?: boolean }
+  | { paperId: string; assessmentId?: never; showHeader?: boolean; editable?: boolean }
 
 export function QuestionPaperView(props: QuestionPaperViewProps) {
-  const { showHeader = true } = props
-  const { assessments } = useAssessments()
-  const { getPaper, getQuestionsByIds } = useQuestionPapers()
+  const { showHeader = true, editable = false } = props
+  const { assessments, ensureLoaded: ensureAssessmentsLoaded } = useAssessments()
+  const { getPaper, getQuestionsByIds, removeQuestion, ensureLoaded: ensurePapersLoaded } =
+    useQuestionPapers()
+  const { confirm } = useConfirmModal()
+  const [fetchedAssessment, setFetchedAssessment] = useState<TutorAssessmentSchedule | null>(null)
+  const [pageLoading, setPageLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    void (async () => {
+      setPageLoading(true)
+      setNotFound(false)
+      setFetchedAssessment(null)
+
+      try {
+        await ensurePapersLoaded()
+        if (props.assessmentId) {
+          await ensureAssessmentsLoaded()
+          const fromContext = assessments.find((a) => a.id === props.assessmentId)
+          const resolved =
+            fromContext ?? (await fetchAssessment(props.assessmentId).catch(() => null))
+          if (cancelled) return
+          if (!resolved) {
+            setNotFound(true)
+            return
+          }
+          setFetchedAssessment(resolved)
+        } else if (props.paperId && !getPaper(props.paperId)) {
+          if (!cancelled) setNotFound(true)
+        }
+      } catch {
+        if (!cancelled) setNotFound(true)
+      } finally {
+        if (!cancelled) setPageLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [props.assessmentId, props.paperId, assessments, ensureAssessmentsLoaded, ensurePapersLoaded, getPaper])
 
   const assessment = props.assessmentId
-    ? assessments.find((a) => a.id === props.assessmentId)
+    ? assessments.find((a) => a.id === props.assessmentId) ?? fetchedAssessment ?? undefined
     : undefined
   const paper = props.paperId ? getPaper(props.paperId) : undefined
 
@@ -58,7 +102,15 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
   const questions = getQuestionsByIds(questionIds)
   const totalMarks = questions.reduce((sum, q) => sum + q.marks, 0)
 
-  if (!assessment && !paper) {
+  if (pageLoading) {
+    return (
+      <AppCard className="text-center py-12">
+        <p className="text-muted-foreground">Loading question paper…</p>
+      </AppCard>
+    )
+  }
+
+  if (notFound || (!assessment && !paper)) {
     return (
       <AppCard className="text-center py-12">
         <p className="text-muted-foreground">Question paper not found.</p>
@@ -167,9 +219,30 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
                           <div className="text-sm font-medium">
                             Q{num}. <span className="font-normal text-foreground">{q.text}</span>
                           </div>
-                          <span className="font-mono-data text-xs text-muted-foreground shrink-0">
-                            [{q.marks} mark{q.marks !== 1 ? 's' : ''}]
-                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-mono-data text-xs text-muted-foreground">
+                              [{q.marks} mark{q.marks !== 1 ? 's' : ''}]
+                            </span>
+                            {editable && paper && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void confirm({
+                                    title: 'Delete question?',
+                                    message: 'Delete this question from the bank? This cannot be undone.',
+                                    confirmLabel: 'Delete',
+                                    variant: 'danger',
+                                  }).then((ok) => {
+                                    if (ok) void removeQuestion(q.id)
+                                  })
+                                }}
+                                className="text-rose hover:opacity-80"
+                                aria-label="Delete question"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div className="text-[10px] text-muted-foreground">
                           {q.chapter} · {q.topic} · {q.difficulty} · {q.questionType.toUpperCase()}

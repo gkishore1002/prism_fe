@@ -59,12 +59,12 @@ export function ScoreRing({
             {value}%
           </span>
           {sublabel && (
-            <span className="text-[9px] text-text-muted mt-0.5 font-sans">{sublabel}</span>
+            <span className="text-[9px] text-muted-foreground mt-0.5 font-sans">{sublabel}</span>
           )}
         </div>
       </div>
       {label && (
-        <p className="text-[11px] font-display font-medium text-text-muted mt-2 uppercase tracking-wide">{label}</p>
+        <p className="text-[11px] font-display font-medium text-muted-foreground mt-2 uppercase tracking-wide">{label}</p>
       )}
     </div>
   )

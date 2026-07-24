@@ -1,4 +1,4 @@
-/** Learnova design tokens — bold navy + CSC gold (see LEARNOVA_DESIGN_SYSTEM.md) */
+/** Prism design tokens — bold navy + CSC gold (see PRISM_DESIGN_SYSTEM.md) */
 
 export const colors = {
   blue: {

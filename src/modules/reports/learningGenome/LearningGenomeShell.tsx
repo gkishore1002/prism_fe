@@ -1,0 +1,205 @@
+import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { APP_NAME } from '@/lib/constants'
+import '@/modules/tutor/styles/learningGenome.css'
+
+export function LgReportLayout({ children }: { children: ReactNode }) {
+  return (
+    <div className="lg-report -mx-2 sm:-mx-4 rounded-xl overflow-hidden border border-[var(--lg-line)] shadow-sm">
+      {children}
+    </div>
+  )
+}
+
+export function LgHero({
+  reportKind,
+  title,
+  titleEmphasis,
+  description,
+  meta,
+  stats,
+  backHref,
+  backLabel,
+}: {
+  reportKind: string
+  title: ReactNode
+  titleEmphasis?: ReactNode
+  description?: string
+  meta?: { label: string; value: string }[]
+  stats?: { value: string | number; unit?: string; label: string }[]
+  backHref?: string
+  backLabel?: string
+}) {
+  return (
+    <section className="lg-hero">
+      <div className="lg-hero-top">
+        <div className="lg-brand">
+          <div className="lg-brand-mark">{APP_NAME.charAt(0)}</div>
+          <div>
+            <div className="lg-brand-name">{APP_NAME} Intelligence</div>
+            <div className="lg-brand-sub">{reportKind}</div>
+          </div>
+        </div>
+        {meta && meta.length > 0 && (
+          <div className="lg-doc-meta">
+            {meta.map((row) => (
+              <div key={row.label}>
+                {row.label}: <strong>{row.value}</strong>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <h1 className="lg-hero-title lg-serif">
+        {title}
+        {titleEmphasis != null && (
+          <>
+            {' '}
+            <em className="text-[0.92em]">{titleEmphasis}</em>
+          </>
+        )}
+      </h1>
+
+      {description && <p className="lg-hero-desc">{description}</p>}
+
+      {backHref && backLabel && (
+        <div className="lg-hero-actions">
+          <Link to={backHref} className="lg-back-link">
+            ← {backLabel}
+          </Link>
+        </div>
+      )}
+
+      {stats && stats.length > 0 && (
+        <div className="lg-hero-stats">
+          {stats.map((stat) => (
+            <div key={stat.label} className="lg-hstat">
+              <div className="num">
+                {stat.value}
+                {stat.unit && <span className="unit">{stat.unit}</span>}
+              </div>
+              <div className="lbl">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+export function LgSection({
+  eyebrow,
+  title,
+  description,
+  children,
+  id,
+}: {
+  eyebrow: string
+  title: string
+  description?: string
+  children: ReactNode
+  id?: string
+}) {
+  return (
+    <section className="lg-section" id={id}>
+      <div className="lg-eyebrow">{eyebrow}</div>
+      <h2 className="lg-section-title lg-serif">{title}</h2>
+      {description && <p className="lg-section-desc">{description}</p>}
+      {children}
+    </section>
+  )
+}
+
+export function LgKpiRow({ items }: { items: { value: string | number; label: string }[] }) {
+  return (
+    <div className="lg-kpi-row">
+      {items.map((item) => (
+        <div key={item.label} className="lg-kpi">
+          <div className="v">{item.value}</div>
+          <div className="l">{item.label}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function LgNarrative({ children, note }: { children: ReactNode; note?: string }) {
+  return (
+    <div>
+      {note && (
+        <p className="lg-mono text-[0.58rem] uppercase tracking-widest text-[var(--lg-slate)] mb-1">
+          {note}
+        </p>
+      )}
+      <div className="lg-narrative">{children}</div>
+    </div>
+  )
+}
+
+export function LgInsightFeed({
+  title,
+  dateLabel,
+  rows,
+}: {
+  title: string
+  dateLabel?: string
+  rows: { tag: string; tagClass?: string; content: ReactNode }[]
+}) {
+  return (
+    <div className="lg-insight-feed">
+      <div className="lg-insight-head">
+        <div className="t lg-serif">{title}</div>
+        {dateLabel && <div className="d lg-mono">{dateLabel}</div>}
+      </div>
+      {rows.map((row, idx) => (
+        <div key={idx} className="lg-insight-row">
+          <span className={`lg-tag ${row.tagClass ?? 'lg-tag-watch'}`}>{row.tag}</span>
+          <p>{row.content}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function LgBoardTable({
+  headers,
+  rows,
+}: {
+  headers: string[]
+  rows: ReactNode[][]
+}) {
+  return (
+    <div className="lg-board-wrap">
+      <table className="lg-board">
+        <thead>
+          <tr>
+            {headers.map((h) => (
+              <th key={h}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((cells, ri) => (
+            <tr key={ri} className="lg-row-static">
+              {cells.map((cell, ci) => (
+                <td key={ci}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+export function LgFooter() {
+  return (
+    <footer className="lg-footer">
+      <span>
+        Generated by <b>{APP_NAME} Learning Genome Engine</b>
+      </span>
+      <span className="lg-mono">Confidential · For academic use only</span>
+    </footer>
+  )
+}

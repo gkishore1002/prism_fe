@@ -1,7 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  GraduationCap,
-  LayoutDashboard,
   BookOpen,
   Sparkles,
   AlertTriangle,
@@ -11,9 +9,8 @@ import {
   FileText,
   ScrollText,
   ClipboardList,
+  ClipboardCheck,
   Upload,
-  Bell,
-  Search,
   Building2,
   BookMarked,
   Target,
@@ -26,13 +23,18 @@ import {
   Menu,
   X,
   Calendar,
+  LayoutDashboard,
 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { moduleRegistry, type ModuleId } from '@/lib/modules'
 import { useAuth } from '@/hooks/useAuth'
+import { useAnalytics } from '@/hooks/useAnalytics'
 import { useNotifications } from '@/hooks/useNotifications'
-import { APP_NAME } from '@/lib/constants'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
+import { StudentPendingAssessmentReminder } from '@/components/student/StudentPendingAssessmentReminder'
+import { PrismLogo } from '@/components/brand/PrismLogo'
 import { getSidebarProfile } from '@/lib/roleProfile'
+import { studentProfileSubtitle } from '@/modules/student/lib/studentProfile'
 import { cn } from '@/lib/cn'
 import type { NavItem } from '@/types'
 
@@ -46,6 +48,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Database,
   ScrollText,
   ClipboardList,
+  ClipboardCheck,
   Upload,
   Building2,
   MapPin,
@@ -54,7 +57,6 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   BookMarked,
   Target,
   FileText,
-  Bell,
   Calendar,
 }
 
@@ -62,6 +64,33 @@ function detectModule(pathname: string): ModuleId {
   if (pathname.startsWith('/tutor')) return 'tutor'
   if (pathname.startsWith('/admin')) return 'admin'
   return 'student'
+}
+
+function resolvePageBreadcrumb(moduleId: ModuleId, pathname: string): string {
+  const home = `/${moduleId}`
+  const nav = moduleRegistry[moduleId].nav
+  const segments = pathname.split('/').filter(Boolean)
+
+  if (pathname === home) {
+    return nav.find((item) => item.href === home)?.label ?? 'Dashboard'
+  }
+
+  const section = segments[1]
+  const sectionNav = nav.find(
+    (item) => item.href === `${home}/${section}` || pathname.startsWith(item.href + '/'),
+  )
+  const sectionLabel = sectionNav?.label ?? section?.replace(/-/g, ' ') ?? 'Page'
+
+  if (segments.length >= 3) {
+    if (section === 'assessments' && segments[3] === 'take') return `${sectionLabel} · Exam`
+    if (section === 'assessments' && segments[3] === 'paper') return `${sectionLabel} · Paper`
+    if (section === 'assessments' && segments[3] === 'attendance') return `${sectionLabel} · Attendance`
+    if (section === 'question-bank' && segments[2] === 'papers') return `${sectionLabel} · Paper`
+    if (section === 'students' && segments[2] === 'report') return `${sectionLabel} · Report`
+    if (section === 'reports' && segments[2]) return `${sectionLabel} · ${segments[2]}`
+  }
+
+  return sectionLabel
 }
 
 interface AppShellProps {
@@ -72,16 +101,40 @@ export function AppShell({ module }: AppShellProps) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { logout, user } = useAuth()
-  const { unreadCount } = useNotifications()
+  const { studentProfile, overview, load } = useAnalytics()
+  const [shellLoading, setShellLoading] = useState(false)
+  const { ensureLoaded: ensureNotificationsLoaded } = useNotifications()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const moduleId = module ?? detectModule(pathname)
+
+  useEffect(() => {
+    if (moduleId === 'student') {
+      setShellLoading(true)
+      void load('shellStudent').finally(() => setShellLoading(false))
+      void ensureNotificationsLoaded()
+    } else if (moduleId === 'admin') {
+      setShellLoading(true)
+      void load('shellInstitution').finally(() => setShellLoading(false))
+      void ensureNotificationsLoaded()
+    } else if (moduleId === 'tutor') {
+      void ensureNotificationsLoaded()
+    }
+  }, [moduleId, load, ensureNotificationsLoaded])
   const config = moduleRegistry[moduleId]
-  const profile = getSidebarProfile(moduleId, user)
+  const sidebarSubtitle =
+    moduleId === 'student' && studentProfile
+      ? studentProfileSubtitle(studentProfile)
+      : moduleId === 'student' && shellLoading
+        ? 'Loading profile…'
+        : moduleId === 'admin' && overview?.institution.name
+          ? overview.institution.name
+          : undefined
+  const profile = getSidebarProfile(moduleId, user, { subtitle: sidebarSubtitle })
   const nav = config.nav
   const homePath = `/${moduleId}`
-  const unread = unreadCount(moduleId)
+  const pageBreadcrumb = resolvePageBreadcrumb(moduleId, pathname)
 
-  const sidebarContent = (
+  const sidebarNav = (
     <>
       <nav className="flex-1 min-h-0 px-3 py-4 space-y-0.5 overflow-y-auto scrollbar-thin">
         {nav.map((item) => (
@@ -95,16 +148,16 @@ export function AppShell({ module }: AppShellProps) {
         ))}
       </nav>
 
-      <div className="shrink-0 px-3 py-3 border-t border-border bg-card/30">
-        <div className="flex items-center gap-2 px-2 py-1.5 rounded-md">
-          <div className="w-9 h-9 rounded-full bg-accent/20 text-accent grid place-items-center font-display font-semibold text-sm shrink-0">
+      <div className="shrink-0 px-3 py-4 border-t border-border bg-card/20 backdrop-blur-md">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-[14px]">
+          <div className="w-10 h-10 rounded-full bg-accent/20 text-accent grid place-items-center font-display font-semibold text-sm shrink-0 ring-2 ring-white/60">
             {profile.initials}
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-widest text-accent font-medium">
               {profile.roleLabel}
             </div>
-            <div className="text-sm font-medium truncate">{profile.name}</div>
+            <div className="text-sm font-medium truncate text-foreground">{profile.name}</div>
             <div className="text-[11px] text-muted-foreground truncate">{profile.subtitle}</div>
           </div>
         </div>
@@ -114,7 +167,7 @@ export function AppShell({ module }: AppShellProps) {
             logout()
             navigate('/login', { replace: true })
           }}
-          className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+          className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-[14px] text-sm text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-all duration-[280ms] ios-press"
         >
           <LogOut className="w-4 h-4 shrink-0" />
           <span>Sign out</span>
@@ -123,96 +176,82 @@ export function AppShell({ module }: AppShellProps) {
     </>
   )
 
-  return (
-    <div className="h-dvh overflow-hidden text-foreground flex flex-col app-page-bg">
-      <div className="flex shrink-0 h-14 z-20">
-        <Link
-          to={homePath}
-          className="w-auto md:w-64 shrink-0 h-14 flex items-center gap-2 px-4 sm:px-6 border-r border-b border-border bg-card/75 hover:bg-card/90 backdrop-blur-sm transition-colors"
-        >
-          <div className="w-8 h-8 rounded-md bg-ink text-paper grid place-items-center shrink-0">
-            <GraduationCap className="w-4 h-4" />
-          </div>
-          <div className="min-w-0 hidden sm:block">
-            <div className="font-display text-lg leading-none truncate">
-              {APP_NAME}<span className="text-accent">+</span>
-            </div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1 truncate">
-              Academic Intel.
-            </div>
-          </div>
-        </Link>
+  const sidebarHeader = (
+    <div className="shrink-0 px-4 py-4 border-b border-border">
+      <PrismLogo size="sm" showWordmark showTagline href={homePath} />
+    </div>
+  )
 
-        <header className="flex-1 min-w-0 h-14 flex items-center px-3 sm:px-6 gap-2 sm:gap-4 border-b border-border/70 bg-card/80 shadow-[0_2px_12px_rgba(184,134,11,0.06)] backdrop-blur-md relative">
+  return (
+    <div className="h-dvh overflow-hidden text-foreground flex app-page-bg safe-top">
+      <aside className="hidden lg:flex w-[272px] shrink-0 h-full glass-sidebar flex-col overflow-hidden border-r border-border">
+        {sidebarHeader}
+        {sidebarNav}
+      </aside>
+
+      <div className="flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">
+        <header className="shrink-0 h-14 flex items-center px-3 sm:px-5 gap-2 sm:gap-3 glass-nav border-b border-border z-ln-sticky">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden btn btn-secondary p-2 text-muted-foreground"
+            className="lg:hidden btn btn-secondary p-2 text-muted-foreground shrink-0"
             aria-label="Open menu"
           >
             <Menu className="w-4 h-4" />
           </button>
-          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+          <div className="min-w-0 flex-1 lg:hidden">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground truncate">
+              {config.portalLabel}
+            </div>
+            <div className="text-sm font-medium text-foreground truncate capitalize">
+              {pageBreadcrumb}
+            </div>
+          </div>
+          <div className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground min-w-0">
             <Library className="w-3.5 h-3.5 shrink-0 text-accent/80" />
-            <span className="uppercase tracking-widest font-display truncate">Academic Year 2025–26</span>
+            <span className="uppercase tracking-widest font-display truncate">{config.portalLabel}</span>
+            <span className="text-border">·</span>
+            <span className="capitalize truncate">{pageBreadcrumb}</span>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-md border border-border/80 bg-card/70 text-xs text-muted-foreground w-72 shadow-sm backdrop-blur-sm">
-              <Search className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Search students, topics, questions…</span>
-              <kbd className="ml-auto text-[10px] px-1 py-0.5 bg-secondary rounded font-mono-data shadow-sm">⌘K</kbd>
+            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="uppercase tracking-widest font-display">Academic Year 2025–26</span>
             </div>
-            <button
-              type="button"
-              onClick={() => navigate(`${homePath}/notifications`)}
-              className="relative btn btn-ghost p-2 text-muted-foreground"
-              aria-label="Notifications"
-            >
-              <Bell className="w-4 h-4" />
-              {unread > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-rose text-white text-[10px] font-bold grid place-items-center shadow-card">
-                  {unread > 9 ? '9+' : unread}
-                </span>
-              )}
-            </button>
+            <NotificationBell moduleId={moduleId} />
           </div>
         </header>
-      </div>
-
-      <div className="flex flex-1 min-h-0 overflow-hidden relative">
-        <aside className="hidden lg:flex w-64 shrink-0 h-full border-r border-border bg-card/55 backdrop-blur-sm flex-col overflow-hidden">
-          {sidebarContent}
-        </aside>
 
         {sidebarOpen && (
-          <div className="lg:hidden fixed inset-0 z-30 flex">
+          <div className="lg:hidden fixed inset-0 z-ln-drawer flex">
             <button
               type="button"
-              className="absolute inset-0 bg-ink/40"
+              className="absolute inset-0 glass-overlay"
               onClick={() => setSidebarOpen(false)}
               aria-label="Close menu"
             />
-            <aside className="relative w-[min(100%,280px)] h-full border-r border-border bg-card flex flex-col overflow-hidden shadow-xl">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-                <span className="font-display text-sm">Menu</span>
+            <aside className="relative w-[min(100%,300px)] h-full glass-sheet flex flex-col overflow-hidden animate-ios-sheet">
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border shrink-0">
+                <PrismLogo size="sm" showWordmark href={homePath} />
                 <button
                   type="button"
                   onClick={() => setSidebarOpen(false)}
-                  className="p-1.5 rounded-md hover:bg-secondary"
+                  className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground shrink-0"
+                  aria-label="Close menu"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              {sidebarContent}
+              {sidebarNav}
             </aside>
           </div>
         )}
 
-        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto scrollbar-thin">
+        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto scrollbar-thin page-enter safe-bottom">
           <PageBackBar moduleId={moduleId} />
           <Outlet />
         </main>
       </div>
+      {moduleId === 'student' && <StudentPendingAssessmentReminder />}
     </div>
   )
 }
@@ -228,9 +267,9 @@ function PageBackBar({ moduleId }: { moduleId: ModuleId }) {
     <button
       type="button"
       onClick={() => navigate(back.href)}
-      className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 -mt-2 transition-colors group print:hidden"
+      className="hidden md:inline-flex items-center gap-2.5 text-sm text-muted-foreground hover:text-foreground mb-6 -mt-1 transition-colors duration-[280ms] group print:hidden ios-press"
     >
-      <span className="inline-flex items-center justify-center w-8 h-8 rounded-md border border-border bg-card group-hover:bg-secondary transition-colors">
+      <span className="inline-flex items-center justify-center w-9 h-9 rounded-[14px] border border-border glass ios-shadow-sm group-hover:bg-card/90 transition-all duration-[280ms]">
         <ArrowLeft className="w-4 h-4" />
       </span>
       <span>{back.label}</span>
@@ -260,8 +299,8 @@ function resolveBackNavigation(
     if (section === 'assessments' && segments[2] !== undefined) {
       return { href: `${home}/assessments`, label: 'Back to assessments' }
     }
-    if (section === 'students' && segments[2] !== undefined) {
-      return { href: `${home}/students`, label: 'Back to students' }
+    if (section === 'students' && segments[2] === 'report') {
+      return { href: `${home}/reports/students`, label: 'Back to student reports' }
     }
   }
 
@@ -290,20 +329,18 @@ function NavLinkItem({
       to={item.href}
       onClick={onNavigate}
       className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition',
-        active
-          ? 'bg-secondary text-foreground'
-          : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+        'ios-nav-pill',
+        active ? 'ios-nav-pill-active' : 'ios-nav-pill-inactive',
       )}
     >
-      {Icon && <Icon className="w-4 h-4 shrink-0" />}
+      {Icon && <Icon className={cn('w-[18px] h-[18px] shrink-0', active && 'text-accent')} />}
       <span className="flex-1">{item.label}</span>
       {item.badge != null && (
-        <span className="font-mono-data text-[10px] bg-accent/15 text-accent px-1.5 py-0.5 rounded-full">
+        <span className="font-mono-data text-[10px] bg-accent/15 text-accent px-2 py-0.5 rounded-full">
           {item.badge}
         </span>
       )}
-      {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-accent shrink-0" />}
+      {active && <span className="ml-auto h-2 w-2 rounded-full bg-accent shrink-0 shadow-[0_0_8px_rgba(232,184,32,0.5)]" />}
     </Link>
   )
 }
@@ -320,27 +357,36 @@ export function PageHeader({
   actions?: ReactNode
 }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6 pb-4 sm:pb-6 mb-6 sm:mb-8 border-b border-border">
+    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6 pb-5 sm:pb-6 mb-6 sm:mb-8">
       <div className="min-w-0">
         {eyebrow && (
-          <div className="text-[11px] uppercase tracking-[0.2em] text-accent font-medium mb-2">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-accent font-semibold mb-2.5">
             {eyebrow}
           </div>
         )}
-        <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl text-foreground">{title}</h1>
-        {sub && <p className="text-muted-foreground mt-2 max-w-2xl text-sm sm:text-base">{sub}</p>}
+        <h1 className="font-display text-[28px] sm:text-[32px] lg:text-[36px] font-bold text-foreground tracking-tight leading-[1.15]">
+          {title}
+        </h1>
+        {sub && <p className="text-muted-foreground mt-2.5 max-w-2xl text-[15px] leading-relaxed">{sub}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0 flex-wrap">{actions}</div>}
+      {actions && <div className="page-actions shrink-0">{actions}</div>}
     </div>
   )
 }
 
 export function AppCard({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('bg-card border border-border rounded-lg p-4 sm:p-5 shadow-card', className)}>
+    <div className={cn('glass-card border border-border rounded-[14px] p-4 sm:p-5', className)}>
       {children}
     </div>
   )
+}
+
+const statAccent: Record<string, string> = {
+  default: 'border-l-blue-500',
+  accent: 'border-l-yellow-400',
+  leaf: 'border-l-emerald-500',
+  rose: 'border-l-rose-500',
 }
 
 export function AppStat({
@@ -366,9 +412,9 @@ export function AppStat({
           : 'text-foreground'
 
   return (
-    <AppCard>
-      <div className="text-[11px] uppercase tracking-widest text-muted-foreground">{label}</div>
-      <div className={cn('mt-3 font-mono-data text-3xl', toneColor)}>
+    <AppCard className={cn('border-l-[4px] rounded-[14px]', statAccent[tone])}>
+      <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-medium">{label}</div>
+      <div className={cn('mt-3 font-mono-data text-[32px] leading-none tracking-tight', toneColor)}>
         {value}
         {unit && <span className="text-base text-muted-foreground ml-1 font-sans">{unit}</span>}
       </div>

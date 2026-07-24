@@ -18,16 +18,16 @@ export function PlanTimeline({ pending, completed }: PlanTimelineProps) {
               {i + 1}
             </span>
             {(i < pending.length - 1 || completed.length > 0) && (
-              <div className="w-0.5 flex-1 min-h-[24px] bg-surface-200 my-1" />
+              <div className="w-0.5 flex-1 min-h-[24px] bg-border my-1" />
             )}
           </div>
           <div className={cn('flex-1 pb-5', i === pending.length - 1 && completed.length === 0 && 'pb-0')}>
-            <div className="rounded-xl border border-surface-200 bg-white p-4 shadow-sm">
-              <p className="text-[14px] font-medium text-text-primary">{step.action}</p>
-              <p className="text-[11px] text-text-muted mt-0.5">{step.topicName} · {step.subjectName}</p>
+            <div className="rounded-[14px] border border-border glass-card p-4 shadow-card">
+              <p className="text-[14px] font-medium text-foreground">{step.action}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{step.topicName} · {step.subjectName}</p>
               <div className="flex items-center justify-between mt-3 gap-3">
                 <div className="flex gap-2">
-                  <span className="text-[10px] font-mono-data px-2 py-0.5 rounded-full bg-surface-50 text-text-muted border border-surface-100">
+                  <span className="text-[10px] font-mono-data px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
                     {step.estimatedHours}h
                   </span>
                   <span className="text-[10px] font-mono-data px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
@@ -50,7 +50,7 @@ export function PlanTimeline({ pending, completed }: PlanTimelineProps) {
             {i < completed.length - 1 && <div className="w-0.5 flex-1 min-h-[16px] bg-emerald-100 my-1" />}
           </div>
           <div className={cn('flex-1 pb-4', i === completed.length - 1 && 'pb-0')}>
-            <p className="text-[13px] text-text-muted line-through pt-1.5">{step.action}</p>
+            <p className="text-[13px] text-muted-foreground line-through pt-1.5">{step.action}</p>
           </div>
         </div>
       ))}

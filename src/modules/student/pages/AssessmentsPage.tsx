@@ -1,46 +1,87 @@
+import { useEffect } from 'react'
+import { PageLoader } from '@/components/ui/PrismLoader'
 import { Link } from 'react-router-dom'
-import { Play, Clock, Calendar, Sparkles, Lock } from 'lucide-react'
+import { Play, Clock, Calendar, Sparkles, Lock, CheckCircle2 } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
-import { recentAssessments, studentProfile } from '@/data/mock'
 import { useAuth } from '@/hooks/useAuth'
 import { useAssessments } from '@/hooks/useAssessments'
-import { getStudentAcademicScope } from '@/lib/studentScope'
+import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
+import { resolveStudentProfile, scopeLabelFromProfile } from '@/modules/student/lib/studentProfile'
 import { scopeLabel } from '@/lib/academicScope'
 
 export function StudentAssessmentsPage() {
   const { user } = useAuth()
-  const { getAssessmentsForStudent, canStudentAttend } = useAssessments()
+  useAnalyticsPage('studentAssessments')
+  const { getAssessmentsForStudent, canStudentAttend, loading: assessmentsLoading, error, refresh, ensureLoaded } =
+    useAssessments()
+  const { loading: analyticsLoading, recentAssessments, studentProfile } = useAnalytics()
 
-  const academicScope = getStudentAcademicScope(user.id) ?? {
-    board: studentProfile.board,
-    grade: String(studentProfile.grade),
+  useEffect(() => {
+    void ensureLoaded()
+  }, [ensureLoaded])
+  const profile = resolveStudentProfile(studentProfile, user)
+
+  if (analyticsLoading || assessmentsLoading) {
+    return <PageLoader label="Loading assessments…" />
   }
-  const query = { studentId: user.id, ...academicScope }
 
+  if (!profile) {
+    return (
+      <p className="text-sm text-muted-foreground p-4">
+        Assessment data is unavailable. Connect to the Prism API and sign in again.
+      </p>
+    )
+  }
+
+  const academicScope = { board: profile.board, grade: profile.grade }
+  const query = { studentId: profile.id || user.id, ...academicScope }
   const assigned = getAssessmentsForStudent(query)
-  const live = assigned.filter((a) => a.status === 'live')
-  const upcoming = assigned.filter((a) => a.status === 'scheduled')
+  const availableNow = assigned.filter(
+    (a) => a.status === 'live' && !a.studentSubmitted,
+  )
+  const upcoming = assigned.filter(
+    (a) => a.status === 'scheduled' && !a.studentSubmitted,
+  )
+  const awaitingResults = assigned.filter(
+    (a) => a.studentSubmitted && a.status !== 'completed',
+  )
   const [latest, ...earlier] = recentAssessments
-  const avgScore =
-    recentAssessments.length > 0
-      ? Math.round(recentAssessments.reduce((s, a) => s + a.accuracy, 0) / recentAssessments.length)
-      : 0
+
+  if (error) {
+    return (
+      <div className="p-4 space-y-3">
+        <p className="text-sm text-rose">{error}</p>
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          className="text-sm text-accent hover:underline"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   return (
     <>
       <PageHeader
-        eyebrow={scopeLabel(academicScope)}
+        eyebrow={scopeLabelFromProfile(profile)}
         title="Assessments"
         sub="Board-wise tests from your tutor — you only see exams for your board and grade that you're invited to."
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <AppStat label="Available now" value={live.length} tone="accent" hint="Ready to start" />
-        <AppStat label="Upcoming" value={upcoming.length} hint="You're invited" />
-        <AppStat label="Avg score" value={avgScore} unit="%" tone="leaf" />
+        <AppStat label="Live now" value={availableNow.length} tone="accent" hint="Tutor has gone live" />
+        <AppStat label="Upcoming" value={upcoming.length} hint="Waiting for tutor to start" />
+        <AppStat
+          label="Awaiting results"
+          value={awaitingResults.length}
+          hint="Submitted, session still open"
+          tone="leaf"
+        />
       </div>
 
-      {assigned.length === 0 && (
+      {availableNow.length === 0 && upcoming.length === 0 && awaitingResults.length === 0 && !latest && earlier.length === 0 && (
         <AppCard className="mb-8 text-center py-10">
           <Lock className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
           <p className="font-medium text-foreground">No assessments assigned yet</p>
@@ -50,10 +91,10 @@ export function StudentAssessmentsPage() {
         </AppCard>
       )}
 
-      {live.length > 0 && (
+      {availableNow.length > 0 && (
         <div className="space-y-3 mb-8">
           <h3 className="font-display text-lg text-foreground">Start now</h3>
-          {live.map((a) => (
+          {availableNow.map((a) => (
             <div key={a.id} className="bg-ink text-paper rounded-lg p-6 relative overflow-hidden">
               <div className="absolute inset-0 paper-grid opacity-[0.08]" aria-hidden />
               <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -63,10 +104,12 @@ export function StudentAssessmentsPage() {
                   </span>
                   <h4 className="font-display text-2xl font-bold mt-2">{a.title}</h4>
                   <p className="text-paper/70 text-sm mt-1">
-                    {a.questionCount} questions · {a.durationMinutes} minutes · {a.subject}
+                    {a.questionCount} questions
+                    {a.durationMinutes > 0 ? ` · ${a.durationMinutes} minutes` : ' · Untimed'} · {a.subject}
                   </p>
                   <p className="text-paper/50 text-xs mt-1">
                     {scopeLabel({ board: a.board, grade: a.grade })} · {a.batchName}
+                    {a.scheduledAt ? ` · ${a.scheduledAt}` : ''}
                   </p>
                 </div>
                 {canStudentAttend(query, a.id) ? (
@@ -87,7 +130,7 @@ export function StudentAssessmentsPage() {
 
       {upcoming.length > 0 && (
         <AppCard className="mb-8">
-          <h3 className="font-display text-lg text-foreground mb-4">Upcoming — you're invited</h3>
+          <h3 className="font-display text-lg text-foreground mb-4">Upcoming — waiting for tutor to go live</h3>
           <div className="space-y-3">
             {upcoming.map((a) => (
               <div
@@ -97,19 +140,50 @@ export function StudentAssessmentsPage() {
                 <div>
                   <p className="font-medium text-foreground">{a.title}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {a.subject} · {a.mode} mode · {a.questionCount} questions
+                    {a.subject} · {a.mode} mode · {a.questionCount} questions · Scheduled
                   </p>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground shrink-0">
-                  <span className="inline-flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {a.scheduledAt}
+                <div className="flex flex-col sm:items-end gap-2 text-xs text-muted-foreground shrink-0">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-secondary text-foreground">
+                    <Lock className="w-3 h-3" />
+                    Starts when tutor goes live
                   </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    {a.durationMinutes} min
-                  </span>
+                  <div className="flex items-center gap-4">
+                    <span className="inline-flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {a.scheduledAt || 'Date TBC'}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      {a.durationMinutes > 0 ? `${a.durationMinutes} min` : 'Untimed'}
+                    </span>
+                  </div>
                 </div>
+              </div>
+            ))}
+          </div>
+        </AppCard>
+      )}
+
+      {awaitingResults.length > 0 && (
+        <AppCard className="mb-8">
+          <h3 className="font-display text-lg text-foreground mb-4">Submitted — awaiting results</h3>
+          <div className="space-y-3">
+            {awaitingResults.map((a) => (
+              <div
+                key={a.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-md border border-border bg-secondary/20"
+              >
+                <div>
+                  <p className="font-medium text-foreground">{a.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {a.subject} · submitted · your tutor will share results after the session ends
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-leaf/15 text-leaf shrink-0">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Awaiting results
+                </span>
               </div>
             ))}
           </div>
@@ -118,6 +192,10 @@ export function StudentAssessmentsPage() {
 
       <div className="space-y-4">
         <h3 className="font-display text-lg text-foreground">Your results</h3>
+
+        {availableNow.length === 0 && upcoming.length === 0 && !latest && earlier.length === 0 && awaitingResults.length === 0 && (
+          <AppCard><p className="text-sm text-muted-foreground">No assessments yet.</p></AppCard>
+        )}
 
         {latest && (
           <AppCard className="border-accent/20">
@@ -139,6 +217,14 @@ export function StudentAssessmentsPage() {
                   <p className="text-xs text-muted-foreground mt-3">
                     Work on: {latest.weakTopics.join(', ')}
                   </p>
+                )}
+                {latest.assessmentId && (
+                  <Link
+                    to={`/student/reports/assessment/${latest.assessmentId}`}
+                    className="text-xs text-accent hover:underline mt-3 inline-block"
+                  >
+                    View assessment report →
+                  </Link>
                 )}
               </div>
               <div className="text-center shrink-0">
@@ -163,12 +249,24 @@ export function StudentAssessmentsPage() {
                     <p className="text-xs text-muted-foreground">
                       {a.date} · {a.subjectName}
                     </p>
+                    {a.assessmentId && (
+                      <Link
+                        to={`/student/reports/assessment/${a.assessmentId}`}
+                        className="text-[10px] text-accent hover:underline mt-1 inline-block"
+                      >
+                        View report
+                      </Link>
+                    )}
                   </div>
                   <span className="font-mono-data text-lg font-semibold">{a.accuracy}%</span>
                 </div>
               ))}
             </div>
           </AppCard>
+        )}
+
+        {!latest && earlier.length === 0 && (
+          <AppCard><p className="text-sm text-muted-foreground">No completed assessments yet.</p></AppCard>
         )}
       </div>
     </>

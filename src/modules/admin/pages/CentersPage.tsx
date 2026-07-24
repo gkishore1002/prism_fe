@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Sparkles, MapPin } from 'lucide-react'
+import { PageLoader } from '@/components/ui/PrismLoader'
+import { MapPin, Plus } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -15,17 +16,91 @@ import {
   Radar,
 } from 'recharts'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
-import { ownerCenters, aiCenterInsights } from '@/data/ownerMock'
-
-const flagTone = {
-  leaf: 'text-leaf border-leaf/40 bg-leaf/5',
-  amber: 'text-accent border-accent/40 bg-accent/5',
-  rose: 'text-rose border-rose/40 bg-rose/5',
-} as const
+import { AnalyticsInsightsCard } from '@/components/ui/AnalyticsInsightsCard'
+import { centerInsightBullets } from '@/lib/analyticsInsights'
+import { formatCenterLabel } from '@/lib/centerLabel'
+import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
+import { useCenters } from '@/hooks/useCenters'
+import { createCenter } from '@/lib/api/institutionsApi'
 
 export function AdminCentersPage() {
-  const [selected, setSelected] = useState(ownerCenters[0].id)
-  const center = ownerCenters.find((c) => c.id === selected)!
+  useAnalyticsPage('adminCenters')
+  const { loading, centerAnalytics, refresh } = useAnalytics()
+  const { refresh: refreshCenters } = useCenters({ enabled: false })
+  const [selected, setSelected] = useState<string>('')
+  const [showForm, setShowForm] = useState(false)
+  const [centerName, setCenterName] = useState('')
+  const [centerCity, setCenterCity] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  async function handleCreateCenter(e: React.FormEvent) {
+    e.preventDefault()
+    if (!centerName.trim() || !centerCity.trim()) return
+    setCreating(true)
+    try {
+      await createCenter(centerName.trim(), centerCity.trim())
+      setCenterName('')
+      setCenterCity('')
+      setShowForm(false)
+      await refresh('adminCenters')
+      await refreshCenters()
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  if (loading) {
+    return <PageLoader />
+  }
+
+  if (centerAnalytics.length === 0) {
+    return (
+      <>
+        <PageHeader
+          title="Multi-center performance"
+          sub="Add your first center to start tracking branch analytics."
+        />
+        <AppCard>
+          <form onSubmit={(e) => void handleCreateCenter(e)} className="grid sm:grid-cols-3 gap-4 items-end">
+            <label className="block sm:col-span-1">
+              <span className="text-xs text-muted-foreground">Center name</span>
+              <input
+                value={centerName}
+                onChange={(e) => setCenterName(e.target.value)}
+                required
+                placeholder="e.g. Koramangala"
+                className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+              />
+            </label>
+            <label className="block sm:col-span-1">
+              <span className="text-xs text-muted-foreground">City</span>
+              <input
+                value={centerCity}
+                onChange={(e) => setCenterCity(e.target.value)}
+                required
+                placeholder="e.g. Bengaluru"
+                className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={creating}
+              className="bg-ink text-paper px-4 py-2 rounded-md text-sm font-medium disabled:opacity-60"
+            >
+              {creating ? 'Creating…' : 'Create first center'}
+            </button>
+          </form>
+        </AppCard>
+      </>
+    )
+  }
+
+  const selectedId = selected || centerAnalytics[0].id
+  const center = centerAnalytics.find((c) => c.id === selectedId) ?? centerAnalytics[0]
+  const chartData = centerAnalytics.map((c) => ({
+    ...c,
+    label: formatCenterLabel(c),
+  }))
   const radarData = [
     { metric: 'Avg score', value: center.avg },
     { metric: 'Retention', value: center.retention },
@@ -37,34 +112,78 @@ export function AdminCentersPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Network · 5 centers"
+        eyebrow={`Network · ${centerAnalytics.length} centers`}
         title="Multi-center performance"
         sub="Compare every center on the same scorecard. Drill in to see where each one wins or struggles."
+        actions={
+          <button
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            className="inline-flex items-center gap-2 bg-accent text-accent-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90"
+          >
+            <Plus className="w-4 h-4" /> Add center
+          </button>
+        }
       />
 
+      {showForm && (
+        <AppCard className="mb-6">
+          <form onSubmit={(e) => void handleCreateCenter(e)} className="grid sm:grid-cols-3 gap-4 items-end">
+            <label className="block sm:col-span-1">
+              <span className="text-xs text-muted-foreground">Center name</span>
+              <input
+                value={centerName}
+                onChange={(e) => setCenterName(e.target.value)}
+                required
+                className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+              />
+            </label>
+            <label className="block sm:col-span-1">
+              <span className="text-xs text-muted-foreground">City</span>
+              <input
+                value={centerCity}
+                onChange={(e) => setCenterCity(e.target.value)}
+                required
+                className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={creating}
+              className="bg-ink text-paper px-4 py-2 rounded-md text-sm font-medium disabled:opacity-60"
+            >
+              {creating ? 'Creating…' : 'Create center'}
+            </button>
+          </form>
+        </AppCard>
+      )}
+
       <div className="grid md:grid-cols-4 gap-4 mb-8">
-        <AppStat label="Total centers" value={ownerCenters.length} />
+        <AppStat label="Total centers" value={centerAnalytics.length} />
         <AppStat
           label="Network students"
-          value={ownerCenters.reduce((a, c) => a + c.students, 0).toLocaleString()}
+          value={centerAnalytics.reduce((a, c) => a + c.students, 0).toLocaleString()}
           tone="accent"
         />
         <AppStat
           label="Network avg"
-          value={Math.round(ownerCenters.reduce((a, c) => a + c.avg, 0) / ownerCenters.length)}
+          value={Math.round(centerAnalytics.reduce((a, c) => a + c.avg, 0) / centerAnalytics.length)}
           unit="%"
           tone="leaf"
         />
-        <AppStat label="Best center" value="Andheri" hint="78% avg · 93% retention" />
+        <AppStat
+          label="Best center"
+          value={centerAnalytics.reduce((best, c) => (c.avg > best.avg ? c : best), centerAnalytics[0]).name}
+        />
       </div>
 
       <AppCard className="mb-6">
         <div className="font-display text-2xl mb-4">Center comparison · average score</div>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={ownerCenters}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="city" fontSize={11} />
+              <XAxis dataKey="label" fontSize={11} interval={0} angle={-12} textAnchor="end" height={56} />
               <YAxis fontSize={11} />
               <Tooltip />
               <Bar dataKey="avg" fill="var(--color-ink)" name="Avg score" radius={[4, 4, 0, 0]} />
@@ -81,17 +200,17 @@ export function AdminCentersPage() {
             Select a center
           </div>
           <div className="space-y-1.5">
-            {ownerCenters.map((c) => (
+            {centerAnalytics.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => setSelected(c.id)}
                 className={`w-full text-left px-3 py-2.5 rounded-md text-sm flex items-center gap-2 transition ${
-                  selected === c.id ? 'bg-ink text-paper' : 'hover:bg-secondary'
+                  selectedId === c.id ? 'bg-ink text-paper' : 'hover:bg-secondary'
                 }`}
               >
                 <MapPin className="w-3.5 h-3.5 shrink-0" />
-                <span className="flex-1 truncate">{c.city}</span>
+                <span className="flex-1 truncate">{formatCenterLabel(c)}</span>
                 <span className="font-mono-data text-xs opacity-70">{c.students}</span>
               </button>
             ))}
@@ -100,7 +219,7 @@ export function AdminCentersPage() {
 
         <AppCard className="md:col-span-2">
           <div className="flex items-baseline justify-between mb-3">
-            <div className="font-display text-2xl">{center.name}</div>
+            <div className="font-display text-2xl">{formatCenterLabel(center)}</div>
             <span className="text-xs text-muted-foreground">5-metric scorecard</span>
           </div>
           <div className="h-64">
@@ -121,19 +240,10 @@ export function AdminCentersPage() {
         </AppCard>
       </div>
 
-      <AppCard>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-accent mb-4">
-          <Sparkles className="w-3.5 h-3.5" /> AI Center insights · auto-generated weekly
-        </div>
-        <div className="grid md:grid-cols-2 gap-3">
-          {aiCenterInsights.map((c) => (
-            <div key={c.center} className={`border rounded-md p-4 ${flagTone[c.flag]}`}>
-              <div className="font-medium">{c.center}</div>
-              <div className="text-sm mt-1 text-foreground/80">{c.insight}</div>
-            </div>
-          ))}
-        </div>
-      </AppCard>
+      <AnalyticsInsightsCard
+        title="Center insights"
+        bullets={centerInsightBullets(centerAnalytics)}
+      />
     </>
   )
 }

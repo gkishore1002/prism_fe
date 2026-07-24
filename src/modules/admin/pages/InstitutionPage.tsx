@@ -1,82 +1,113 @@
-import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
+import { MapPin } from 'lucide-react'
+import { PageLoader } from '@/components/ui/PrismLoader'
+import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { Badge } from '@/components/ui/Badge'
-import { institution, boards, grades, subjects } from '@/data/mock'
-import { Users, GraduationCap, MapPin } from 'lucide-react'
+import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
+import { useCurriculum } from '@/hooks/useCurriculum'
 
 export function AdminInstitutionPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-zinc-900">Institution Profile</h2>
-        <p className="text-sm text-zinc-500">Organization overview and operational metrics</p>
-      </div>
+  useAnalyticsPage('adminInstitution')
+  const { loading: analyticsLoading, overview } = useAnalytics()
+  const { curriculum, loading: curriculumLoading } = useCurriculum()
 
-      <Card className="border-brand-200/60">
+  const loading = analyticsLoading || curriculumLoading
+  const institution = overview?.institution
+  const gradeCount = curriculum.reduce((n, b) => n + b.grades.length, 0)
+
+  if (loading) {
+    return <PageLoader />
+  }
+
+  if (!institution) {
+    return (
+      <>
+        <PageHeader title="Institution profile" sub="No institution data available yet." />
+        <AppCard>
+          <p className="text-sm text-muted-foreground">Connect your institution or add data via admin setup.</p>
+        </AppCard>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="Organization"
+        title="Institution profile"
+        sub="Organization overview and operational metrics"
+      />
+
+      <AppCard className="accent-yellow mb-6">
         <div className="flex items-start gap-5">
           <div className="w-14 h-14 rounded-2xl gradient-brand-icon flex items-center justify-center shrink-0">
-            <span className="font-display font-bold text-brand-900">L+</span>
+            <span className="font-display font-bold text-ink">L+</span>
           </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-bold text-zinc-900">{institution.name}</h3>
-            <p className="text-sm text-zinc-500 capitalize mt-0.5">{institution.type} center</p>
-            <div className="flex items-center gap-1.5 mt-2 text-xs text-zinc-400">
-              <MapPin className="w-3 h-3" /> Mumbai, Maharashtra
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-display font-bold text-foreground">{institution.name}</h3>
+            <p className="text-sm text-muted-foreground capitalize mt-0.5">{institution.type} center</p>
+            <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
+              <MapPin className="w-3 h-3 shrink-0" />
+              {institution.name}
             </div>
           </div>
           <Badge variant="brand">Active</Badge>
         </div>
+      </AppCard>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-zinc-100">
-          <div className="text-center p-3 rounded-lg bg-zinc-50">
-            <Users className="w-4 h-4 text-brand-600 mx-auto mb-1" />
-            <p className="text-2xl font-bold text-zinc-900">{institution.studentCount}</p>
-            <p className="text-xs text-zinc-500">Students</p>
-          </div>
-          <div className="text-center p-3 rounded-lg bg-zinc-50">
-            <GraduationCap className="w-4 h-4 text-brand-600 mx-auto mb-1" />
-            <p className="text-2xl font-bold text-zinc-900">{institution.tutorCount}</p>
-            <p className="text-xs text-zinc-500">Tutors</p>
-          </div>
-          <div className="text-center p-3 rounded-lg bg-zinc-50">
-            <p className="text-2xl font-bold text-zinc-900">{boards.length}</p>
-            <p className="text-xs text-zinc-500">Boards</p>
-          </div>
-          <div className="text-center p-3 rounded-lg bg-zinc-50">
-            <p className="text-2xl font-bold text-zinc-900">{grades.length}</p>
-            <p className="text-xs text-zinc-500">Grades</p>
-          </div>
-        </div>
-      </Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <AppStat label="Students" value={overview?.totalStudents ?? institution.studentCount} tone="accent" />
+        <AppStat label="Tutors" value={overview?.tutorCount ?? institution.tutorCount} />
+        <AppStat label="Boards" value={curriculum.length} />
+        <AppStat label="Grades" value={gradeCount} tone="leaf" />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Boards</CardTitle>
-          </CardHeader>
-          <div className="space-y-2">
-            {boards.map((board) => (
-              <div key={board.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-50">
-                <span className="font-medium text-zinc-900">{board.name}</span>
-                <Badge variant="neutral">{board.code}</Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
+        <AppCard className="accent-blue">
+          <h3 className="font-display text-[15px] font-semibold text-foreground mb-4 pb-3 border-b border-secondary">
+            Active boards
+          </h3>
+          {curriculum.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No boards configured.</p>
+          ) : (
+            <div className="space-y-2">
+              {curriculum.map((board) => (
+                <div
+                  key={board.board}
+                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
+                >
+                  <span className="font-medium text-foreground">{board.board}</span>
+                  <Badge variant="neutral">{board.grades.length} grades</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </AppCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Grade Levels</CardTitle>
-          </CardHeader>
-          <div className="space-y-2">
-            {grades.map((grade) => (
-              <div key={grade.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-50">
-                <span className="font-medium text-zinc-900">{grade.name}</span>
-                <span className="text-xs text-zinc-500">{subjects.filter((s) => s.gradeId === grade.id).length} subjects</span>
-              </div>
-            ))}
-          </div>
-        </Card>
+        <AppCard className="accent-emerald">
+          <h3 className="font-display text-[15px] font-semibold text-foreground mb-4 pb-3 border-b border-secondary">
+            Grade levels
+          </h3>
+          {curriculum.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No grades configured.</p>
+          ) : (
+            <div className="space-y-2">
+              {curriculum.flatMap((board) =>
+                board.grades.map((grade) => (
+                  <div
+                    key={`${board.board}-${grade.grade}`}
+                    className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
+                  >
+                    <span className="font-medium text-foreground">{grade.grade}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {grade.subjects.length} subjects · {board.board}
+                    </span>
+                  </div>
+                )),
+              )}
+            </div>
+          )}
+        </AppCard>
       </div>
-    </div>
+    </>
   )
 }

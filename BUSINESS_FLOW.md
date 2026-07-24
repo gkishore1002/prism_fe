@@ -1,6 +1,6 @@
-# Learnova — Business Flow Document
+# Prism — Business Flow Document
 
-**Product:** Learnova (Academic Intelligence Platform)  
+**Product:** Prism (Academic Intelligence Platform)  
 **Document type:** Business flow — mock frontend implementation  
 **Version:** 1.0  
 **Date:** 25 June 2026  
@@ -10,7 +10,7 @@
 
 ## 1. Executive summary
 
-Learnova turns every test a student takes into personalised, topic-level guidance. Instead of reporting only a total mark, the platform identifies weak topics, explains performance gaps, and recommends what to study next — all scoped to the correct **Board** and **Grade**.
+Prism turns every test a student takes into personalised, topic-level guidance. Instead of reporting only a total mark, the platform identifies weak topics, explains performance gaps, and recommends what to study next — all scoped to the correct **Board** and **Grade**.
 
 **Core value proposition**
 
@@ -368,10 +368,10 @@ This is the main operational loop tutors run repeatedly:
 
 | Role | Email | Password |
 |------|-------|----------|
-| Owner / Admin | `rajesh@learnova.app` | `demo123` |
-| Tutor | `arjun@learnova.app` | `demo123` |
-| Student | `priya@learnova.app` | `demo123` |
-| Generic demo | `demo@learnova.app` | `demo123` |
+| Owner / Admin | `rajesh@prism.app` | `demo123` |
+| Tutor | `arjun@prism.app` | `demo123` |
+| Student | `priya@prism.app` | `demo123` |
+| Generic demo | `demo@prism.app` | `demo123` |
 
 **Suggested demo path**
 
@@ -386,7 +386,7 @@ This is the main operational loop tutors run repeatedly:
 | Document | Location |
 |----------|----------|
 | Business Requirements (BRD v4) | `brd_full.txt` |
-| Design system | `LEARNOVA_DESIGN_SYSTEM.md` |
+| Design system | `PRISM_DESIGN_SYSTEM.md` |
 
 ---
 

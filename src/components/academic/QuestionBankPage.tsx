@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Eye, FilePlus2, ChevronDown, ChevronUp, Upload, CheckSquare, Square } from 'lucide-react'
+import { FileText, Eye, FilePlus2, ChevronDown, ChevronUp, Upload, CheckSquare, Square, PenLine } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { QuestionUploadWorkflow } from '@/components/academic/QuestionUploadWorkflow'
+import { ManualQuestionEntry } from '@/components/academic/ManualQuestionEntry'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
+import { useAuth } from '@/hooks/useAuth'
 import { topicCounts, totalMarksForQuestions } from '@/lib/questionPaperUtils'
 import { cn } from '@/lib/cn'
+import { useConfirmModal } from '@/components/ui/AppModal'
 
 interface QuestionBankPageProps {
   role?: 'tutor' | 'admin'
@@ -32,12 +35,63 @@ function SectionHeading({
   )
 }
 
+function CollapsibleSection({
+  icon: Icon,
+  title,
+  sub,
+  open,
+  onToggle,
+  children,
+}: {
+  icon: typeof FileText
+  title: string
+  sub?: string
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <section className="mb-4">
+      <AppCard className="p-0 overflow-hidden">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className="w-full flex items-start justify-between gap-4 p-4 text-left hover:bg-secondary/30 transition-colors"
+        >
+          <div className="flex items-start gap-2 min-w-0">
+            <Icon className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+            <div>
+              <h2 className="font-display text-lg text-foreground">{title}</h2>
+              {sub && <p className="text-sm text-muted-foreground mt-0.5">{sub}</p>}
+            </div>
+          </div>
+          {open ? (
+            <ChevronUp className="w-5 h-5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" />
+          )}
+        </button>
+        {open && <div className="border-t border-border p-4">{children}</div>}
+      </AppCard>
+    </section>
+  )
+}
+
 export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionBankPageProps) {
-  const { questionPapers, questions, createCustomPaper } = useQuestionPapers()
+  const { user } = useAuth()
+  const { questionPapers, questions, createCustomPaper, removePaper, ensureLoaded } = useQuestionPapers()
+  const { confirm } = useConfirmModal()
+
+  useEffect(() => {
+    void ensureLoaded()
+  }, [ensureLoaded])
   const [customPaperId, setCustomPaperId] = useState<string | null>(null)
   const [customName, setCustomName] = useState('')
   const [customSelectedTopics, setCustomSelectedTopics] = useState<string[]>([])
   const [customQuestionIds, setCustomQuestionIds] = useState<string[]>([])
+  const [manualOpen, setManualOpen] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
 
   const paperPreviewBase =
     role === 'tutor' ? '/tutor/question-bank/papers' : '/admin/question-bank/papers'
@@ -109,14 +163,14 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
     }
   }
 
-  function handleCreateCustom(e: React.FormEvent, parentId: string) {
+  async function handleCreateCustom(e: React.FormEvent, parentId: string) {
     e.preventDefault()
     if (!customName.trim() || customQuestionIds.length === 0) return
-    createCustomPaper(
+    await createCustomPaper(
       customName.trim(),
       parentId,
       customQuestionIds,
-      role === 'tutor' ? 'tut-1' : 'adm-1',
+      user.id,
     )
     setCustomPaperId(null)
     setCustomName('')
@@ -134,11 +188,11 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
         sub={
           readOnly
             ? 'Browse tutor-uploaded question papers organized by topic. Creation and uploads are tutor-only.'
-            : 'Upload Excel to save a question paper. Derive another paper by choosing topics and questions, or use full or topic-filtered papers when creating assessments.'
+            : 'Browse saved papers first. Expand add or upload below when you need to build a new question paper.'
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <AppStat label="Question papers" value={questionPapers.length} />
         <AppStat
           label="Total questions"
@@ -152,18 +206,7 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
         />
       </div>
 
-      {!readOnly && (
-        <section className="mb-12">
-          <SectionHeading
-            icon={Upload}
-            title="Upload Excel"
-            sub="Valid rows are saved directly as a question paper, grouped by topic."
-          />
-          <QuestionUploadWorkflow />
-        </section>
-      )}
-
-      <section>
+      <section className="mb-8">
         <SectionHeading
           icon={FileText}
           title={`Question papers (${questionPapers.length})`}
@@ -176,7 +219,8 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
               <p className="text-muted-foreground">No question papers yet.</p>
               {!readOnly && (
                 <p className="text-sm text-muted-foreground mt-2">
-                  Upload an Excel file above to create your first paper.
+                  Expand <strong className="font-medium text-foreground">Add manually</strong> or{' '}
+                  <strong className="font-medium text-foreground">Upload Excel</strong> below to create your first paper.
                 </p>
               )}
             </AppCard>
@@ -232,6 +276,24 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                       >
                         <Eye className="w-4 h-4" /> View paper
                       </Link>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void confirm({
+                              title: 'Delete question paper?',
+                              message: `Delete paper "${paper.name}"? All linked custom papers may be affected.`,
+                              confirmLabel: 'Delete',
+                              variant: 'danger',
+                            }).then((ok) => {
+                              if (ok) void removePaper(paper.id)
+                            })
+                          }}
+                          className="text-xs text-rose hover:underline"
+                        >
+                          Delete paper
+                        </button>
+                      )}
                       {!readOnly && (
                         <button
                           type="button"
@@ -386,6 +448,30 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
           )}
         </div>
       </section>
+
+      {!readOnly && (
+        <>
+          <CollapsibleSection
+            icon={PenLine}
+            title="Add manually"
+            sub="Add multiple questions on one screen, save a local draft, then publish as a question paper."
+            open={manualOpen}
+            onToggle={() => setManualOpen((v) => !v)}
+          >
+            <ManualQuestionEntry />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            icon={Upload}
+            title="Upload Excel"
+            sub="Download the template, upload your file, and save valid rows as a question paper."
+            open={uploadOpen}
+            onToggle={() => setUploadOpen((v) => !v)}
+          >
+            <QuestionUploadWorkflow variant="minimal" />
+          </CollapsibleSection>
+        </>
+      )}
     </>
   )
 }

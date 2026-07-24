@@ -4,7 +4,8 @@ export const tutorNav: NavItem[] = [
   { label: 'Dashboard', href: '/tutor', icon: 'LayoutDashboard' },
   { label: 'Students', href: '/tutor/students', icon: 'Users' },
   { label: 'Assessments', href: '/tutor/assessments', icon: 'ClipboardList' },
-  { label: 'Study Plans', href: '/tutor/study-plans', icon: 'Calendar' },
+  { label: 'Marks', href: '/tutor/marks', icon: 'ClipboardCheck' },
+  { label: 'Reports', href: '/tutor/reports', icon: 'BarChart3' },
   { label: 'Question Bank', href: '/tutor/question-bank', icon: 'Database' },
   { label: 'Curriculum Setup', href: '/tutor/curriculum', icon: 'Network' },
 ]

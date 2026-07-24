@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Calendar, Clock, MapPin, Users, FileText } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { AssessmentBuilder } from '@/components/academic/AssessmentBuilder'
-import { institutionCenters, studentMasterProfiles } from '@/data/mock'
 import { useAssessments } from '@/hooks/useAssessments'
-import type { TutorAssessmentSchedule } from '@/types'
+import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
+import { useCenters } from '@/hooks/useCenters'
+import { useAuth } from '@/hooks/useAuth'
+import { centerLabelsForIds } from '@/lib/centerLabel'
+import type { InstitutionCenter, TutorAssessmentSchedule } from '@/types'
+import { useConfirmModal } from '@/components/ui/AppModal'
 
 const statusStyles: Record<string, string> = {
   draft: 'bg-secondary text-muted-foreground',
@@ -14,17 +18,13 @@ const statusStyles: Record<string, string> = {
   completed: 'bg-secondary text-foreground',
 }
 
-function centerLabel(ids: string[]) {
-  if (ids.length === 0 || ids.length === institutionCenters.length) return 'All branches'
-  return ids
-    .map((id) => institutionCenters.find((c) => c.id === id)?.name)
-    .filter(Boolean)
-    .join(', ')
+function centerLabel(ids: string[], centers: InstitutionCenter[]) {
+  return centerLabelsForIds(ids, centers)
 }
 
-function studentNames(ids: string[]) {
+function studentNames(ids: string[], master: { id: string; name: string }[]) {
   return ids
-    .map((id) => studentMasterProfiles.find((s) => s.id === id)?.name)
+    .map((id) => master.find((s) => s.id === id)?.name)
     .filter(Boolean)
     .join(', ')
 }
@@ -34,17 +34,27 @@ interface AssessmentsPageProps {
 }
 
 export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
-  const { assessments, addAssessment } = useAssessments()
+  useAnalyticsPage(['tutorNames', 'adminStudents'])
+  const { assessments, addAssessment, removeAssessment, patchAssessment, ensureLoaded } = useAssessments()
+
+  useEffect(() => {
+    void ensureLoaded()
+  }, [ensureLoaded])
+  const { confirm } = useConfirmModal()
+  const { user } = useAuth()
+  const { studentMaster } = useAnalytics()
+  const { centers } = useCenters()
   const [builderOpen, setBuilderOpen] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(
+    null,
+  )
 
-  const scheduled = assessments.filter((a) => a.status === 'scheduled' || a.status === 'live')
+  const liveNow = assessments.filter((a) => a.status === 'live')
+  const scheduledOnly = assessments.filter((a) => a.status === 'scheduled')
+  const upcomingAndLive = [...liveNow, ...scheduledOnly]
   const completed = assessments.filter((a) => a.status === 'completed')
-  const avgClassScore =
-    completed.length > 0
-      ? Math.round(completed.reduce((sum, a) => sum + (a.classAvg ?? 0), 0) / completed.length)
-      : 0
 
-  function handleSave(draft: Partial<TutorAssessmentSchedule>) {
+  async function handleSave(draft: Partial<TutorAssessmentSchedule>) {
     const newAssessment: TutorAssessmentSchedule = {
       id: `ta-${Date.now()}`,
       title: draft.title ?? 'New assessment',
@@ -53,21 +63,30 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
       subject: draft.subject ?? 'Mathematics',
       scope: draft.scope ?? 'topic',
       mode: draft.mode ?? 'assessment',
-      batchName: draft.batchName ?? 'Batch A',
+      batchName: draft.batchName ?? '',
       questionCount: draft.questionCount ?? 0,
-      durationMinutes: draft.durationMinutes ?? 45,
-      scheduledAt: draft.scheduledAt ?? new Date().toISOString().slice(0, 10),
+      durationMinutes: draft.durationMinutes ?? 0,
+      scheduledAt: draft.scheduledAt ?? '',
       status: 'scheduled',
       centerIds: draft.centerIds ?? [],
       selectedQuestionIds: draft.selectedQuestionIds ?? [],
       assignedStudentIds: draft.assignedStudentIds ?? [],
-      createdByTutorId: draft.createdByTutorId ?? 'tut-1',
+      createdByTutorId: draft.createdByTutorId ?? user.id,
       questionPaperId: draft.questionPaperId,
       paperCoverage: draft.paperCoverage,
       selectedTopics: draft.selectedTopics,
       topic: draft.topic,
     }
-    addAssessment(newAssessment)
+    try {
+      await addAssessment(newAssessment)
+      setSaveMessage({ type: 'success', text: `Assessment “${newAssessment.title}” scheduled.` })
+    } catch (e) {
+      setSaveMessage({
+        type: 'error',
+        text: e instanceof Error ? e.message : 'Failed to create assessment',
+      })
+      throw e
+    }
   }
 
   return (
@@ -102,16 +121,31 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
         />
       )}
 
+      {saveMessage && (
+        <div
+          className={`mb-4 rounded-md border px-3 py-2 text-sm ${
+            saveMessage.type === 'success'
+              ? 'border-leaf/30 bg-leaf/10 text-foreground'
+              : 'border-rose/30 bg-rose/10 text-rose'
+          }`}
+        >
+          {saveMessage.text}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <AppStat label="This Month" value={assessments.length} hint="Assessments created" />
-        <AppStat label="Avg Class Score" value={avgClassScore} unit="%" tone="leaf" />
-        <AppStat label="Upcoming" value={scheduled.length} hint="Scheduled or live" tone="accent" />
+        <AppStat label="Live now" value={liveNow.length} hint="Students can start" tone="accent" />
+        <AppStat label="Scheduled" value={scheduledOnly.length} hint="Waiting to go live" />
+        <AppStat label="Completed" value={completed.length} hint="Sessions ended" />
       </div>
 
       <AppCard className="mb-6">
         <h3 className="font-display text-lg text-foreground mb-4">Upcoming & live</h3>
         <div className="space-y-3">
-          {scheduled.map((assessment) => (
+          {upcomingAndLive.length === 0 && (
+            <p className="text-sm text-muted-foreground">No live or scheduled assessments.</p>
+          )}
+          {upcomingAndLive.map((assessment) => (
             <div
               key={assessment.id}
               className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-md border border-border hover:border-accent/30 transition-colors"
@@ -135,14 +169,14 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
-                  {centerLabel(assessment.centerIds)}
+                  {centerLabel(assessment.centerIds, centers)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1">
                   <Users className="w-3 h-3" />
                   {assessment.assignedStudentIds.length} students invited
                   {assessment.assignedStudentIds.length > 0 && (
                     <span className="text-foreground/70">
-                      — {studentNames(assessment.assignedStudentIds)}
+                      — {studentNames(assessment.assignedStudentIds, studentMaster)}
                     </span>
                   )}
                 </p>
@@ -165,9 +199,48 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                     Question paper
                   </Link>
                 )}
+                {role === 'tutor' && assessment.status === 'scheduled' && (
+                  <button
+                    type="button"
+                    onClick={() => void patchAssessment(assessment.id, { status: 'live' })}
+                    className="text-leaf font-medium hover:underline"
+                  >
+                    Go live
+                  </button>
+                )}
+                {role === 'tutor' && assessment.status === 'live' && (
+                  <button
+                    type="button"
+                    onClick={() => void patchAssessment(assessment.id, { status: 'completed' })}
+                    className="text-muted-foreground hover:underline"
+                  >
+                    Mark completed
+                  </button>
+                )}
+                {(role === 'tutor' || role === 'admin') && (
+                  <Link
+                    to={`/${role}/assessments/${assessment.id}/attendance`}
+                    className="text-xs text-muted-foreground hover:underline"
+                  >
+                    Results
+                  </Link>
+                )}
                 {role === 'tutor' && (
-                  <button type="button" className="text-accent hover:underline">
-                    Edit
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void confirm({
+                        title: 'Delete assessment?',
+                        message: `Delete "${assessment.title}"? Students will no longer see this assessment.`,
+                        confirmLabel: 'Delete',
+                        variant: 'danger',
+                      }).then((ok) => {
+                        if (ok) void removeAssessment(assessment.id)
+                      })
+                    }}
+                    className="text-rose hover:underline"
+                  >
+                    Delete
                   </button>
                 )}
               </div>
@@ -207,7 +280,7 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                   <td className="py-3 font-mono-data">{assessment.questionCount}</td>
                   <td className="py-3 font-mono-data">{assessment.durationMinutes}m</td>
                   <td className="py-3 text-xs text-muted-foreground max-w-[120px]">
-                    {centerLabel(assessment.centerIds)}
+                    {centerLabel(assessment.centerIds, centers)}
                   </td>
                   <td className="py-3 text-muted-foreground text-xs">{assessment.scheduledAt}</td>
                   <td className="py-3 font-mono-data">{assessment.classAvg}%</td>
@@ -222,9 +295,12 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                           Question paper
                         </Link>
                       )}
-                      <button type="button" className="text-xs text-muted-foreground hover:underline text-left">
-                        Class report
-                      </button>
+                      <Link
+                        to={`/${role}/assessments/${assessment.id}/attendance`}
+                        className="text-xs text-accent hover:underline text-left"
+                      >
+                        View results
+                      </Link>
                     </div>
                   </td>
                 </tr>

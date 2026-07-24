@@ -1,9 +1,18 @@
 import { PageHeader, AppStat } from '@/components/layout/AppShell'
+import { PageLoader } from '@/components/ui/PrismLoader'
 import { StudentManagementPanel } from '@/components/academic/StudentManagementPanel'
-import { studentMasterProfiles, institutionCenters } from '@/data/mock'
+import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
+import { useCenters } from '@/hooks/useCenters'
 
 export function AdminStudentsPage() {
-  const active = studentMasterProfiles.filter((s) => s.status === 'active')
+  useAnalyticsPage('adminStudents')
+  const { studentMaster, loading } = useAnalytics()
+  const { centers } = useCenters()
+  const active = studentMaster.filter((s) => s.status === 'active')
+
+  if (loading) {
+    return <PageLoader />
+  }
 
   return (
     <>
@@ -14,12 +23,19 @@ export function AdminStudentsPage() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <AppStat label="Total Students" value={studentMasterProfiles.length} />
+        <AppStat label="Total Students" value={studentMaster.length} />
         <AppStat label="Active" value={active.length} tone="leaf" />
-        <AppStat label="Branches" value={institutionCenters.length} hint="Across institute" />
+        <AppStat label="Branches" value={centers.length} hint="Across institute" />
       </div>
 
-      <StudentManagementPanel scope="admin" />
+      <StudentManagementPanel
+        scope="admin"
+        students={studentMaster.map((s) => ({
+          ...s,
+          schoolName: s.schoolName ?? undefined,
+          email: s.email ?? undefined,
+        }))}
+      />
     </>
   )
 }

@@ -22,12 +22,12 @@ export function LoginHeroPanel({ headline, subtitle, footer }: LoginHeroPanelPro
 
       {/* Top institutional lockup */}
       <div className="relative z-10 px-10 xl:px-14 pt-10 pointer-events-none">
-        <div className="inline-flex flex-col gap-1 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.25)] backdrop-blur-sm">
+        <div className="inline-flex flex-col gap-1 rounded-[16px] glass-dark px-4 py-3 ios-shadow-md">
           <p className="text-[10px] font-display font-semibold uppercase tracking-[0.28em] text-yellow-300/80">
             Computer Software College
           </p>
           <p className="text-[11px] font-display font-medium text-white/50 tracking-wide">
-            Centre Division · Learnova Software
+            Centre Division · Prism Software
           </p>
         </div>
       </div>

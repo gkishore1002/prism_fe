@@ -1,4 +1,5 @@
-import { currentStudent, currentTutor, currentAdmin, institution } from '@/data/mock'
+import { apiFetch, ApiError } from '@/lib/apiClient'
+import { readSession } from '@/modules/auth/lib/authStorage'
 import type { User, UserRole } from '@/types'
 
 export interface RoleOption {
@@ -12,6 +13,7 @@ export interface LoginSuccess {
   email: string
   role: UserRole
   user: User
+  accessToken?: string
 }
 
 export interface LoginPendingRoles {
@@ -22,70 +24,99 @@ export interface LoginPendingRoles {
 
 export type LoginResult = LoginSuccess | LoginPendingRoles
 
-const DEMO_PASSWORD = 'demo123'
-
-const roleUsers: Record<UserRole, User> = {
-  student: currentStudent,
-  tutor: currentTutor,
-  admin: currentAdmin,
+interface ApiUser {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+  avatar?: string | null
+  institutionId: string
+  gradeId?: string | null
+  boardId?: string | null
 }
 
-const allRoles: RoleOption[] = [
-  { role: 'student', label: 'Student', description: 'Today, practice, diagnostics, reports, and alerts — all in one portal' },
-  { role: 'tutor', label: 'Tutor', description: 'Students, assessments, curriculum setup, and class intelligence' },
-  { role: 'admin', label: 'Admin', description: 'Institution intelligence and analytics' },
-]
+interface ApiLoginAuthenticated {
+  type: 'authenticated'
+  email: string
+  role: UserRole
+  user: ApiUser
+  accessToken: string
+}
 
-/** Mock login — accepts any @brightpath.edu email or demo@learnova.app */
-export async function loginLearnova(
+interface ApiLoginRoleSelection {
+  type: 'role_selection'
+  email: string
+  roles: RoleOption[]
+}
+
+function mapApiUser(user: ApiUser): User {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatar: user.avatar ?? undefined,
+    institutionId: user.institutionId,
+    gradeId: user.gradeId ?? undefined,
+    boardId: user.boardId ?? undefined,
+  }
+}
+
+export async function loginPrism(
   email: string,
   password: string,
-  _institutionCode: string,
+  institutionCode: string,
 ): Promise<LoginResult> {
-  await delay(400)
+  const result = await apiFetch<ApiLoginAuthenticated | ApiLoginRoleSelection>('/auth/login', {
+    method: 'POST',
+    auth: false,
+    body: JSON.stringify({ email, password, institutionCode }),
+  })
 
-  const normalizedEmail = email.trim().toLowerCase()
-  if (!normalizedEmail || password !== DEMO_PASSWORD) {
-    throw new Error('Invalid email or password. Use demo123 as the password.')
-  }
-
-  const isDemoAccount = normalizedEmail.endsWith('@brightpath.edu') || normalizedEmail === 'demo@learnova.app'
-  if (!isDemoAccount) {
-    throw new Error('Use a @brightpath.edu email or demo@learnova.app for this demo.')
+  if (result.type === 'role_selection') {
+    return { type: 'role_selection', email: result.email, roles: result.roles }
   }
 
-  // Single-role accounts skip selection
-  if (normalizedEmail === currentStudent.email) {
-    return { type: 'authenticated', email: normalizedEmail, role: 'student', user: currentStudent }
-  }
-  if (normalizedEmail === currentTutor.email) {
-    return { type: 'authenticated', email: normalizedEmail, role: 'tutor', user: currentTutor }
-  }
-  if (normalizedEmail === currentAdmin.email) {
-    return { type: 'authenticated', email: normalizedEmail, role: 'admin', user: currentAdmin }
-  }
-
-  // Generic demo login → role selection (Swotify pattern)
-  return {
-    type: 'role_selection',
-    email: normalizedEmail,
-    roles: allRoles,
-  }
-}
-
-export function resolveRoleLogin(email: string, role: UserRole): LoginSuccess {
   return {
     type: 'authenticated',
-    email,
-    role,
-    user: roleUsers[role],
+    email: result.email,
+    role: result.role,
+    user: mapApiUser(result.user),
+    accessToken: result.accessToken,
   }
 }
 
-export function getInstitutionName() {
-  return institution.name
+export async function selectRolePrism(email: string, role: UserRole): Promise<LoginSuccess> {
+  const result = await apiFetch<ApiLoginAuthenticated>('/auth/select-role', {
+    method: 'POST',
+    auth: false,
+    body: JSON.stringify({ email, role }),
+  })
+  return {
+    type: 'authenticated',
+    email: result.email,
+    role: result.role,
+    user: mapApiUser(result.user),
+    accessToken: result.accessToken,
+  }
 }
 
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+export async function fetchCurrentUser(): Promise<User | null> {
+  const session = readSession()
+  if (!session?.accessToken) return null
+  try {
+    const user = await apiFetch<ApiUser>('/auth/me')
+    return mapApiUser(user)
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) return null
+    return null
+  }
+}
+
+export async function logoutPrism(): Promise<void> {
+  try {
+    await apiFetch<void>('/auth/logout', { method: 'POST' })
+  } catch {
+    // stateless JWT — ignore network errors on logout
+  }
 }

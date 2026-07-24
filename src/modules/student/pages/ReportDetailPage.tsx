@@ -1,12 +1,20 @@
 import { Navigate, useParams } from 'react-router-dom'
+import { PageLoader } from '@/components/ui/PrismLoader'
 import { Download, Printer } from 'lucide-react'
 import { PageHeader } from '@/components/layout/AppShell'
 import { btnClass } from '@/components/ui/Button'
+import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { findMonthBySlug, StudentFullReportView } from '../components/StudentFullReportView'
 
 export function StudentReportDetailPage() {
   const { period } = useParams<{ period: string }>()
-  const entry = period ? findMonthBySlug(period) : undefined
+  useAnalyticsPage('studentReportDetail')
+  const { loading, monthlyReports } = useAnalytics()
+  const entry = period ? findMonthBySlug(period, monthlyReports) : undefined
+
+  if (loading) {
+    return <PageLoader />
+  }
 
   if (!entry) {
     return <Navigate to="/student/reports" replace />
@@ -19,7 +27,7 @@ export function StudentReportDetailPage() {
       <div className="print:hidden">
         <PageHeader
           eyebrow="Monthly report"
-          title={entry.month}
+          title={entry.period}
           sub="Full academic intelligence for this period."
           actions={
             <div className="flex gap-2">
@@ -42,7 +50,7 @@ export function StudentReportDetailPage() {
         />
       </div>
 
-      <StudentFullReportView periodLabel={entry.month} />
+      <StudentFullReportView periodLabel={entry.period} />
     </>
   )
 }

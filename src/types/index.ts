@@ -94,6 +94,7 @@ export interface ReadinessPrediction {
 
 export interface AssessmentResult {
   id: string
+  assessmentId?: string
   title: string
   subjectName: string
   date: string
@@ -118,6 +119,68 @@ export interface StudentWiseReport {
   weakTopics: string[]
   recentTests: { title: string; date: string; accuracy: number; subject: string }[]
   insight: string
+  summary?: string
+  summarySource?: 'vertex' | 'rule-based'
+  reportType?: 'snapshot' | 'overall'
+}
+
+export interface AssessmentSubjectScore {
+  subject: string
+  score: number
+  maxScore: number
+  accuracy: number
+}
+
+export interface AssessmentReport {
+  id: string
+  assessmentId: string
+  studentId: string
+  submissionId?: string | null
+  assessmentTitle: string
+  subject: string
+  score: number
+  maxScore: number
+  accuracy: number
+  classAvg?: number | null
+  rankInClass?: number | null
+  totalInClass?: number | null
+  timeSpentMin: number
+  submittedAt: string
+  subjectScores: AssessmentSubjectScore[]
+  strongTopics: string[]
+  weakTopics: string[]
+  summary: string
+  summarySource: 'vertex' | 'rule-based'
+  computedAt: string
+  reportType: 'assessment'
+}
+
+export interface OverallPerformanceReport {
+  studentId: string
+  studentName: string
+  board: string
+  grade: string
+  batch: string
+  health: number
+  readiness: number
+  improvement: number
+  avgAccuracy: number
+  status: HealthStatus
+  criticalGaps: number
+  improving: boolean
+  subjectHealth: { name: string; health: number; status: string }[]
+  learningGaps: LearningGap[]
+  readinessPredictions: ReadinessPrediction[]
+  improvementTrend: { month: string; score: number }[]
+  topicBreakdown: { topic: string; subject: string; mastery: number; status: string }[]
+  monthlyReports: { period: string; health: number; readiness: number; improvement: number }[]
+  recoveryPlan: RecoveryStep[]
+  recentAssessments: AssessmentResult[]
+  strongTopics: string[]
+  weakTopics: string[]
+  summary: string
+  summarySource: 'vertex' | 'rule-based'
+  reportType: 'overall'
 }
 
 export interface AcademicHealth {
@@ -147,6 +210,7 @@ export interface User {
 }
 
 export interface Institution {
+  /** Whole coaching chain / school — one Prism tenant (e.g. BrightPath Academy). */
   id: string
   name: string
   type: 'school' | 'coaching' | 'tuition' | 'training'
@@ -189,6 +253,7 @@ export interface StudentSummary {
 }
 
 export interface InstitutionCenter {
+  /** Physical branch/campus within an institution (e.g. Koramangala center). */
   id: string
   name: string
   city: string
@@ -202,6 +267,7 @@ export interface StudentMasterProfile {
   board: string
   grade: string
   batch: string
+  batchIds?: string[]
   centerId: string
   academicYear: string
   schoolName?: string
@@ -226,6 +292,7 @@ export interface TutorBatch {
   board: string
   grade: string
   subject?: string
+  scheduleTiming?: string
   studentIds: string[]
   avgScore?: number
 }
@@ -266,35 +333,8 @@ export interface TutorAssessmentSchedule {
   questionPaperId?: string
   paperCoverage?: 'full' | 'selected_topics'
   selectedTopics?: string[]
-}
-
-export type StudyPlanTaskType = 'Revise' | 'Practice' | 'Assessment' | 'Review'
-
-export interface StudyPlanDay {
-  id: string
-  day: number
-  focus: string
-  type: StudyPlanTaskType
-  mins: number
-  topic?: string
-  done: boolean
-}
-
-export interface StudyPlan {
-  id: string
-  title: string
-  board: string
-  grade: string
-  subject: string
-  batchName?: string
-  studentIds: string[]
-  targetScore?: number
-  baselineScore?: number
-  durationDays: number
-  days: StudyPlanDay[]
-  status: 'draft' | 'active' | 'completed'
-  createdByTutorId: string
-  createdAt: string
+  /** True when this student has already submitted (cannot retake). */
+  studentSubmitted?: boolean
 }
 
 export interface QuestionBankEntry {
@@ -327,7 +367,7 @@ export interface QuestionPaper {
   totalMarks: number
   createdAt: string
   createdBy?: string
-  source: 'upload' | 'custom'
+  source: 'upload' | 'custom' | 'manual'
   parentPaperId?: string
 }
 
@@ -336,6 +376,7 @@ export interface AssessmentAttendanceRecord {
   studentName: string
   status: 'attended' | 'absent' | 'pending'
   score?: number
+  maxScore?: number
   timeSpentMin?: number
   submittedAt?: string
 }
@@ -351,6 +392,11 @@ export interface QuestionUploadRow {
   marks: number
   questionType: string
   text: string
+  optionA?: string
+  optionB?: string
+  optionC?: string
+  optionD?: string
+  correctAnswer?: string
   valid: boolean
   errors: string[]
 }

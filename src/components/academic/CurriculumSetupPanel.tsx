@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
+import { PageLoader } from '@/components/ui/PrismLoader'
 import {
   Plus,
   Network,
@@ -9,11 +10,16 @@ import {
   ChevronRight,
   Users,
   Layers,
+  Trash2,
+  Clock,
 } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { AppSelect } from '@/components/ui/AppSelect'
 import { BatchStudentSearchList } from '@/components/academic/BatchStudentSearchList'
+import { BatchStudentPicker } from '@/components/academic/BatchStudentPicker'
+import { SyllabusCompletionSection } from '@/components/academic/SyllabusCompletionSection'
 import { useCurriculum } from '@/hooks/useCurriculum'
+import { useConfirmModal } from '@/components/ui/AppModal'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
 import { boardsMatch, gradesMatch } from '@/lib/academicScope'
 import { cn } from '@/lib/cn'
@@ -30,16 +36,43 @@ function topicMatches(questionTopic: string, selectedTopic: string): boolean {
   return q === t || q.includes(t) || t.includes(q)
 }
 
+function ExistingItemsHint({ items, label }: { items: string[]; label: string }) {
+  if (items.length === 0) return null
+  return (
+    <div className="mt-2 pt-2 border-t border-border/60">
+      <p className="text-[10px] text-muted-foreground mb-1.5">
+        {label} ({items.length})
+      </p>
+      <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto scrollbar-thin">
+        {items.map((name) => (
+          <span
+            key={name}
+            className="inline-block px-1.5 py-0.5 rounded bg-secondary text-[10px] text-foreground"
+          >
+            {name}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function InlineAddForm({
   label,
   placeholder,
+  existingItems = [],
+  existingLabel = 'Already added',
   onSubmit,
   onCancel,
+  onDuplicate,
 }: {
   label: string
   placeholder: string
+  existingItems?: string[]
+  existingLabel?: string
   onSubmit: (value: string) => void
   onCancel: () => void
+  onDuplicate?: (value: string) => void
 }) {
   const [value, setValue] = useState('')
   return (
@@ -47,7 +80,13 @@ function InlineAddForm({
       className="mt-2 p-2 rounded-md border border-accent/30 bg-accent/5 space-y-2"
       onSubmit={(e: FormEvent) => {
         e.preventDefault()
-        onSubmit(value)
+        const trimmed = value.trim()
+        if (!trimmed) return
+        if (existingItems.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
+          onDuplicate?.(trimmed)
+          return
+        }
+        onSubmit(trimmed)
         setValue('')
       }}
     >
@@ -59,11 +98,9 @@ function InlineAddForm({
         placeholder={placeholder}
         className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
       />
+      <ExistingItemsHint items={existingItems} label={existingLabel} />
       <div className="flex gap-2">
-        <button
-          type="submit"
-          className="text-xs btn btn-primary px-2 py-1"
-        >
+        <button type="submit" className="text-xs btn btn-primary px-2 py-1">
           Save
         </button>
         <button type="button" onClick={onCancel} className="text-xs text-muted-foreground px-2 py-1">
@@ -74,10 +111,42 @@ function InlineAddForm({
   )
 }
 
+function DeleteButton({
+  label,
+  onDelete,
+  className,
+}: {
+  label: string
+  onDelete: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        onDelete()
+      }}
+      className={cn(
+        'p-1 rounded shrink-0 text-muted-foreground hover:text-rose hover:bg-rose/10 transition-colors',
+        className,
+      )}
+      aria-label={`Delete ${label}`}
+      title={`Delete ${label}`}
+    >
+      <Trash2 className="w-3.5 h-3.5" />
+    </button>
+  )
+}
+
 export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   const {
     curriculum,
     batches,
+    students,
+    loading,
+    error,
+    ensureLoaded: ensureCurriculumLoaded,
     addBoard,
     addGrade,
     addSubject,
@@ -86,26 +155,102 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
     addStudentToBatch,
     assignStudentToBatch,
     removeStudentFromBatch,
+    removeBoard,
+    removeGrade,
+    removeSubject,
+    removeTopic,
+    removeBatch,
     getBatchesForScope,
     getStudentsForBatch,
-    getUnassignedStudents,
+    getStudentsNotInBatch,
   } = useCurriculum()
-  const { questions } = useQuestionPapers()
+  const { confirm } = useConfirmModal()
+  const { questions, ensureLoaded } = useQuestionPapers()
 
-  const [board, setBoard] = useState(curriculum[0]?.board ?? 'CBSE')
-  const [grade, setGrade] = useState(curriculum[0]?.grades[0]?.grade ?? 'Grade 8')
-  const [subject, setSubject] = useState(
-    curriculum[0]?.grades[0]?.subjects[0]?.name ?? 'Mathematics',
-  )
+  useEffect(() => {
+    void ensureCurriculumLoaded()
+    void ensureLoaded()
+  }, [ensureCurriculumLoaded, ensureLoaded])
+
+  const [board, setBoard] = useState('')
+  const [grade, setGrade] = useState('')
+  const [subject, setSubject] = useState('')
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
   const [addTarget, setAddTarget] = useState<AddTarget>(null)
   const [batchName, setBatchName] = useState('')
   const [batchSubject, setBatchSubject] = useState('')
+  const [batchScheduleTiming, setBatchScheduleTiming] = useState('')
   const [createSelectedIds, setCreateSelectedIds] = useState<string[]>([])
   const [createPendingNames, setCreatePendingNames] = useState<string[]>([])
   const [createNewStudentName, setCreateNewStudentName] = useState('')
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null)
   const [newStudentName, setNewStudentName] = useState('')
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(
+    null,
+  )
+  const [saving, setSaving] = useState(false)
+
+  async function runAction(action: () => Promise<void>, successText: string) {
+    setSaving(true)
+    setActionMessage(null)
+    try {
+      await action()
+      setActionMessage({ type: 'success', text: successText })
+    } catch (e) {
+      setActionMessage({
+        type: 'error',
+        text: e instanceof Error ? e.message : 'Something went wrong',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function confirmDelete(
+    message: string,
+    action: () => Promise<void>,
+    successText: string,
+    title = 'Delete item?',
+  ) {
+    const ok = await confirm({
+      title,
+      message,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    })
+    if (!ok) return
+    await runAction(action, successText)
+  }
+
+  function reportDuplicate(name: string) {
+    setActionMessage({ type: 'error', text: `"${name}" already exists — pick a different name or delete the existing one.` })
+  }
+
+  useEffect(() => {
+    if (curriculum.length === 0) return
+    const hasBoard = curriculum.some((b) => b.board === board)
+    if (!hasBoard) {
+      const first = curriculum[0]
+      setBoard(first.board)
+      setGrade(first.grades[0]?.grade ?? '')
+      setSubject(first.grades[0]?.subjects[0]?.name ?? '')
+      return
+    }
+    const data = curriculum.find((b) => b.board === board)
+    if (!data) return
+    const gradeOk = data.grades.some((g) => g.grade === grade)
+    if (!gradeOk) {
+      setGrade(data.grades[0]?.grade ?? '')
+      setSubject(data.grades[0]?.subjects[0]?.name ?? '')
+      return
+    }
+    const gData = data.grades.find((g) => g.grade === grade)
+    const subjectOk = gData?.subjects.some((s) => s.name === subject)
+    if (gData && !subjectOk) {
+      setSubject(gData.subjects[0]?.name ?? '')
+    }
+  }, [curriculum, board, grade, subject])
 
   const boardData = curriculum.find((b) => b.board === board) ?? curriculum[0]
   const gradeData = boardData?.grades.find((g) => g.grade === grade) ?? boardData?.grades[0]
@@ -137,10 +282,17 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   const canManage = role === 'admin' || role === 'tutor'
 
   function selectBoard(next: string) {
-    const data = curriculum.find((b) => b.board === next)!
+    const data = curriculum.find((b) => b.board === next)
+    if (!data) return
     setBoard(next)
-    setGrade(data.grades[0].grade)
-    setSubject(data.grades[0].subjects[0].name)
+    const firstGrade = data.grades[0]
+    if (firstGrade) {
+      setGrade(firstGrade.grade)
+      setSubject(firstGrade.subjects[0]?.name ?? '')
+    } else {
+      setGrade('')
+      setSubject('')
+    }
     setBatchSubject('')
     setSelectedBatchId(null)
     setSelectedTopic(null)
@@ -148,9 +300,10 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   }
 
   function selectGrade(next: string) {
-    const data = boardData!.grades.find((g) => g.grade === next)!
+    const data = boardData?.grades.find((g) => g.grade === next)
+    if (!data) return
     setGrade(next)
-    setSubject(data.subjects[0].name)
+    setSubject(data.subjects[0]?.name ?? '')
     setBatchSubject('')
     setSelectedBatchId(null)
     setSelectedTopic(null)
@@ -166,6 +319,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   function resetBatchForm() {
     setBatchName('')
     setBatchSubject('')
+    setBatchScheduleTiming('')
     setCreateSelectedIds([])
     setCreatePendingNames([])
     setCreateNewStudentName('')
@@ -185,42 +339,68 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
     setCreateNewStudentName('')
   }
 
-  function handleAddBatch(e: FormEvent) {
+  async function handleAddBatch(e: FormEvent) {
     e.preventDefault()
-    if (!batchName.trim()) return
-    const batchId = addBatch({
-      name: batchName.trim(),
-      board,
-      grade,
-      subject: batchSubject.trim() || undefined,
-      avgScore: 0,
-      studentIds: createSelectedIds,
-    })
-    createPendingNames.forEach((name) => addStudentToBatch(batchId, name))
-    resetBatchForm()
+    if (!batchName.trim() || !hasBatchScope) return
+    const trimmed = batchName.trim()
+    if (existingBatchNames.some((n) => n.toLowerCase() === trimmed.toLowerCase())) {
+      reportDuplicate(trimmed)
+      return
+    }
+    await runAction(async () => {
+      const batchId = await addBatch({
+        name: trimmed,
+        board,
+        grade,
+        subject: batchSubject.trim() || undefined,
+        scheduleTiming: batchScheduleTiming.trim() || undefined,
+        avgScore: 0,
+        studentIds: createSelectedIds,
+      })
+      for (const name of createPendingNames) {
+        await addStudentToBatch(batchId, name)
+      }
+      resetBatchForm()
+      setSelectedBatchId(batchId)
+    }, `Batch "${trimmed}" created`)
   }
 
-  function handleAddStudentToBatch(e: FormEvent, batchId: string) {
+  async function handleAddStudentToBatch(e: FormEvent, batchId: string) {
     e.preventDefault()
     if (!newStudentName.trim()) return
-    addStudentToBatch(batchId, newStudentName.trim())
-    setNewStudentName('')
+    const name = newStudentName.trim()
+    await runAction(async () => {
+      await addStudentToBatch(batchId, name)
+      setNewStudentName('')
+    }, `Added ${name} to batch`)
   }
 
   const selectedBatch = selectedBatchId
     ? scopedBatches.find((b) => b.id === selectedBatchId)
     : undefined
   const batchStudents = selectedBatchId ? getStudentsForBatch(selectedBatchId) : []
-  const unassignedStudents = getUnassignedStudents(board, grade)
-  const createSelectedStudents = unassignedStudents.filter((s) =>
-    createSelectedIds.includes(s.id),
-  )
+  const studentsAvailableForBatch = selectedBatchId
+    ? getStudentsNotInBatch(selectedBatchId)
+    : students
+  const createSelectedStudents = students.filter((s) => createSelectedIds.includes(s.id))
   const createStudentCount = createSelectedIds.length + createPendingNames.length
+  const isEmpty = curriculum.length === 0
+  const hasBatchScope = Boolean(boardData && gradeData)
+  const existingBoardNames = curriculum.map((b) => b.board)
+  const existingGradeNames = boardData?.grades.map((g) => g.grade) ?? []
+  const existingSubjectNames = gradeData?.subjects.map((s) => s.name) ?? []
+  const existingTopicNames = subjectData?.topics.map((t) => t.name) ?? []
+  const existingBatchNames = scopedBatches.map((b) => b.name)
 
-  if (!boardData || !gradeData || !subjectData) {
+  if (loading) {
+    return <PageLoader label="Loading curriculum…" />
+  }
+
+  if (error) {
     return (
-      <AppCard className="text-center py-12">
-        <p className="text-muted-foreground">Add a board to start building your curriculum.</p>
+      <AppCard className="text-center py-10">
+        <p className="text-sm text-rose mb-2">Could not load curriculum</p>
+        <p className="text-sm text-muted-foreground">{error}</p>
       </AppCard>
     )
   }
@@ -232,14 +412,16 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
         title="Board → Grade → Subject → Topic"
         sub={
           role === 'admin'
-            ? 'Define and maintain the academic hierarchy and batches. Reports, question banks, and assessments derive from this structure.'
-            : 'Create batches for a board and grade, then add students to each batch. Subject is optional.'
+            ? 'Define the academic hierarchy, track syllabus completion, and manage batches. Reports and assessments derive from this structure.'
+            : 'Create batches for a board and grade, then add students to each batch. Subject and class timing are optional.'
         }
         actions={
           <>
             <button
               type="button"
-              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-secondary flex items-center gap-1.5"
+              disabled
+              title="Excel import coming soon"
+              className="text-xs px-3 py-1.5 rounded-md border border-border opacity-50 cursor-not-allowed flex items-center gap-1.5"
             >
               <Upload className="w-3.5 h-3.5" /> Import Excel
             </button>
@@ -256,18 +438,66 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
         }
       />
 
-      {addTarget === 'board' && canManage && (
-        <AppCard className="mb-4">
+      {actionMessage && (
+        <div
+          className={cn(
+            'mb-4 rounded-md px-4 py-3 text-sm',
+            actionMessage.type === 'success'
+              ? 'bg-leaf/10 text-leaf border border-leaf/30'
+              : 'bg-rose/10 text-rose border border-rose/30',
+          )}
+        >
+          {actionMessage.text}
+        </div>
+      )}
+
+      {isEmpty && canManage && (
+        <AppCard className="mb-6 accent-yellow">
+          <h3 className="font-display text-lg text-foreground mb-1">Start your curriculum</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Add your first board to unlock grades, subjects, topics, and batches. This is the foundation
+            for question banks, assessments, and student reports.
+          </p>
           <InlineAddForm
-            label="Board name"
-            placeholder="e.g. ICSE"
+            label="First board name"
+            placeholder="e.g. CBSE"
+            existingItems={existingBoardNames}
+            existingLabel="Existing boards"
+            onDuplicate={reportDuplicate}
             onSubmit={(v) => {
-              addBoard(v)
-              setAddTarget(null)
+              void runAction(async () => {
+                await addBoard(v)
+                setBoard(v)
+                setAddTarget(null)
+              }, `Board "${v}" added`)
             }}
             onCancel={() => setAddTarget(null)}
           />
         </AppCard>
+      )}
+
+      {addTarget === 'board' && canManage && !isEmpty && (
+        <AppCard className="mb-4">
+          <InlineAddForm
+            label="Board name"
+            placeholder="e.g. ICSE"
+            existingItems={existingBoardNames}
+            existingLabel="Existing boards"
+            onDuplicate={reportDuplicate}
+            onSubmit={(v) => {
+              void runAction(async () => {
+                await addBoard(v)
+                setBoard(v)
+                setAddTarget(null)
+              }, `Board "${v}" added`)
+            }}
+            onCancel={() => setAddTarget(null)}
+          />
+        </AppCard>
+      )}
+
+      {!isEmpty && (
+        <SyllabusCompletionSection curriculum={curriculum} boardFilter={board || undefined} />
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -287,35 +517,59 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             )}
           </div>
           <div className="space-y-1 max-h-64 overflow-y-auto scrollbar-thin">
-            {curriculum.map((b) => (
-              <button
-                key={b.board}
-                type="button"
-                onClick={() => selectBoard(b.board)}
-                className={cn(
-                  'w-full text-left px-3 py-2 rounded-md text-sm',
-                  board === b.board ? 'bg-ink text-paper' : 'hover:bg-secondary',
-                )}
-              >
-                <div className="font-medium">{b.board}</div>
-                <div
+            {curriculum.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">No boards yet</p>
+            ) : (
+              curriculum.map((b) => (
+              <div key={b.board} className="flex items-stretch gap-0.5 group">
+                <button
+                  type="button"
+                  onClick={() => selectBoard(b.board)}
                   className={cn(
-                    'text-[10px]',
-                    board === b.board ? 'text-paper/60' : 'text-muted-foreground',
+                    'flex-1 text-left px-3 py-2 rounded-md text-sm min-w-0',
+                    board === b.board ? 'bg-ink text-paper' : 'hover:bg-secondary',
                   )}
                 >
-                  {b.grades.length} grades ·{' '}
-                  {b.grades.reduce((a, g) => a + g.subjects.length, 0)} subjects
-                </div>
-              </button>
-            ))}
+                  <div className="font-medium">{b.board}</div>
+                  <div
+                    className={cn(
+                      'text-[10px]',
+                      board === b.board ? 'text-paper/60' : 'text-muted-foreground',
+                    )}
+                  >
+                    {b.grades.length} grades ·{' '}
+                    {b.grades.reduce((a, g) => a + g.subjects.length, 0)} subjects
+                  </div>
+                </button>
+                {canManage && (
+                  <DeleteButton
+                    label={b.board}
+                    className="self-center opacity-60 group-hover:opacity-100"
+                    onDelete={() =>
+                      void confirmDelete(
+                        `Delete board "${b.board}" and all its grades, subjects, and topics?`,
+                        async () => {
+                          await removeBoard(b.board)
+                          if (board === b.board) {
+                            setSelectedTopic(null)
+                            setSelectedBatchId(null)
+                          }
+                        },
+                        `Board "${b.board}" deleted`,
+                      )
+                    }
+                  />
+                )}
+              </div>
+            ))
+            )}
           </div>
         </AppCard>
 
         <AppCard>
           <div className="flex items-center justify-between mb-3">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-              Grades · {board}
+              Grades · {board || '—'}
             </div>
             {canManage && (
               <button
@@ -331,43 +585,78 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             <InlineAddForm
               label="Grade name"
               placeholder="e.g. Grade 10"
+              existingItems={existingGradeNames}
+              existingLabel="Existing grades"
+              onDuplicate={reportDuplicate}
               onSubmit={(v) => {
-                addGrade(board, v)
-                setAddTarget(null)
+                void runAction(async () => {
+                  await addGrade(board, v)
+                  setGrade(v)
+                  setSubject(
+                    boardData?.grades.find((g) => g.grade === v)?.subjects[0]?.name ?? subject,
+                  )
+                  setAddTarget(null)
+                }, `Grade "${v}" added`)
               }}
               onCancel={() => setAddTarget(null)}
             />
           )}
           <div className="space-y-1 max-h-64 overflow-y-auto scrollbar-thin mt-2">
-            {boardData.grades.map((g) => (
-              <button
-                key={g.grade}
-                type="button"
-                onClick={() => selectGrade(g.grade)}
-                className={cn(
-                  'w-full text-left px-3 py-2 rounded-md text-sm',
-                  grade === g.grade ? 'bg-ink text-paper' : 'hover:bg-secondary',
-                )}
-              >
-                <div className="font-medium">{g.grade}</div>
-                <div
+            {!boardData ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">Select or add a board</p>
+            ) : boardData.grades.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">No grades yet</p>
+            ) : (
+              boardData.grades.map((g) => (
+              <div key={g.grade} className="flex items-stretch gap-0.5 group">
+                <button
+                  type="button"
+                  onClick={() => selectGrade(g.grade)}
                   className={cn(
-                    'text-[10px]',
-                    grade === g.grade ? 'text-paper/60' : 'text-muted-foreground',
+                    'flex-1 text-left px-3 py-2 rounded-md text-sm min-w-0',
+                    grade === g.grade ? 'bg-ink text-paper' : 'hover:bg-secondary',
                   )}
                 >
-                  {g.subjects.length} subjects ·{' '}
-                  {g.subjects.reduce((a, s) => a + s.topics.length, 0)} topics
-                </div>
-              </button>
-            ))}
+                  <div className="font-medium">{g.grade}</div>
+                  <div
+                    className={cn(
+                      'text-[10px]',
+                      grade === g.grade ? 'text-paper/60' : 'text-muted-foreground',
+                    )}
+                  >
+                    {g.subjects.length} subjects ·{' '}
+                    {g.subjects.reduce((a, s) => a + s.topics.length, 0)} topics
+                  </div>
+                </button>
+                {canManage && (
+                  <DeleteButton
+                    label={g.grade}
+                    className="self-center opacity-60 group-hover:opacity-100"
+                    onDelete={() =>
+                      void confirmDelete(
+                        `Delete grade "${g.grade}" and all its subjects and topics?`,
+                        async () => {
+                          await removeGrade(board, g.grade)
+                          if (grade === g.grade) {
+                            setSelectedTopic(null)
+                            setSelectedBatchId(null)
+                          }
+                        },
+                        `Grade "${g.grade}" deleted`,
+                      )
+                    }
+                  />
+                )}
+              </div>
+            ))
+            )}
           </div>
         </AppCard>
 
         <AppCard>
           <div className="flex items-center justify-between mb-3">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-              <BookOpen className="w-3 h-3" /> Subjects · {grade}
+              <BookOpen className="w-3 h-3" /> Subjects · {grade || '—'}
             </div>
             {canManage && (
               <button
@@ -383,42 +672,71 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             <InlineAddForm
               label="Subject name"
               placeholder="e.g. Science"
+              existingItems={existingSubjectNames}
+              existingLabel="Existing subjects"
+              onDuplicate={reportDuplicate}
               onSubmit={(v) => {
-                addSubject(board, grade, v)
-                setAddTarget(null)
+                void runAction(async () => {
+                  await addSubject(board, grade, v)
+                  setSubject(v)
+                  setAddTarget(null)
+                }, `Subject "${v}" added`)
               }}
               onCancel={() => setAddTarget(null)}
             />
           )}
           <div className="space-y-1 max-h-64 overflow-y-auto scrollbar-thin mt-2">
-            {gradeData.subjects.map((s) => (
-              <button
-                key={s.name}
-                type="button"
-                onClick={() => selectSubject(s.name)}
-                className={cn(
-                  'w-full text-left px-3 py-2 rounded-md text-sm',
-                  subject === s.name ? 'bg-ink text-paper' : 'hover:bg-secondary',
-                )}
-              >
-                <div className="font-medium">{s.name}</div>
-                <div
+            {!gradeData ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">Select a grade</p>
+            ) : gradeData.subjects.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">No subjects yet</p>
+            ) : (
+              gradeData.subjects.map((s) => (
+              <div key={s.name} className="flex items-stretch gap-0.5 group">
+                <button
+                  type="button"
+                  onClick={() => selectSubject(s.name)}
                   className={cn(
-                    'text-[10px]',
-                    subject === s.name ? 'text-paper/60' : 'text-muted-foreground',
+                    'flex-1 text-left px-3 py-2 rounded-md text-sm min-w-0',
+                    subject === s.name ? 'bg-ink text-paper' : 'hover:bg-secondary',
                   )}
                 >
-                  {s.topics.length} topics · {s.topics.reduce((a, t) => a + t.questions, 0)} qs
-                </div>
-              </button>
-            ))}
+                  <div className="font-medium">{s.name}</div>
+                  <div
+                    className={cn(
+                      'text-[10px]',
+                      subject === s.name ? 'text-paper/60' : 'text-muted-foreground',
+                    )}
+                  >
+                    {s.topics.length} topics · {s.topics.reduce((a, t) => a + t.questions, 0)} qs
+                  </div>
+                </button>
+                {canManage && (
+                  <DeleteButton
+                    label={s.name}
+                    className="self-center opacity-60 group-hover:opacity-100"
+                    onDelete={() =>
+                      void confirmDelete(
+                        `Delete subject "${s.name}" and all its topics? Linked questions in the bank will also be removed.`,
+                        async () => {
+                          await removeSubject(board, grade, s.name)
+                          if (subject === s.name) setSelectedTopic(null)
+                        },
+                        `Subject "${s.name}" deleted`,
+                      )
+                    }
+                  />
+                )}
+              </div>
+            ))
+            )}
           </div>
         </AppCard>
 
         <AppCard>
           <div className="flex items-center justify-between mb-3">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-              <FileText className="w-3 h-3" /> Topics · {subject}
+              <FileText className="w-3 h-3" /> Topics · {subject || '—'}
             </div>
             {canManage && (
               <button
@@ -434,44 +752,69 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             <InlineAddForm
               label="Topic name"
               placeholder="e.g. Linear Equations"
+              existingItems={existingTopicNames}
+              existingLabel="Existing topics"
+              onDuplicate={reportDuplicate}
               onSubmit={(v) => {
-                addTopic(board, grade, subject, v)
-                setAddTarget(null)
+                void runAction(async () => {
+                  await addTopic(board, grade, subject, v)
+                  setSelectedTopic(v)
+                  setAddTarget(null)
+                }, `Topic "${v}" added`)
               }}
               onCancel={() => setAddTarget(null)}
             />
           )}
           <div className="space-y-1 max-h-64 overflow-y-auto scrollbar-thin mt-2">
-            {subjectData.topics.map((t) => {
+            {!subjectData ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">Select a subject</p>
+            ) : subjectData.topics.map((t) => {
               const active = selectedTopic === t.name
               return (
-                <button
-                  key={t.name}
-                  type="button"
-                  onClick={() => setSelectedTopic(active ? null : t.name)}
-                  className={cn(
-                    'w-full text-left px-3 py-2 rounded-md text-sm transition-colors',
-                    active ? 'bg-accent/15 border border-accent/40' : 'hover:bg-secondary',
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <Check className="w-3 h-3 text-leaf shrink-0" />
-                    <span className="flex-1 font-medium truncate">{t.name}</span>
-                    <ChevronRight
-                      className={cn(
-                        'w-3 h-3 text-muted-foreground transition-transform',
-                        active && 'rotate-90 text-accent',
-                      )}
+                <div key={t.name} className="flex items-stretch gap-0.5 group">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTopic(active ? null : t.name)}
+                    className={cn(
+                      'flex-1 text-left px-3 py-2 rounded-md text-sm transition-colors min-w-0',
+                      active ? 'bg-accent/15 border border-accent/40' : 'hover:bg-secondary',
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Check className="w-3 h-3 text-leaf shrink-0" />
+                      <span className="flex-1 font-medium truncate">{t.name}</span>
+                      <ChevronRight
+                        className={cn(
+                          'w-3 h-3 text-muted-foreground transition-transform',
+                          active && 'rotate-90 text-accent',
+                        )}
+                      />
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 pl-5 flex items-center gap-3">
+                      <span className="font-mono-data">{t.questions} in bank</span>
+                      <span className="font-mono-data">{t.mastery}% mastery</span>
+                    </div>
+                  </button>
+                  {canManage && (
+                    <DeleteButton
+                      label={t.name}
+                      className="self-center opacity-60 group-hover:opacity-100"
+                      onDelete={() =>
+                        void confirmDelete(
+                          `Delete topic "${t.name}"? Questions tagged to this topic will also be removed.`,
+                          async () => {
+                            await removeTopic(board, grade, subject, t.name)
+                            if (selectedTopic === t.name) setSelectedTopic(null)
+                          },
+                          `Topic "${t.name}" deleted`,
+                        )
+                      }
                     />
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5 pl-5 flex items-center gap-3">
-                    <span className="font-mono-data">{t.questions} in bank</span>
-                    <span className="font-mono-data">{t.mastery}% mastery</span>
-                  </div>
-                </button>
+                  )}
+                </div>
               )
             })}
-            {subjectData.topics.length === 0 && (
+            {subjectData && subjectData.topics.length === 0 && (
               <p className="text-xs text-muted-foreground py-4 text-center">No topics yet — add one above.</p>
             )}
           </div>
@@ -487,8 +830,9 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             <div>
               <h3 className="font-display text-lg">Batches</h3>
               <p className="text-xs text-muted-foreground">
-                {board} · {grade} — {scopedBatches.length} batch
-                {scopedBatches.length !== 1 ? 'es' : ''} · {batches.length} total
+                {board && grade
+                  ? `${board} · ${grade} — ${scopedBatches.length} batch${scopedBatches.length !== 1 ? 'es' : ''} · ${batches.length} total`
+                  : 'Add board and grade to create batches'}
               </p>
             </div>
           </div>
@@ -509,11 +853,12 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
           )}
         </div>
 
-        {addTarget === 'batch' && (
+        {addTarget === 'batch' && hasBatchScope && (
           <form
             onSubmit={handleAddBatch}
             className="mb-4 p-4 rounded-lg border border-accent/30 bg-accent/5 space-y-4"
           >
+            <ExistingItemsHint items={existingBatchNames} label={`Existing batches for ${board} · ${grade}`} />
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <label className="block sm:col-span-2 lg:col-span-1">
                 <span className="text-xs text-muted-foreground">Batch name *</span>
@@ -535,8 +880,19 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                 ]}
                 placeholder="No subject"
               />
+              <label className="block">
+                <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> Class timing (optional)
+                </span>
+                <input
+                  value={batchScheduleTiming}
+                  onChange={(e) => setBatchScheduleTiming(e.target.value)}
+                  placeholder="e.g. Mon/Wed 4–6 PM"
+                  className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                />
+              </label>
               <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-1">
-                <button type="submit" className="btn btn-primary px-4 py-2 text-sm">
+                <button type="submit" disabled={saving} className="btn btn-primary px-4 py-2 text-sm disabled:opacity-50">
                   Save batch
                   {createStudentCount > 0 ? ` (${createStudentCount} students)` : ''}
                 </button>
@@ -550,22 +906,25 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               </div>
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-4 pt-2 border-t border-border/60">
-              <div>
-                <p className="text-xs font-medium text-foreground mb-2">
-                  Add existing students ({board} · {grade})
-                </p>
-                <BatchStudentSearchList
-                  students={unassignedStudents}
-                  mode="pick"
-                  selectedIds={createSelectedIds}
-                  onToggle={toggleCreateStudent}
-                  emptyMessage="No unassigned students for this board and grade."
-                  searchPlaceholder="Search students to add…"
-                />
-              </div>
+            <div className="pt-2 border-t border-border/60">
+              <p className="text-xs font-medium text-foreground mb-3">
+                Assign students to this batch
+              </p>
+              <p className="text-[11px] text-muted-foreground mb-3">
+                All institution students are listed below. A student can belong to multiple batches.
+              </p>
+              <BatchStudentPicker
+                students={students}
+                selectedIds={createSelectedIds}
+                onToggle={toggleCreateStudent}
+                emptyMessage="No students yet — add new names below or create students in Student Management."
+                dropdownLabel="Quick add — searchable dropdown"
+                listLabel="Full list — search and multi-select"
+              />
+            </div>
 
-              <div className="space-y-4">
+            <div className="grid lg:grid-cols-2 gap-4 pt-2 border-t border-border/60">
+              <div className="lg:col-span-2 space-y-4">
                 <div>
                   <p className="text-xs font-medium text-foreground mb-2">Add new student</p>
                   <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
@@ -599,7 +958,14 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                           key={student.id}
                           className="flex items-center justify-between gap-2 p-2 rounded-md bg-card border border-border text-sm"
                         >
-                          <span className="truncate">{student.name}</span>
+                          <span className="truncate">
+                            {student.name}
+                            {student.batch ? (
+                              <span className="text-xs text-muted-foreground ml-1">
+                                (also in {student.batch})
+                              </span>
+                            ) : null}
+                          </span>
                           <button
                             type="button"
                             onClick={() => toggleCreateStudent(student.id)}
@@ -637,7 +1003,17 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
           </form>
         )}
 
-        {scopedBatches.length === 0 ? (
+        {addTarget === 'batch' && !hasBatchScope && (
+          <p className="text-sm text-muted-foreground text-center py-4 mb-4">
+            Select a board and grade above before creating a batch.
+          </p>
+        )}
+
+        {!hasBatchScope ? (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            Select a board and grade to create batches and assign students.
+          </p>
+        ) : scopedBatches.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">
             No batches for {board} · {grade} yet. Add a batch to assign students and schedule assessments.
           </p>
@@ -649,6 +1025,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                   <tr className="text-left text-xs text-muted-foreground border-b border-border">
                     <th className="pb-3 font-medium">Batch</th>
                     <th className="pb-3 font-medium">Subject</th>
+                    <th className="pb-3 font-medium">Timing</th>
                     <th className="pb-3 font-medium">Students</th>
                     <th className="pb-3 font-medium" />
                   </tr>
@@ -664,15 +1041,33 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                       >
                         <td className="py-3 font-medium">{b.name}</td>
                         <td className="py-3 text-muted-foreground">{b.subject ?? '—'}</td>
+                        <td className="py-3 text-muted-foreground text-xs">{b.scheduleTiming ?? '—'}</td>
                         <td className="py-3 font-mono-data">{count}</td>
                         <td className="py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedBatchId(active ? null : b.id)}
-                            className="text-xs text-accent hover:underline"
-                          >
-                            {active ? 'Close' : 'Manage students'}
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedBatchId(active ? null : b.id)}
+                              className="text-xs text-accent hover:underline"
+                            >
+                              {active ? 'Close' : 'Manage students'}
+                            </button>
+                            {canManage && (
+                              <DeleteButton
+                                label={b.name}
+                                onDelete={() =>
+                                  void confirmDelete(
+                                    `Delete batch "${b.name}"? Students will be unassigned from this batch.`,
+                                    async () => {
+                                      await removeBatch(b.id)
+                                      if (selectedBatchId === b.id) setSelectedBatchId(null)
+                                    },
+                                    `Batch "${b.name}" deleted`,
+                                  )
+                                }
+                              />
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -689,7 +1084,8 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                   </h4>
                   <p className="text-xs text-muted-foreground mt-1">
                     {board} · {grade}
-                    {selectedBatch.subject ? ` · ${selectedBatch.subject}` : ''} ·{' '}
+                    {selectedBatch.subject ? ` · ${selectedBatch.subject}` : ''}
+                    {selectedBatch.scheduleTiming ? ` · ${selectedBatch.scheduleTiming}` : ''} ·{' '}
                     {batchStudents.length} enrolled
                   </p>
                 </div>
@@ -703,7 +1099,10 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                       students={batchStudents}
                       mode="enrolled"
                       onRemove={(studentId) =>
-                        removeStudentFromBatch(studentId, selectedBatch.id)
+                        void runAction(
+                          () => removeStudentFromBatch(studentId, selectedBatch.id),
+                          'Student removed from batch',
+                        )
                       }
                       emptyMessage="No students match your search."
                       searchPlaceholder="Search enrolled students…"
@@ -711,30 +1110,38 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                   )}
                 </div>
 
-                <div className="grid lg:grid-cols-2 gap-4 pt-2 border-t border-border/60">
-                  <div>
-                    <p className="text-xs font-medium text-foreground mb-2">
-                      Add existing students ({board} · {grade})
+                <div className="pt-2 border-t border-border/60">
+                  <p className="text-xs font-medium text-foreground mb-2">
+                    Add students from institution roster
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mb-3">
+                    Students already in this batch are hidden. Others may still belong to different
+                    batches.
+                  </p>
+                  {studentsAvailableForBatch.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Every student is already assigned to this batch.
                     </p>
-                    {unassignedStudents.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        All students for this board and grade are already in a batch.
-                      </p>
-                    ) : (
-                      <BatchStudentSearchList
-                        students={unassignedStudents}
-                        mode="pick"
-                        selectedIds={[]}
-                        onToggle={(studentId) =>
-                          assignStudentToBatch(studentId, selectedBatch.id)
-                        }
-                        emptyMessage="No unassigned students match your search."
-                        searchPlaceholder="Search students to add…"
-                      />
-                    )}
-                  </div>
+                  ) : (
+                    <BatchStudentPicker
+                      students={studentsAvailableForBatch}
+                      selectedIds={[]}
+                      onToggle={(studentId) =>
+                        void runAction(
+                          () => assignStudentToBatch(studentId, selectedBatch.id),
+                          'Student assigned to batch',
+                        )
+                      }
+                      emptyMessage="No students match your search."
+                      listSearchPlaceholder="Search students by name or batch…"
+                      dropdownLabel="Quick add — searchable dropdown"
+                      listLabel="Full list — search and assign"
+                      assignOnPick
+                    />
+                  )}
+                </div>
 
-                  <div>
+                <div>
                     <p className="text-xs font-medium text-foreground mb-2">Add new student</p>
                     <form
                       onSubmit={(e) => handleAddStudentToBatch(e, selectedBatch.id)}
@@ -756,7 +1163,6 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                         Add to batch
                       </button>
                     </form>
-                  </div>
                 </div>
               </div>
             )}

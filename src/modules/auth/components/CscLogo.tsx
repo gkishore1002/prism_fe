@@ -22,7 +22,7 @@ const taglineStyles = {
   onLight: {
     college: 'text-blue-800',
     centre: 'text-blue-600',
-    product: 'text-text-muted',
+    product: 'text-muted-foreground',
   },
 }
 
@@ -97,7 +97,7 @@ export function CscLogo({
             className={cn('font-display font-semibold uppercase tracking-[0.18em]', tags.centre)}
             style={{ fontSize: s.tagSub }}
           >
-            Centre · Learnova Software
+            Centre · Prism Software
           </p>
           <p
             className={cn('font-display font-medium uppercase tracking-[0.22em] pt-0.5', tags.product)}

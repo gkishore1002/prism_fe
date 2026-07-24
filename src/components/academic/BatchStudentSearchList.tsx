@@ -12,6 +12,8 @@ interface BatchStudentSearchListProps {
   emptyMessage?: string
   searchPlaceholder?: string
   maxHeight?: string
+  /** Show "Assign" instead of toggle selected state (immediate assign flow). */
+  assignOnPick?: boolean
 }
 
 export function BatchStudentSearchList({
@@ -23,6 +25,7 @@ export function BatchStudentSearchList({
   emptyMessage = 'No students found.',
   searchPlaceholder = 'Search students by name…',
   maxHeight = 'max-h-56',
+  assignOnPick = false,
 }: BatchStudentSearchListProps) {
   const [search, setSearch] = useState('')
 
@@ -68,7 +71,10 @@ export function BatchStudentSearchList({
                     <p className="text-sm font-medium truncate">{student.name}</p>
                     <p className="text-xs text-muted-foreground">
                       Readiness {student.readiness}%
-                      {student.batch ? ` · ${student.batch}` : ''}
+                      {student.batch ? ` · ${student.batch}` : ' · No batch yet'}
+                      {student.board && student.grade
+                        ? ` · ${student.board} ${student.grade}`
+                        : ''}
                     </p>
                   </div>
                   {mode === 'pick' ? (
@@ -77,13 +83,13 @@ export function BatchStudentSearchList({
                       onClick={() => onToggle?.(student.id)}
                       className={cn(
                         'text-xs px-2.5 py-1 rounded-md shrink-0 inline-flex items-center gap-1',
-                        selected
+                        !assignOnPick && selected
                           ? 'bg-ink text-paper'
                           : 'border border-border hover:bg-secondary',
                       )}
                     >
                       <UserPlus className="w-3 h-3" />
-                      {selected ? 'Selected' : 'Add'}
+                      {assignOnPick ? 'Assign' : selected ? 'Selected' : 'Add'}
                     </button>
                   ) : (
                     <button

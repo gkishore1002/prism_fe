@@ -4,5 +4,5 @@ import { QuestionPaperView } from '@/components/academic/QuestionPaperView'
 export function BankQuestionPaperPage() {
   const { paperId } = useParams<{ paperId: string }>()
   if (!paperId) return null
-  return <QuestionPaperView paperId={paperId} />
+  return <QuestionPaperView paperId={paperId} editable />
 }

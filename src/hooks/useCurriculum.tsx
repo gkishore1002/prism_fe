@@ -2,232 +2,212 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
-import { curriculum as seedCurriculum } from '@/data/ownerMock'
-import { tutorBatches as seedBatches, tutorStudents as seedStudents } from '@/data/mock'
+import { useAuth } from '@/hooks/useAuth'
+import * as curriculumApi from '@/lib/api/curriculumApi'
 import type { StudentSummary, TutorBatch } from '@/types'
-import type { CurriculumBoard, CurriculumTopic } from '@/data/ownerMock'
+import type { CurriculumBoard, CurriculumTopic } from '@/types/curriculum'
 import { boardsMatch, gradesMatch } from '@/lib/academicScope'
 
 interface CurriculumContextValue {
   curriculum: CurriculumBoard[]
   batches: TutorBatch[]
   students: StudentSummary[]
-  addBoard: (name: string) => void
-  addGrade: (board: string, grade: string) => void
-  addSubject: (board: string, grade: string, subject: string) => void
-  addTopic: (board: string, grade: string, subject: string, topic: string) => void
+  loading: boolean
+  error: string | null
+  addBoard: (name: string) => Promise<void>
+  addGrade: (board: string, grade: string) => Promise<void>
+  addSubject: (board: string, grade: string, subject: string) => Promise<void>
+  addTopic: (board: string, grade: string, subject: string, topic: string) => Promise<void>
   addBatch: (
     batch: Omit<TutorBatch, 'id' | 'studentIds'> & { studentIds?: string[] },
-  ) => string
-  addStudentToBatch: (batchId: string, name: string) => void
-  assignStudentToBatch: (studentId: string, batchId: string) => void
-  removeStudentFromBatch: (studentId: string, batchId: string) => void
+  ) => Promise<string>
+  addStudentToBatch: (batchId: string, name: string) => Promise<void>
+  assignStudentToBatch: (studentId: string, batchId: string) => Promise<void>
+  removeStudentFromBatch: (studentId: string, batchId: string) => Promise<void>
+  removeBoard: (board: string) => Promise<void>
+  removeGrade: (board: string, grade: string) => Promise<void>
+  removeSubject: (board: string, grade: string, subject: string) => Promise<void>
+  removeTopic: (board: string, grade: string, subject: string, topic: string) => Promise<void>
+  removeBatch: (batchId: string) => Promise<void>
   getBatchesForScope: (board: string, grade: string) => TutorBatch[]
   getStudentsForBatch: (batchId: string) => StudentSummary[]
-  getUnassignedStudents: (board: string, grade: string) => StudentSummary[]
+  loadStudentsForBatch: (batchId: string) => Promise<StudentSummary[]>
+  getStudentsNotInBatch: (batchId: string) => StudentSummary[]
+  /** @deprecated Use getStudentsNotInBatch — students can belong to multiple batches. */
+  getUnassignedStudents: (batchId: string) => StudentSummary[]
+  refresh: () => Promise<void>
+  ensureLoaded: () => Promise<void>
 }
 
 const CurriculumContext = createContext<CurriculumContextValue | null>(null)
 
-function cloneCurriculum(data: CurriculumBoard[]): CurriculumBoard[] {
-  return JSON.parse(JSON.stringify(data)) as CurriculumBoard[]
+async function loadFromApi() {
+  const [curriculum, batches, students] = await Promise.all([
+    curriculumApi.fetchCurriculum(),
+    curriculumApi.fetchBatches(),
+    curriculumApi.fetchStudents(),
+  ])
+  return { curriculum, batches, students }
 }
 
 export function CurriculumProvider({ children }: { children: ReactNode }) {
-  const [curriculum, setCurriculum] = useState<CurriculumBoard[]>(() => cloneCurriculum(seedCurriculum))
-  const [batches, setBatches] = useState<TutorBatch[]>(() =>
-    seedBatches.map((b) => ({ ...b, studentIds: [...b.studentIds] })),
-  )
-  const [students, setStudents] = useState<StudentSummary[]>(() => [...seedStudents])
+  const { isAuthenticated, role } = useAuth()
+  const [curriculum, setCurriculum] = useState<CurriculumBoard[]>([])
+  const [batches, setBatches] = useState<TutorBatch[]>([])
+  const [students, setStudents] = useState<StudentSummary[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const loadPromiseRef = useRef<Promise<void> | null>(null)
 
-  const addBoard = useCallback((name: string) => {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    setCurriculum((prev) => {
-      if (prev.some((b) => b.board === trimmed)) return prev
-      return [
-        ...prev,
-        {
-          board: trimmed,
-          grades: [{ grade: 'Grade 8', subjects: [{ name: 'Mathematics', topics: [] }] }],
-        },
-      ]
-    })
-  }, [])
+  const refresh = useCallback(async () => {
+    if (!isAuthenticated || role === 'student') return
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await loadFromApi()
+      setCurriculum(data.curriculum)
+      setBatches(data.batches)
+      setStudents(data.students)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load curriculum')
+    } finally {
+      setLoading(false)
+    }
+  }, [isAuthenticated, role])
 
-  const addGrade = useCallback((board: string, grade: string) => {
-    const trimmed = grade.trim()
-    if (!trimmed) return
-    setCurriculum((prev) =>
-      prev.map((b) => {
-        if (b.board !== board) return b
-        if (b.grades.some((g) => g.grade === trimmed)) return b
-        return {
-          ...b,
-          grades: [
-            ...b.grades,
-            { grade: trimmed, subjects: [{ name: 'Mathematics', topics: [] }] },
-          ],
-        }
-      }),
-    )
-  }, [])
+  const ensureLoaded = useCallback(async () => {
+    if (!isAuthenticated || role === 'student') return
+    if (curriculum.length > 0 || batches.length > 0) return
+    if (!loadPromiseRef.current) {
+      loadPromiseRef.current = refresh().finally(() => {
+        loadPromiseRef.current = null
+      })
+    }
+    await loadPromiseRef.current
+  }, [isAuthenticated, role, curriculum.length, batches.length, refresh])
 
-  const addSubject = useCallback((board: string, grade: string, subject: string) => {
-    const trimmed = subject.trim()
-    if (!trimmed) return
-    setCurriculum((prev) =>
-      prev.map((b) => {
-        if (b.board !== board) return b
-        return {
-          ...b,
-          grades: b.grades.map((g) => {
-            if (g.grade !== grade) return g
-            if (g.subjects.some((s) => s.name === trimmed)) return g
-            return { ...g, subjects: [...g.subjects, { name: trimmed, topics: [] }] }
-          }),
-        }
-      }),
-    )
-  }, [])
+  useEffect(() => {
+    if (!isAuthenticated || role === 'student') {
+      setCurriculum([])
+      setBatches([])
+      setStudents([])
+    }
+  }, [isAuthenticated, role])
+
+  const addBoard = useCallback(async (name: string) => {
+    await curriculumApi.addBoard(name.trim())
+    await refresh()
+  }, [refresh])
+
+  const addGrade = useCallback(async (board: string, grade: string) => {
+    await curriculumApi.addGrade(board, grade.trim())
+    await refresh()
+  }, [refresh])
+
+  const addSubject = useCallback(async (board: string, grade: string, subject: string) => {
+    await curriculumApi.addSubject(board, grade, subject.trim())
+    await refresh()
+  }, [refresh])
 
   const addTopic = useCallback(
-    (board: string, grade: string, subject: string, topic: string) => {
-      const trimmed = topic.trim()
-      if (!trimmed) return
-      setCurriculum((prev) =>
-        prev.map((b) => {
-          if (b.board !== board) return b
-          return {
-            ...b,
-            grades: b.grades.map((g) => {
-              if (g.grade !== grade) return g
-              return {
-                ...g,
-                subjects: g.subjects.map((s) => {
-                  if (s.name !== subject) return s
-                  if (s.topics.some((t) => t.name === trimmed)) return s
-                  const entry: CurriculumTopic = { name: trimmed, questions: 0, mastery: 0 }
-                  return { ...s, topics: [...s.topics, entry] }
-                }),
-              }
-            }),
-          }
-        }),
-      )
+    async (board: string, grade: string, subject: string, topic: string) => {
+      await curriculumApi.addTopic(board, grade, subject, topic.trim())
+      await refresh()
     },
-    [],
+    [refresh],
   )
 
   const addBatch = useCallback(
-    (batch: Omit<TutorBatch, 'id' | 'studentIds'> & { studentIds?: string[] }): string => {
-      const { studentIds = [], subject, ...rest } = batch
-      const id = `batch-${Date.now()}`
-      const newBatch: TutorBatch = {
+    async (batch: Omit<TutorBatch, 'id' | 'studentIds'> & { studentIds?: string[] }) => {
+      const { studentIds = [], subject, scheduleTiming, ...rest } = batch
+      const created = await curriculumApi.createBatch({
         ...rest,
         subject: subject?.trim() || undefined,
-        studentIds: [...studentIds],
-        id,
-      }
-
-      setBatches((prev) => [
-        ...prev.map((b) => ({
-          ...b,
-          studentIds: b.studentIds.filter((sid) => !studentIds.includes(sid)),
-        })),
-        newBatch,
-      ])
-
-      if (studentIds.length > 0) {
-        setStudents((prev) =>
-          prev.map((s) =>
-            studentIds.includes(s.id)
-              ? { ...s, batch: newBatch.name, board: newBatch.board, grade: newBatch.grade }
-              : s,
-          ),
-        )
-      }
-
-      return id
+        scheduleTiming: scheduleTiming?.trim() || undefined,
+        studentIds,
+      })
+      await refresh()
+      return created.id
     },
-    [],
+    [refresh],
   )
 
-  const assignStudentToBatch = useCallback((studentId: string, batchId: string) => {
-    const batch = batches.find((b) => b.id === batchId)
-    if (!batch) return
-
-    setBatches((prev) =>
-      prev.map((b) => {
-        if (b.id === batchId) {
-          const ids = b.studentIds.includes(studentId)
-            ? b.studentIds
-            : [...b.studentIds, studentId]
-          return { ...b, studentIds: ids }
-        }
-        return { ...b, studentIds: b.studentIds.filter((id) => id !== studentId) }
-      }),
-    )
-
-    setStudents((prev) =>
-      prev.map((s) =>
-        s.id === studentId
-          ? { ...s, batch: batch.name, board: batch.board, grade: batch.grade }
-          : s,
-      ),
-    )
-  }, [batches])
+  const assignStudentToBatch = useCallback(
+    async (studentId: string, batchId: string) => {
+      await curriculumApi.assignStudentToBatchApi(batchId, studentId)
+      await refresh()
+    },
+    [refresh],
+  )
 
   const addStudentToBatch = useCallback(
-    (batchId: string, name: string) => {
-      const trimmed = name.trim()
-      if (!trimmed) return
+    async (batchId: string, name: string) => {
       const batch = batches.find((b) => b.id === batchId)
       if (!batch) return
-
-      const id = `stu-${Date.now()}`
-      const student: StudentSummary = {
-        id,
-        name: trimmed,
+      await curriculumApi.createStudent({
+        name: name.trim(),
         board: batch.board,
         grade: batch.grade,
         batch: batch.name,
-        centerId: 'ctr-andheri',
-        academicYear: '2025-26',
-        health: 70,
-        status: 'good',
-        readiness: 50,
-        lastAssessment: '—',
-        criticalGaps: 0,
-        improving: true,
-      }
-
-      setStudents((prev) => [...prev, student])
-      setBatches((prev) =>
-        prev.map((b) =>
-          b.id === batchId ? { ...b, studentIds: [...b.studentIds, id] } : b,
-        ),
-      )
+      })
+      await refresh()
     },
-    [batches],
+    [batches, refresh],
   )
 
-  const removeStudentFromBatch = useCallback((studentId: string, batchId: string) => {
-    setBatches((prev) =>
-      prev.map((b) =>
-        b.id === batchId
-          ? { ...b, studentIds: b.studentIds.filter((id) => id !== studentId) }
-          : b,
-      ),
-    )
-    setStudents((prev) =>
-      prev.map((s) => (s.id === studentId ? { ...s, batch: undefined } : s)),
-    )
-  }, [])
+  const removeStudentFromBatch = useCallback(
+    async (studentId: string, batchId: string) => {
+      await curriculumApi.removeStudentFromBatchApi(batchId, studentId)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const removeBoard = useCallback(
+    async (boardName: string) => {
+      await curriculumApi.deleteBoard(boardName)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const removeGrade = useCallback(
+    async (boardName: string, gradeName: string) => {
+      await curriculumApi.deleteGrade(boardName, gradeName)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const removeSubject = useCallback(
+    async (boardName: string, gradeName: string, subjectName: string) => {
+      await curriculumApi.deleteSubject(boardName, gradeName, subjectName)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const removeTopic = useCallback(
+    async (boardName: string, gradeName: string, subjectName: string, topicName: string) => {
+      await curriculumApi.deleteTopic(boardName, gradeName, subjectName, topicName)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const removeBatch = useCallback(
+    async (batchId: string) => {
+      await curriculumApi.deleteBatch(batchId)
+      await refresh()
+    },
+    [refresh],
+  )
 
   const getBatchesForScope = useCallback(
     (board: string, grade: string) =>
@@ -244,17 +224,34 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
     [batches, students],
   )
 
-  const getUnassignedStudents = useCallback(
-    (board: string, grade: string) => {
-      const assigned = new Set(batches.flatMap((b) => b.studentIds))
-      return students.filter(
-        (s) =>
-          boardsMatch(s.board ?? 'CBSE', board) &&
-          gradesMatch(s.grade, grade) &&
-          !assigned.has(s.id),
+  const loadStudentsForBatch = useCallback(async (batchId: string) => {
+    const list = await curriculumApi.fetchStudentsForBatch(batchId)
+    const batch = batches.find((b) => b.id === batchId)
+    if (batch) {
+      const ids = new Set(list.map((s) => s.id))
+      setStudents((prev) => {
+        const kept = prev.filter((s) => !ids.has(s.id))
+        return [...kept, ...list]
+      })
+      setBatches((prev) =>
+        prev.map((b) => (b.id === batchId ? { ...b, studentIds: list.map((s) => s.id) } : b)),
       )
+    }
+    return list
+  }, [batches])
+
+  const getStudentsNotInBatch = useCallback(
+    (batchId: string) => {
+      const batch = batches.find((b) => b.id === batchId)
+      const enrolled = new Set(batch?.studentIds ?? [])
+      return students.filter((s) => !enrolled.has(s.id))
     },
     [batches, students],
+  )
+
+  const getUnassignedStudents = useCallback(
+    (batchId: string) => getStudentsNotInBatch(batchId),
+    [getStudentsNotInBatch],
   )
 
   const value = useMemo(
@@ -262,6 +259,8 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
       curriculum,
       batches,
       students,
+      loading,
+      error,
       addBoard,
       addGrade,
       addSubject,
@@ -270,14 +269,25 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
       addStudentToBatch,
       assignStudentToBatch,
       removeStudentFromBatch,
+      removeBoard,
+      removeGrade,
+      removeSubject,
+      removeTopic,
+      removeBatch,
       getBatchesForScope,
       getStudentsForBatch,
+      loadStudentsForBatch,
+      getStudentsNotInBatch,
       getUnassignedStudents,
+      refresh,
+      ensureLoaded,
     }),
     [
       curriculum,
       batches,
       students,
+      loading,
+      error,
       addBoard,
       addGrade,
       addSubject,
@@ -286,9 +296,18 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
       addStudentToBatch,
       assignStudentToBatch,
       removeStudentFromBatch,
+      removeBoard,
+      removeGrade,
+      removeSubject,
+      removeTopic,
+      removeBatch,
       getBatchesForScope,
       getStudentsForBatch,
+      loadStudentsForBatch,
+      getStudentsNotInBatch,
       getUnassignedStudents,
+      refresh,
+      ensureLoaded,
     ],
   )
 

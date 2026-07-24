@@ -1,12 +1,35 @@
-import { useState } from 'react'
-import { Check, X, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { useMemo, useState, useEffect } from 'react'
+import { PageLoader } from '@/components/ui/PrismLoader'
+import { Check, X, ArrowRight } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
-import { practiceQuestions } from '@/data/mock'
+import { useQuestionPapers } from '@/hooks/useQuestionPapers'
+import { practiceFromBank } from '@/lib/practiceFromBank'
 
 export function StudentPracticePage() {
+  const { questions, loading, ensureLoaded } = useQuestionPapers()
+  const practiceQuestions = useMemo(() => practiceFromBank(questions), [questions])
   const [i, setI] = useState(0)
   const [picked, setPicked] = useState<number | null>(null)
   const [results, setResults] = useState<('correct' | 'wrong')[]>([])
+
+  useEffect(() => {
+    void ensureLoaded()
+  }, [ensureLoaded])
+
+  if (loading) {
+    return <PageLoader />
+  }
+
+  if (practiceQuestions.length === 0) {
+    return (
+      <>
+        <PageHeader eyebrow="Practice" title="Practice mode" sub="No practice questions available yet." />
+        <AppCard className="text-center py-10">
+          <p className="text-sm text-muted-foreground">Questions will appear here once your tutor uploads them.</p>
+        </AppCard>
+      </>
+    )
+  }
 
   const q = practiceQuestions[i]
   const done = i >= practiceQuestions.length
@@ -28,15 +51,11 @@ export function StudentPracticePage() {
             </div>
             <div className="font-mono-data text-6xl font-bold mt-2">{pct}%</div>
             <div className="text-paper/70 mt-2 font-sans text-sm">
-              {correct} of {results.length} correct · Linear Eq. · Triangles · Word problems
-            </div>
-            <div className="mt-6 pt-6 border-t border-paper/20 text-sm font-sans">
-              <CheckCircle2 className="w-4 h-4 inline-block text-accent mr-2" />
-              Triangles mastery confirmed. Plan re-sequenced — Linear Equations stays priority #1.
+              {correct} of {results.length} correct
             </div>
           </AppCard>
           <AppCard>
-            <div className="text-[11px] uppercase tracking-widest text-text-muted font-display font-semibold">
+            <div className="text-[11px] uppercase tracking-widest text-muted-foreground font-display font-semibold">
               Topic accuracy
             </div>
             <div className="mt-3 space-y-3">
@@ -58,7 +77,7 @@ export function StudentPracticePage() {
                 setPicked(null)
                 setResults([])
               }}
-              className="mt-6 w-full text-sm bg-surface-100 hover:bg-surface-200 px-4 py-2 rounded-lg font-display font-medium"
+              className="mt-6 w-full text-sm bg-secondary hover:bg-secondary/80 px-4 py-2 rounded-lg font-display font-medium"
             >
               Practice again
             </button>
@@ -100,11 +119,11 @@ export function StudentPracticePage() {
         </div>
 
         <AppCard className="p-8">
-          <div className="flex items-center gap-2 text-xs text-text-muted mb-4">
-            <span className="px-2 py-0.5 bg-surface-100 rounded font-display">{q.difficulty}</span>
-            <span className="px-2 py-0.5 bg-surface-100 rounded font-mono-data">{q.marks} mark</span>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
+            <span className="px-2 py-0.5 bg-secondary rounded font-display">{q.difficulty}</span>
+            <span className="px-2 py-0.5 bg-secondary rounded font-mono-data">{q.marks} mark</span>
           </div>
-          <div className="font-display text-2xl leading-snug text-text-primary">{q.q}</div>
+          <div className="font-display text-2xl leading-snug text-foreground">{q.q}</div>
 
           <div className="mt-8 space-y-3">
             {q.options.map((opt, idx) => {
@@ -124,7 +143,7 @@ export function StudentPracticePage() {
                         ? 'border-rose-300 bg-rose-50'
                         : isPicked
                           ? 'border-blue-400 bg-blue-50'
-                          : 'border-surface-200 hover:border-blue-300'
+                          : 'border-border hover:border-blue-300'
                   }`}
                 >
                   <span className="w-7 h-7 rounded-full border border-current grid place-items-center text-xs font-mono-data">
@@ -139,9 +158,9 @@ export function StudentPracticePage() {
           </div>
 
           {answered && (
-            <div className="mt-6 p-4 bg-surface-50 rounded-lg border border-surface-200">
-              <div className="text-xs uppercase tracking-widest text-text-muted mb-1 font-display">Solution</div>
-              <p className="text-sm text-text-secondary font-sans">{q.solution}</p>
+            <div className="mt-6 p-4 bg-secondary/40 rounded-lg border border-border">
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1 font-display">Solution</div>
+              <p className="text-sm text-muted-foreground font-sans">{q.solution}</p>
             </div>
           )}
 

@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, BookOpen, Layers, FileText, Hash } from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
+import { PageLoader } from '@/components/ui/PrismLoader'
+import { ChevronRight, ChevronDown, BookOpen, Layers, Hash } from 'lucide-react'
+import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { Badge } from '@/components/ui/Badge'
-import { boards, grades, subjects, chapters, topics } from '@/data/mock'
+import { useCurriculum } from '@/hooks/useCurriculum'
 import { cn } from '@/lib/cn'
 
 function HierarchyNode({
@@ -24,22 +25,31 @@ function HierarchyNode({
   const hasChildren = !!children
 
   return (
-    <div className={cn(level > 0 && 'ml-5 border-l border-zinc-200 pl-4')}>
+    <div className={cn(level > 0 && 'ml-5 border-l border-border pl-4')}>
       <button
+        type="button"
         onClick={() => hasChildren && setOpen(!open)}
         className={cn(
           'flex items-center gap-2 w-full text-left py-2 px-3 rounded-lg transition-colors',
-          hasChildren ? 'hover:bg-zinc-50 cursor-pointer' : 'cursor-default',
+          hasChildren ? 'hover:bg-secondary/60 cursor-pointer' : 'cursor-default',
         )}
       >
         {hasChildren ? (
-          open ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+          open ? (
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+          )
         ) : (
           <span className="w-3.5" />
         )}
-        <Icon className="w-4 h-4 text-brand-500 shrink-0" />
-        <span className="text-sm font-medium text-zinc-900">{label}</span>
-        {meta && <Badge variant="neutral" className="ml-auto">{meta}</Badge>}
+        <Icon className="w-4 h-4 text-accent shrink-0" />
+        <span className="text-sm font-medium text-foreground">{label}</span>
+        {meta && (
+          <Badge variant="neutral" className="ml-auto">
+            {meta}
+          </Badge>
+        )}
       </button>
       {open && children}
     </div>
@@ -47,56 +57,53 @@ function HierarchyNode({
 }
 
 export function AdminHierarchyPage() {
+  const { curriculum, loading } = useCurriculum()
+
+  if (loading) {
+    return <PageLoader />
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-zinc-900">Academic Hierarchy</h2>
-        <p className="text-sm text-zinc-500">
-          Board → Grade → Subject → Chapter → Topic → Question
+    <>
+      <PageHeader
+        eyebrow="Structure"
+        title="Academic hierarchy"
+        sub="Board → Grade → Subject → Chapter → Topic → Question"
+      />
+
+      <AppCard className="accent-blue">
+        <h3 className="font-display text-[15px] font-semibold text-foreground">Content tree</h3>
+        <p className="text-[12px] text-muted-foreground mt-0.5 mb-4">
+          All analytics and intelligence are built on this hierarchy
         </p>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Content Tree</CardTitle>
-          <CardDescription>All analytics and intelligence are built on this hierarchy</CardDescription>
-        </CardHeader>
-
-        <div className="space-y-1">
-          {boards.map((board) => (
-            <HierarchyNode key={board.id} label={board.name} meta={board.code} icon={BookOpen} defaultOpen>
-              {grades
-                .filter((g) => g.boardId === board.id)
-                .map((grade) => (
-                  <HierarchyNode key={grade.id} label={grade.name} icon={Layers} defaultOpen>
-                    {subjects
-                      .filter((s) => s.gradeId === grade.id)
-                      .map((subject) => (
-                        <HierarchyNode key={subject.id} label={subject.name} icon={BookOpen}>
-                          {chapters
-                            .filter((c) => c.subjectId === subject.id)
-                            .map((chapter) => (
-                              <HierarchyNode key={chapter.id} label={chapter.name} icon={FileText}>
-                                {topics
-                                  .filter((t) => t.chapterId === chapter.id)
-                                  .map((topic) => (
-                                    <HierarchyNode
-                                      key={topic.id}
-                                      label={topic.name}
-                                      meta={`${(topic.weight * 100).toFixed(0)}% weight`}
-                                      icon={Hash}
-                                    />
-                                  ))}
-                              </HierarchyNode>
-                            ))}
-                        </HierarchyNode>
-                      ))}
+        {curriculum.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No curriculum configured yet.</p>
+        ) : (
+          <div className="space-y-1">
+            {curriculum.map((board) => (
+              <HierarchyNode key={board.board} label={board.board} meta={board.board} icon={BookOpen} defaultOpen>
+                {board.grades.map((grade) => (
+                  <HierarchyNode key={grade.grade} label={grade.grade} icon={Layers} defaultOpen>
+                    {grade.subjects.map((subject) => (
+                      <HierarchyNode key={subject.name} label={subject.name} icon={BookOpen}>
+                        {subject.topics.map((topic) => (
+                          <HierarchyNode
+                            key={topic.name}
+                            label={topic.name}
+                            meta={`${topic.mastery}% mastery · ${topic.questions} Q`}
+                            icon={Hash}
+                          />
+                        ))}
+                      </HierarchyNode>
+                    ))}
                   </HierarchyNode>
                 ))}
-            </HierarchyNode>
-          ))}
-        </div>
-      </Card>
-    </div>
+              </HierarchyNode>
+            ))}
+          </div>
+        )}
+      </AppCard>
+    </>
   )
 }

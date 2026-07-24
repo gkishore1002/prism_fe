@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, GraduationCap, Users, Shield, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { InlineLoader } from '@/components/ui/PrismLoader'
 import { useAuth } from '@/hooks/useAuth'
-import { getInstitutionName } from '@/modules/auth/lib/authApi'
 import { authTheme } from '@/modules/auth/lib/authTheme'
 import { LoginHeroPanel } from '@/modules/auth/components/LoginHeroPanel'
 import { CscLogo } from '@/modules/auth/components/CscLogo'
@@ -21,14 +21,20 @@ const roleAccents: Record<UserRole, string> = {
   admin: 'accent-indigo',
 }
 
+const roleIconBg: Record<UserRole, string> = {
+  student: 'bg-blue-100 text-blue-600',
+  tutor: 'bg-yellow-100 text-yellow-700',
+  admin: 'bg-indigo-100 text-indigo-600',
+}
+
 const loginCardClass =
-  'bg-surface rounded-[16px] border border-surface-200/80 p-6 sm:p-8 shadow-[0_4px_6px_rgba(22,58,102,0.04),0_20px_48px_rgba(22,58,102,0.12)]'
+  'glass-card border border-border rounded-[14px] p-6 sm:p-8 ios-shadow-lg'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const { login, selectRole, pendingRoleSelection, cancelRoleSelection } = useAuth()
 
-  const [email, setEmail] = useState('demo@learnova.app')
+  const [email, setEmail] = useState('demo@prism.app')
   const [password, setPassword] = useState('demo123')
   const [institutionCode, setInstitutionCode] = useState('BRIGHTPATH')
   const [showPassword, setShowPassword] = useState(false)
@@ -49,11 +55,13 @@ export function LoginPage() {
     }
   }
 
-  const handlePickRole = (role: UserRole) => {
+  const handlePickRole = async (role: UserRole) => {
     setLoading(true)
     try {
-      const path = selectRole(role)
+      const path = await selectRole(role)
       navigate(path, { replace: true })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Role selection failed')
     } finally {
       setLoading(false)
     }
@@ -65,7 +73,7 @@ export function LoginPage() {
         <LoginHeroPanel
           headline="Choose your portal"
           subtitle="Your account has access to multiple roles. Select how you're working today."
-          footer={getInstitutionName()}
+          footer="BrightPath Academy"
         />
 
         <div className={`flex-1 ${authTheme.lightPanel} flex items-center justify-center p-5 sm:p-8`}>
@@ -74,17 +82,17 @@ export function LoginPage() {
               <CscLogo size="sm" variant="onLight" />
             </div>
 
-            <div className="hidden lg:block mb-6 pb-5 border-b border-surface-100">
+            <div className="hidden lg:block mb-6 pb-5 border-b border-secondary">
               <p className="text-[10px] font-display font-semibold uppercase tracking-[0.22em] text-blue-700">
                 Computer Software College
               </p>
-              <p className="text-[11px] text-text-muted mt-0.5">Centre · Learnova Software</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Centre · Prism Software</p>
             </div>
 
-            <h2 className="text-xl font-display font-bold text-text-primary text-center lg:text-left">
+            <h2 className="text-xl font-display font-bold text-foreground text-center lg:text-left">
               Select your role
             </h2>
-            <p className="text-[12px] text-text-secondary text-center lg:text-left mt-1 mb-6 truncate" title={pendingRoleSelection.email}>
+            <p className="text-[12px] text-muted-foreground text-center lg:text-left mt-1 mb-6 truncate" title={pendingRoleSelection.email}>
               {pendingRoleSelection.email}
             </p>
 
@@ -103,17 +111,17 @@ export function LoginPage() {
                     type="button"
                     disabled={loading}
                     onClick={() => handlePickRole(r.role)}
-                    className={`w-full text-left ${authTheme.roleCard} p-4 ${roleAccents[r.role]} disabled:opacity-50 shadow-sm`}
+                    className={`w-full text-left ${authTheme.roleCard} p-4 ${roleAccents[r.role]} disabled:opacity-50`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-[10px] bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+                      <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center shrink-0 ${roleIconBg[r.role]}`}>
                         <Icon className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="font-display font-semibold text-text-primary text-[14px]">{r.label}</p>
-                        <p className="text-[12px] text-text-secondary font-sans">{r.description}</p>
+                        <p className="font-display font-semibold text-foreground text-[14px]">{r.label}</p>
+                        <p className="text-[12px] text-muted-foreground font-sans">{r.description}</p>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-text-muted ml-auto shrink-0" />
+                      <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto shrink-0" />
                     </div>
                   </button>
                 )
@@ -123,7 +131,7 @@ export function LoginPage() {
             <button
               type="button"
               onClick={cancelRoleSelection}
-              className="mt-5 w-full text-xs font-display font-medium text-text-muted hover:text-text-secondary"
+              className="mt-5 w-full text-xs font-display font-medium text-muted-foreground hover:text-foreground"
             >
               Back to sign in
             </button>
@@ -143,38 +151,36 @@ export function LoginPage() {
 
       <div className={`flex-1 ${authTheme.lightPanel} flex items-center justify-center p-5 sm:p-8`}>
         <div className="w-full max-w-[420px]">
-          {/* Mobile brand */}
           <div className="mb-8 text-center lg:hidden">
             <CscLogo size="md" variant="onLight" />
           </div>
 
           <div className={loginCardClass}>
-            {/* Desktop institutional header inside card */}
-            <div className="hidden lg:flex items-start gap-4 mb-6 pb-6 border-b border-surface-100">
-              <div className="w-11 h-11 rounded-xl gradient-brand-icon flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(212,160,8,0.35)]">
-                <span className="font-display font-black text-[13px] text-blue-900 tracking-tight">CSC</span>
+            <div className="hidden lg:flex items-start gap-4 mb-6 pb-6 border-b border-secondary">
+              <div className="w-11 h-11 rounded-[16px] gradient-brand-icon flex items-center justify-center shrink-0 ios-shadow-sm">
+                <span className="font-display font-black text-[13px] text-ink tracking-tight">CSC</span>
               </div>
               <div className="min-w-0 pt-0.5">
-                <p className="text-[10px] font-display font-bold uppercase tracking-[0.2em] text-blue-800 leading-snug">
+                <p className="text-[10px] font-display font-bold uppercase tracking-[0.2em] text-ink leading-snug">
                   Computer Software College
                 </p>
-                <p className="text-[12px] font-display font-semibold text-text-primary mt-1">
-                  Centre · <span className="text-gradient">Learnova</span> Software
+                <p className="text-[12px] font-display font-semibold text-foreground mt-1">
+                  Centre · <span className="text-gradient">Prism</span> Software
                 </p>
-                <p className="text-[11px] text-text-muted mt-0.5 font-sans">Academic Intelligence Platform</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 font-sans">Academic Intelligence Platform</p>
               </div>
             </div>
 
             <div className="mb-6">
-              <p className="text-[10px] font-display font-semibold uppercase tracking-[0.2em] text-text-muted lg:hidden">
+              <p className="text-[10px] font-display font-semibold uppercase tracking-[0.2em] text-muted-foreground lg:hidden">
                 Computer Software College
               </p>
-              <h2 className="mt-1 lg:mt-0 text-xl sm:text-[22px] font-display font-bold text-text-primary leading-tight">
-                Sign in to <span className="text-gradient">Learnova</span>
+              <h2 className="mt-1 lg:mt-0 text-xl sm:text-[22px] font-display font-bold text-foreground leading-tight">
+                Sign in to <span className="text-gradient">Prism</span>
               </h2>
-              <p className="mt-2 text-[12px] text-text-secondary font-sans leading-relaxed">
+              <p className="mt-2 text-[12px] text-muted-foreground font-sans leading-relaxed">
                 Use your institution credentials. Demo password:{' '}
-                <span className="font-mono-data text-text-primary">demo123</span>
+                <span className="font-mono-data text-foreground">demo123</span>
               </p>
             </div>
 
@@ -186,7 +192,7 @@ export function LoginPage() {
 
             <form className="space-y-4" onSubmit={handleSignIn}>
               <div>
-                <label htmlFor="institution" className="mb-1.5 block text-xs font-display font-semibold text-text-primary">
+                <label htmlFor="institution" className="mb-1.5 block text-xs font-display font-semibold text-foreground">
                   Institution code
                 </label>
                 <input
@@ -198,10 +204,13 @@ export function LoginPage() {
                   className={authTheme.input}
                   placeholder="BRIGHTPATH"
                 />
+                <p className="mt-1 text-[10px] text-muted-foreground font-sans">
+                  Your institute&apos;s login code — not a center/branch ID. After login, add more centers under Admin → Centers.
+                </p>
               </div>
 
               <div>
-                <label htmlFor="email" className="mb-1.5 block text-xs font-display font-semibold text-text-primary">
+                <label htmlFor="email" className="mb-1.5 block text-xs font-display font-semibold text-foreground">
                   Email
                 </label>
                 <input
@@ -212,12 +221,12 @@ export function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={authTheme.input}
-                  placeholder="demo@learnova.app"
+                  placeholder="demo@prism.app"
                 />
               </div>
 
               <div>
-                <label htmlFor="password" className="mb-1.5 block text-xs font-display font-semibold text-text-primary">
+                <label htmlFor="password" className="mb-1.5 block text-xs font-display font-semibold text-foreground">
                   Password
                 </label>
                 <div className="relative">
@@ -234,7 +243,7 @@ export function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-text-muted hover:bg-surface-50"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-muted-foreground hover:bg-secondary"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -242,19 +251,26 @@ export function LoginPage() {
                 </div>
               </div>
 
-              <Button type="submit" variant="action" size="lg" className="w-full shadow-[0_4px_14px_rgba(212,160,8,0.35)]" disabled={loading}>
-                {loading ? 'Signing in…' : 'Sign in to Learnova'}
+              <Button type="submit" variant="action" size="lg" className="w-full" disabled={loading}>
+                {loading ? (
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <InlineLoader size="xs" aria-label="Signing in" />
+                    Signing in…
+                  </span>
+                ) : (
+                  'Sign in to Prism'
+                )}
               </Button>
             </form>
 
-            <p className="mt-5 pt-4 border-t border-surface-100 text-[11px] text-text-muted text-center font-sans leading-relaxed">
-              Try <span className="font-mono-data text-text-secondary">arjun@brightpath.edu</span>
-              {' '}or <span className="font-mono-data text-text-secondary">demo@learnova.app</span>
+            <p className="mt-5 pt-4 border-t border-secondary text-[11px] text-muted-foreground text-center font-sans leading-relaxed">
+              Try <span className="font-mono-data text-foreground">arjun@brightpath.edu</span>
+              {' '}or <span className="font-mono-data text-foreground">demo@prism.app</span>
             </p>
           </div>
 
-          <p className="mt-5 text-center text-[10px] text-text-faint font-display uppercase tracking-[0.18em] hidden lg:block">
-            Computer Software College · Centre Learnova Software
+          <p className="mt-5 text-center text-[10px] text-muted-foreground/60 font-display uppercase tracking-[0.18em] hidden lg:block">
+            Computer Software College · Centre Prism Software
           </p>
         </div>
       </div>

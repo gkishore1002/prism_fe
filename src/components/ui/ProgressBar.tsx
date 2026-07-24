@@ -35,14 +35,14 @@ export function ProgressBar({
 
   return (
     <div className={cn('flex items-center gap-3', className)}>
-      <div className={cn('flex-1 bg-surface-200 rounded-[3px] overflow-hidden', sizeMap[size])}>
+      <div className={cn('flex-1 bg-border/60 rounded-full overflow-hidden', sizeMap[size])}>
         <div
-          className={cn('h-full rounded-[3px] transition-all duration-500', colorMap[color])}
+          className={cn('h-full rounded-full transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]', colorMap[color])}
           style={{ width: `${pct}%` }}
         />
       </div>
       {showValue && (
-        <span className="text-[12px] font-mono-data font-medium text-text-secondary w-8 text-right">
+        <span className="text-[12px] font-mono-data font-medium text-muted-foreground w-8 text-right">
           {Math.round(pct)}%
         </span>
       )}

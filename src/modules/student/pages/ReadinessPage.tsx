@@ -1,15 +1,32 @@
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
-import { readinessPredictions, studentProfile } from '@/data/mock'
-import { parentComparative, parentBoardCoverage, parentPromotionReadiness } from '@/data/parentMock'
+import { PageLoader } from '@/components/ui/PrismLoader'
+import { AnalyticsInsightsCard } from '@/components/ui/AnalyticsInsightsCard'
+import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { Calendar, Target, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
 export function StudentReadinessPage() {
+  useAnalyticsPage('studentReadiness')
+  const { loading, readiness, studentProfile } = useAnalytics()
+
+  if (loading) {
+    return <PageLoader />
+  }
+
+  if (!studentProfile || readiness.length === 0) {
+    return (
+      <>
+        <PageHeader eyebrow="Exam readiness" title="Exam readiness" sub="No readiness data available yet." />
+        <AppCard><p className="text-sm text-muted-foreground">Complete assessments to see readiness predictions.</p></AppCard>
+      </>
+    )
+  }
+
   const avgCurrent = Math.round(
-    readinessPredictions.reduce((s, r) => s + r.currentReadiness, 0) / readinessPredictions.length,
+    readiness.reduce((s, r) => s + r.currentReadiness, 0) / readiness.length,
   )
   const avgProjected = Math.round(
-    readinessPredictions.reduce((s, r) => s + r.projectedReadiness, 0) / readinessPredictions.length,
+    readiness.reduce((s, r) => s + r.projectedReadiness, 0) / readiness.length,
   )
 
   return (
@@ -20,11 +37,9 @@ export function StudentReadinessPage() {
         sub="Board-aware readiness for upcoming school exams — always shown with grade context."
       />
 
-      <div className="grid md:grid-cols-4 gap-4 mb-8">
+      <div className="grid md:grid-cols-2 gap-4 mb-8">
         <AppStat label="Overall readiness" value={avgCurrent} unit="%" tone="accent" />
         <AppStat label="Projected" value={avgProjected} unit="%" hint={`+${avgProjected - avgCurrent}% possible`} tone="leaf" />
-        <AppStat label="Promotion readiness" value={parentPromotionReadiness.score} unit="%" />
-        <AppStat label="Syllabus covered" value={parentBoardCoverage.topicsCovered} unit="%" />
       </div>
 
       <AppCard className="mb-8 bg-ink text-paper">
@@ -32,7 +47,6 @@ export function StudentReadinessPage() {
           <div>
             <p className="text-[10px] uppercase tracking-widest text-paper/60">Grade readiness verdict</p>
             <p className="font-display text-2xl mt-2">Ready for Grade {studentProfile.grade} Quarterly Exam</p>
-            <p className="text-paper/70 text-sm mt-2">Risk areas: Ratio, Social Science geography</p>
           </div>
           <div className="text-right">
             <div className="flex items-center gap-1 text-leaf justify-end">
@@ -45,7 +59,7 @@ export function StudentReadinessPage() {
       </AppCard>
 
       <div className="grid md:grid-cols-2 gap-4 mb-8">
-        {readinessPredictions.map((r) => {
+        {readiness.map((r) => {
           const gap = r.projectedReadiness - r.currentReadiness
           return (
             <AppCard key={r.subjectId}>
@@ -87,23 +101,13 @@ export function StudentReadinessPage() {
         })}
       </div>
 
-      <AppCard>
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Compared with peers</div>
-        <p className="text-sm text-muted-foreground mb-4">
-          {parentComparative.board} Grade {parentComparative.grade} — you&apos;re in the{' '}
-          <span className="text-foreground font-medium">{parentComparative.band}</span> (no raw rank).
-        </p>
-        <div className="flex gap-8 text-sm">
-          <div>
-            <span className="text-muted-foreground">Your average </span>
-            <span className="font-mono-data">{parentComparative.studentAverage}%</span>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Institute average </span>
-            <span className="font-mono-data">{parentComparative.instituteAverage}%</span>
-          </div>
-        </div>
-      </AppCard>
+      <AnalyticsInsightsCard
+        title="Readiness outlook"
+        bullets={readiness.map(
+          (row) =>
+            `${row.subjectName}: ${row.currentReadiness}% now → ${row.projectedReadiness}% projected (${row.confidenceLevel} confidence).`,
+        )}
+      />
     </>
   )
 }

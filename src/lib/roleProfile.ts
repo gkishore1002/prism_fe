@@ -1,11 +1,4 @@
 import type { User, UserRole } from '@/types'
-import {
-  currentStudent,
-  currentTutor,
-  currentAdmin,
-  institution,
-  studentProfile,
-} from '@/data/mock'
 import type { ModuleId } from '@/lib/modules'
 
 export interface RoleProfile {
@@ -15,15 +8,12 @@ export interface RoleProfile {
   initials: string
 }
 
-const usersByModule: Record<ModuleId, User> = {
-  student: currentStudent,
-  tutor: currentTutor,
-  admin: currentAdmin,
-}
-
-export function getSidebarProfile(moduleId: ModuleId, authUser: User): RoleProfile {
-  const portalUser = authUser.role === moduleId ? authUser : usersByModule[moduleId]
-  const parts = portalUser.name.trim().split(/\s+/)
+export function getSidebarProfile(
+  moduleId: ModuleId,
+  authUser: User,
+  options?: { subtitle?: string },
+): RoleProfile {
+  const parts = authUser.name.trim().split(/\s+/)
   const initials = parts
     .map((p) => p[0])
     .join('')
@@ -32,26 +22,26 @@ export function getSidebarProfile(moduleId: ModuleId, authUser: User): RoleProfi
 
   if (moduleId === 'student') {
     return {
-      name: portalUser.name,
+      name: authUser.name,
       roleLabel: 'Student',
-      subtitle: `${studentProfile.board} · Grade ${studentProfile.grade} · ${studentProfile.batch}`,
+      subtitle: options?.subtitle ?? 'Student portal',
       initials,
     }
   }
 
   if (moduleId === 'tutor') {
     return {
-      name: portalUser.name,
+      name: authUser.name,
       roleLabel: 'Tutor',
-      subtitle: 'Mathematics · CBSE Grade 8',
+      subtitle: options?.subtitle ?? 'Tutor portal',
       initials,
     }
   }
 
   return {
-    name: portalUser.name,
+    name: authUser.name,
     roleLabel: 'Institute Owner',
-    subtitle: institution.name,
+    subtitle: options?.subtitle ?? 'BrightPath Academy',
     initials,
   }
 }

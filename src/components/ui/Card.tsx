@@ -29,10 +29,10 @@ export function Card({ className, hover, padding = 'md', accent = 'none', childr
   return (
     <div
       className={cn(
-        'bg-surface rounded-[14px] border border-surface-200 overflow-hidden shadow-card',
+        'glass-card rounded-[14px] overflow-hidden border border-border',
         paddingMap[padding],
         accentMap[accent],
-        hover && 'card-hover cursor-pointer',
+        hover && 'card-hover cursor-pointer ios-press',
         className,
       )}
       {...props}
@@ -44,7 +44,7 @@ export function Card({ className, hover, padding = 'md', accent = 'none', childr
 
 export function CardHeader({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('flex items-center justify-between mb-4 pb-3.5 border-b border-surface-100', className)} {...props}>
+    <div className={cn('flex items-center justify-between mb-4 pb-4 border-b border-border', className)} {...props}>
       {children}
     </div>
   )
@@ -52,7 +52,7 @@ export function CardHeader({ className, children, ...props }: HTMLAttributes<HTM
 
 export function CardTitle({ className, children, ...props }: HTMLAttributes<HTMLHeadingElement>) {
   return (
-    <h3 className={cn('text-[14px] font-display font-semibold text-text-primary', className)} {...props}>
+    <h3 className={cn('text-[15px] font-display font-semibold text-foreground tracking-tight', className)} {...props}>
       {children}
     </h3>
   )
@@ -60,7 +60,7 @@ export function CardTitle({ className, children, ...props }: HTMLAttributes<HTML
 
 export function CardDescription({ className, children, ...props }: HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={cn('text-[12px] text-text-secondary mt-0.5 font-sans', className)} {...props}>
+    <p className={cn('text-[12px] text-muted-foreground mt-0.5 font-sans', className)} {...props}>
       {children}
     </p>
   )

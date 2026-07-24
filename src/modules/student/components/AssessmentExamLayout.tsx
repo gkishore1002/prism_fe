@@ -61,7 +61,7 @@ function QuestionPalette({
             type="button"
             onClick={() => onJumpTo(idx)}
             className={cn(
-              'relative aspect-square rounded-md text-xs sm:text-sm font-mono font-bold transition-all',
+              'relative aspect-square rounded-[12px] text-xs sm:text-sm font-mono font-bold transition-all duration-[280ms] ios-press',
               status === 'current' &&
                 'ring-2 ring-accent ring-offset-2 ring-offset-card bg-accent text-ink scale-105',
               status === 'answered' && 'bg-ink/10 text-ink border border-ink/20',
@@ -105,14 +105,14 @@ export function AssessmentExamLayout({
   const sidebar = (
     <div className="flex flex-col h-full text-foreground">
       <div className="space-y-2 shrink-0">
-        <div className="rounded-lg bg-secondary/60 border border-border px-3 py-2.5">
+        <div className="rounded-[14px] bg-secondary/50 border border-border px-3.5 py-3 backdrop-blur-sm">
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-semibold">
             <Building2 className="w-3.5 h-3.5 shrink-0 text-ink/70" />
             Board
           </div>
           <p className="text-sm font-bold text-ink">{board}</p>
         </div>
-        <div className="rounded-lg bg-secondary/60 border border-border px-3 py-2.5">
+        <div className="rounded-[14px] bg-secondary/50 border border-border px-3.5 py-3 backdrop-blur-sm">
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-semibold">
             <GraduationCap className="w-3.5 h-3.5 shrink-0 text-ink/70" />
             Grade
@@ -166,7 +166,7 @@ export function AssessmentExamLayout({
 
   return (
     <div className="min-h-dvh h-dvh flex flex-col app-page-bg text-foreground overflow-hidden">
-      <header className="lg:hidden shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card">
+      <header className="lg:hidden shrink-0 flex items-center gap-3 px-4 py-3 glass-nav safe-top">
         <button
           type="button"
           onClick={() => onPaletteOpenChange(!paletteOpen)}
@@ -188,7 +188,7 @@ export function AssessmentExamLayout({
         )}
         <Link
           to="/student/assessments"
-          className="p-2 rounded-md hover:bg-secondary text-muted-foreground"
+          className="p-2 rounded-[12px] hover:bg-secondary/70 text-muted-foreground ios-press transition-colors"
           aria-label="Exit assessment"
         >
           <X className="w-4 h-4" />
@@ -196,25 +196,25 @@ export function AssessmentExamLayout({
       </header>
 
       <div className="flex flex-1 min-h-0">
-        <aside className="hidden lg:flex w-[240px] xl:w-[260px] shrink-0 flex-col border-r border-border bg-card p-4">
+        <aside className="hidden lg:flex w-[240px] xl:w-[260px] shrink-0 flex-col glass-sidebar p-4">
           {sidebar}
         </aside>
 
         {paletteOpen && (
-          <div className="lg:hidden fixed inset-0 z-40 flex">
+          <div className="lg:hidden fixed inset-0 z-ln-drawer flex">
             <button
               type="button"
-              className="absolute inset-0 bg-ink/30"
+              className="absolute inset-0 glass-overlay"
               onClick={() => onPaletteOpenChange(false)}
               aria-label="Close question palette"
             />
-            <aside className="relative w-[min(100%,300px)] h-full bg-card border-r border-border p-4 flex flex-col shadow-xl">
+            <aside className="relative w-[min(100%,300px)] h-full glass-sheet p-4 flex flex-col animate-ios-sheet">
               <div className="flex items-center justify-between mb-4 shrink-0">
                 <p className="font-bold text-sm text-ink">Question palette</p>
                 <button
                   type="button"
                   onClick={() => onPaletteOpenChange(false)}
-                  className="p-1 rounded-md hover:bg-secondary text-muted-foreground"
+                  className="p-2 rounded-[12px] hover:bg-secondary/70 text-muted-foreground ios-press"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -225,7 +225,7 @@ export function AssessmentExamLayout({
         )}
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          <div className="hidden lg:flex items-center justify-between px-6 xl:px-10 py-4 border-b border-border bg-card shrink-0">
+          <div className="hidden lg:flex items-center justify-between px-6 xl:px-10 py-4 glass-nav shrink-0">
             <div className="min-w-0">
               <p className="text-base font-bold text-ink truncate">{title}</p>
               <p className="text-xs text-muted-foreground font-medium">
@@ -250,7 +250,7 @@ export function AssessmentExamLayout({
             <div className="w-full max-w-3xl mx-auto text-left">{children}</div>
           </div>
 
-          <footer className="shrink-0 border-t border-border bg-card px-4 sm:px-6 lg:px-10 xl:px-14 py-4">
+          <footer className="shrink-0 glass-nav px-4 sm:px-6 lg:px-10 xl:px-14 py-4 safe-bottom">
             <div className="w-full max-w-3xl mx-auto flex items-center justify-between gap-3">
               <button
                 type="button"
@@ -264,7 +264,7 @@ export function AssessmentExamLayout({
 
               <p className="hidden md:block text-xs text-muted-foreground text-center font-medium">
                 Press{' '}
-                <kbd className="px-2 py-1 rounded border border-border bg-secondary font-mono text-[10px] font-bold text-ink">
+                <kbd className="px-2 py-1 rounded-[8px] border border-border/60 bg-secondary/80 font-mono text-[10px] font-bold text-ink">
                   ENTER
                 </kbd>{' '}
                 for next
@@ -303,9 +303,9 @@ export function ExamQuestionCard({
   children,
 }: QuestionCardProps) {
   return (
-    <div className="w-full text-left bg-card rounded-xl border border-border shadow-card overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-3.5 border-b border-border bg-secondary/30">
-        <span className="inline-flex items-center rounded-md bg-accent/90 text-ink text-xs font-bold px-3 py-1 uppercase tracking-wide">
+    <div className="w-full text-left glass-card border border-border rounded-[14px] overflow-hidden ios-shadow-md">
+      <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-border bg-secondary/25 backdrop-blur-sm">
+        <span className="inline-flex items-center rounded-[12px] bg-accent/90 text-ink text-xs font-bold px-3 py-1.5 uppercase tracking-wide">
           Question {questionNumber} of {totalQuestions}
         </span>
         <button

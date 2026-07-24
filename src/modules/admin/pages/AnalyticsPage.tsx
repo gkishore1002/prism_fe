@@ -1,5 +1,6 @@
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
-import { monthlyTrend, subjectHealthDistribution } from '@/data/mock'
+import { PageHeader, AppCard } from '@/components/layout/AppShell'
+import { PageLoader } from '@/components/ui/PrismLoader'
+import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import {
   LineChart,
   Line,
@@ -8,47 +9,65 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  Legend,
 } from 'recharts'
 
 export function AdminAnalyticsPage() {
+  useAnalyticsPage('adminAnalytics')
+  const { loading, monthlyTrend, subjectHealth } = useAnalytics()
+
+  if (loading) {
+    return <PageLoader />
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-zinc-900">Institution Analytics</h2>
-        <p className="text-sm text-zinc-500">Deep intelligence across assessments, health, and improvement</p>
-      </div>
+    <>
+      <PageHeader
+        eyebrow="Intelligence"
+        title="Institution analytics"
+        sub="Deep intelligence across assessments, health, and improvement"
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Health vs. Assessment Volume</CardTitle>
-          <CardDescription>Correlation between assessment frequency and academic health</CardDescription>
-        </CardHeader>
-        <div style={{ height: 280 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={monthlyTrend} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
-              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#a1a1aa' }} />
-              <YAxis yAxisId="health" domain={[60, 80]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#a1a1aa' }} />
-              <YAxis yAxisId="assessments" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#a1a1aa' }} />
-              <Tooltip contentStyle={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '12px' }} />
-              <Legend />
-              <Line yAxisId="health" type="monotone" dataKey="health" stroke="#6366f1" strokeWidth={2} dot={{ r: 4 }} name="Health %" />
-              <Line yAxisId="assessments" type="monotone" dataKey="assessments" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} name="Assessments" />
-            </LineChart>
-          </ResponsiveContainer>
+      <AppCard className="accent-blue mb-6">
+        <h3 className="font-display text-[15px] font-semibold text-foreground">Monthly trend</h3>
+        <p className="text-[12px] text-muted-foreground mt-0.5 mb-4">Institution health score over time</p>
+        {monthlyTrend.length > 0 ? (
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={monthlyTrend} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f5e8c8" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6e8499' }} />
+                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6e8499' }} />
+                <Tooltip
+                  contentStyle={{
+                    background: '#ffffff',
+                    border: '1px solid #ede4cc',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                  }}
+                />
+                <Line type="monotone" dataKey="score" stroke="#3575c4" strokeWidth={2} dot={{ r: 4 }} name="Score %" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No trend data yet.</p>
+        )}
+      </AppCard>
+
+      {subjectHealth.length === 0 ? (
+        <AppCard>
+          <p className="text-sm text-muted-foreground">No subject health data yet.</p>
+        </AppCard>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {subjectHealth.map((s) => (
+            <AppCard key={s.subject} className="accent-emerald">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">{s.subject}</p>
+              <p className="text-2xl font-mono-data font-semibold text-foreground mt-1">{s.health}%</p>
+            </AppCard>
+          ))}
         </div>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {subjectHealthDistribution.map((s) => (
-          <Card key={s.subject} padding="sm">
-            <p className="text-xs text-zinc-500">{s.subject}</p>
-            <p className="text-2xl font-bold text-zinc-900 mt-1">{s.health}%</p>
-            <p className="text-xs text-zinc-400 mt-1">{s.students} students tracked</p>
-          </Card>
-        ))}
-      </div>
-    </div>
+      )}
+    </>
   )
 }

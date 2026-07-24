@@ -1,22 +1,31 @@
-import type { UserRole } from '@/types'
+import type { User, UserRole } from '@/types'
 
-const SESSION_KEY = 'learnova_session'
+const SESSION_KEY = 'prism_session'
+const LEGACY_SESSION_KEY = 'learnova_session'
 
-export interface LearnovaSession {
+export interface PrismSession {
   email: string
   role: UserRole
   userId: string
+  accessToken?: string
+  user?: User
 }
 
-export function persistSession(session: LearnovaSession) {
+export function persistSession(session: PrismSession) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session))
 }
 
-export function readSession(): LearnovaSession | null {
+export function readSession(): PrismSession | null {
   try {
-    const raw = localStorage.getItem(SESSION_KEY)
+    const raw =
+      localStorage.getItem(SESSION_KEY) ?? localStorage.getItem(LEGACY_SESSION_KEY)
     if (!raw) return null
-    return JSON.parse(raw) as LearnovaSession
+    const session = JSON.parse(raw) as PrismSession
+    if (!localStorage.getItem(SESSION_KEY) && localStorage.getItem(LEGACY_SESSION_KEY)) {
+      persistSession(session)
+      localStorage.removeItem(LEGACY_SESSION_KEY)
+    }
+    return session
   } catch {
     return null
   }
@@ -24,6 +33,9 @@ export function readSession(): LearnovaSession | null {
 
 export function clearSession() {
   localStorage.removeItem(SESSION_KEY)
+  localStorage.removeItem(LEGACY_SESSION_KEY)
+  sessionStorage.removeItem('prism_student_assessment_reminder')
+  sessionStorage.removeItem('learnova_student_assessment_reminder')
 }
 
 export function dashboardPathForRole(role: UserRole): string {

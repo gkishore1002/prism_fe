@@ -1,6 +1,6 @@
 import type { HealthStatus } from '@/types'
 
-export const APP_NAME = 'Learnova'
+export const APP_NAME = 'Prism'
 
 export const HEALTH_CONFIG: Record<
   HealthStatus,

@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Search, X } from 'lucide-react'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 
 export interface AppSelectOption {
@@ -17,6 +18,8 @@ export interface AppSelectOption {
   description?: string
   disabled?: boolean
 }
+
+export type AppSelectVariant = 'default' | 'compact' | 'on-dark'
 
 interface AppSelectProps {
   value: string | null | undefined
@@ -30,8 +33,21 @@ interface AppSelectProps {
   className?: string
   triggerClassName?: string
   emptyMessage?: string
+  searchEmptyMessage?: string
   portal?: boolean
   name?: string
+  variant?: AppSelectVariant
+  /** Full width on mobile even inside flex rows */
+  fullWidth?: boolean
+}
+
+const triggerVariants: Record<AppSelectVariant, string> = {
+  default:
+    'border-border bg-card/85 text-foreground hover:border-accent/35 focus-visible:ring-accent/20',
+  compact:
+    'border-border bg-card/90 text-foreground py-2 min-h-[40px] text-sm hover:border-accent/35',
+  'on-dark':
+    'border-paper/25 bg-paper/10 text-paper hover:border-paper/40 focus-visible:ring-accent/30 placeholder:text-paper/50',
 }
 
 export function AppSelect({
@@ -46,15 +62,20 @@ export function AppSelect({
   className,
   triggerClassName,
   emptyMessage = 'No options available',
+  searchEmptyMessage = 'No options match your search',
   portal = true,
   name,
+  variant = 'default',
+  fullWidth = true,
 }: AppSelectProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [highlighted, setHighlighted] = useState(0)
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({})
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const listId = useId()
+  const isMobile = useIsMobile()
 
   const selected = options.find((o) => o.value === value)
 
@@ -68,28 +89,52 @@ export function AppSelect({
     )
   }, [options, search])
 
+  const selectableFiltered = filtered.filter((o) => !o.disabled)
+
+  const closePanel = useCallback(() => {
+    setOpen(false)
+    setSearch('')
+  }, [])
+
+  const handleSelect = useCallback(
+    (option: AppSelectOption) => {
+      if (option.disabled) return
+      onChange(option.value)
+      setOpen(false)
+      setSearch('')
+      triggerRef.current?.focus()
+    },
+    [onChange],
+  )
+
   const updatePanelPosition = useCallback(() => {
+    if (isMobile) {
+      setPanelStyle({})
+      return
+    }
     const trigger = triggerRef.current
     if (!trigger) return
     const rect = trigger.getBoundingClientRect()
     const gap = 6
-    const maxHeight = 280
+    const maxHeight = 320
     const spaceBelow = window.innerHeight - rect.bottom - gap
     const spaceAbove = rect.top - gap
-    const openUp = spaceBelow < 200 && spaceAbove > spaceBelow
+    const openUp = spaceBelow < 220 && spaceAbove > spaceBelow
     const height = Math.min(maxHeight, openUp ? spaceAbove - 8 : spaceBelow - 8)
+    const width = Math.min(Math.max(rect.width, 220), window.innerWidth - 16)
+    const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8)
 
     setPanelStyle({
       position: 'fixed',
-      left: rect.left,
-      width: rect.width,
-      zIndex: 9999,
-      maxHeight: Math.max(height, 160),
+      left,
+      width,
+      zIndex: 52,
+      maxHeight: Math.max(height, 180),
       ...(openUp
         ? { bottom: window.innerHeight - rect.top + gap }
         : { top: rect.bottom + gap }),
     })
-  }, [])
+  }, [isMobile])
 
   useEffect(() => {
     if (!open) return
@@ -107,37 +152,44 @@ export function AppSelect({
     if (!open) return
     function onPointerDown(e: MouseEvent) {
       const target = e.target as Node
-      if (
-        triggerRef.current?.contains(target) ||
-        panelRef.current?.contains(target)
-      ) {
-        return
-      }
-      setOpen(false)
-      setSearch('')
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return
+      closePanel()
     }
     document.addEventListener('mousedown', onPointerDown)
     return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [open])
+  }, [open, closePanel])
 
   useEffect(() => {
     if (!open) return
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        setOpen(false)
-        setSearch('')
+        closePanel()
+        triggerRef.current?.focus()
+        return
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setHighlighted((i) => Math.min(i + 1, selectableFiltered.length - 1))
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setHighlighted((i) => Math.max(i - 1, 0))
+      }
+      if (e.key === 'Enter' && selectableFiltered[highlighted]) {
+        e.preventDefault()
+        handleSelect(selectableFiltered[highlighted])
       }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open])
+  }, [open, highlighted, selectableFiltered, closePanel, handleSelect])
 
-  function handleSelect(option: AppSelectOption) {
-    if (option.disabled) return
-    onChange(option.value)
-    setOpen(false)
-    setSearch('')
-  }
+  useEffect(() => {
+    if (open) {
+      const idx = selectableFiltered.findIndex((o) => o.value === value)
+      setHighlighted(idx >= 0 ? idx : 0)
+    }
+  }, [open, selectableFiltered, value])
 
   function toggleOpen() {
     if (disabled) return
@@ -147,55 +199,78 @@ export function AppSelect({
     })
   }
 
+  const useMobileSheet = isMobile && portal
+
   const panel = open ? (
     <>
       <div
-        className="fixed inset-0 z-[9998] bg-ink/20 sm:bg-transparent"
+        className={cn(
+          'fixed inset-0 z-ln-dropdown',
+          useMobileSheet ? 'bg-ink/35 backdrop-blur-[2px]' : 'sm:bg-transparent sm:backdrop-blur-none sm:pointer-events-none',
+          !useMobileSheet && 'bg-ink/30 backdrop-blur-sm sm:bg-transparent',
+        )}
         aria-hidden
-        onClick={() => {
-          setOpen(false)
-          setSearch('')
-        }}
+        onClick={closePanel}
       />
       <div
         ref={panelRef}
         id={listId}
         role="listbox"
-        style={portal ? panelStyle : undefined}
+        style={portal && !useMobileSheet ? panelStyle : undefined}
         className={cn(
-          'bg-card border border-border rounded-lg shadow-xl overflow-hidden flex flex-col',
-          !portal && 'absolute left-0 right-0 top-full mt-1.5 z-50 max-h-72',
+          'glass-sheet border border-border overflow-hidden flex flex-col z-ln-dropdown',
+          useMobileSheet
+            ? 'ln-dropdown-sheet fixed inset-x-0 bottom-0 rounded-t-[20px] max-h-[min(85dvh,560px)] animate-ln-sheet-up safe-bottom'
+            : cn(
+                'rounded-[14px] animate-ios-sheet',
+                !portal && 'absolute left-0 right-0 top-full mt-2 max-h-72',
+              ),
         )}
       >
+        {useMobileSheet && (
+          <div className="flex flex-col items-center pt-2 pb-1 shrink-0 border-b border-border/60">
+            <span className="ln-sheet-handle" aria-hidden />
+            {(label || placeholder) && (
+              <p className="text-sm font-medium text-foreground px-4 pb-2 truncate max-w-full">
+                {label ?? placeholder}
+              </p>
+            )}
+          </div>
+        )}
+
         {searchable && (
-          <div className="flex items-center gap-2 border-b border-border px-3 py-2 shrink-0">
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2.5 shrink-0">
             <Search className="w-4 h-4 text-muted-foreground shrink-0" />
             <input
-              autoFocus
+              autoFocus={!useMobileSheet}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={searchPlaceholder}
-              className="text-sm outline-none bg-transparent w-full min-w-0"
+              className="text-sm outline-none bg-transparent w-full min-w-0 min-h-[44px] sm:min-h-0"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch('')}
-                className="text-muted-foreground hover:text-foreground"
+                className="p-2 -mr-1 text-muted-foreground hover:text-foreground"
                 aria-label="Clear search"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             )}
           </div>
         )}
 
-        <div className="overflow-y-auto scrollbar-thin flex-1 p-1">
+        <div className="overflow-y-auto scrollbar-thin flex-1 p-1.5 sm:p-1">
           {filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6 px-3">{emptyMessage}</p>
+            <p className="text-sm text-muted-foreground text-center py-8 px-3">
+              {options.length === 0 ? emptyMessage : searchEmptyMessage}
+            </p>
           ) : (
             filtered.map((option) => {
               const active = option.value === value
+              const idx = selectableFiltered.indexOf(option)
+              const isHighlighted = idx === highlighted && idx >= 0
               return (
                 <button
                   key={option.value}
@@ -203,10 +278,11 @@ export function AppSelect({
                   role="option"
                   aria-selected={active}
                   disabled={option.disabled}
+                  onMouseEnter={() => idx >= 0 && setHighlighted(idx)}
                   onClick={() => handleSelect(option)}
                   className={cn(
-                    'w-full text-left px-3 py-2.5 rounded-md transition-colors flex items-start gap-2',
-                    active ? 'bg-accent/10 text-foreground' : 'hover:bg-secondary/60',
+                    'w-full text-left px-3.5 py-3 sm:py-2.5 rounded-[12px] transition-all duration-[180ms] flex items-start gap-2.5 ios-list-row min-h-[48px] sm:min-h-0',
+                    active || isHighlighted ? 'bg-accent/12 text-foreground' : 'hover:bg-secondary/50',
                     option.disabled && 'opacity-40 cursor-not-allowed',
                   )}
                 >
@@ -217,7 +293,7 @@ export function AppSelect({
                     )}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium truncate">{option.label}</span>
+                    <span className="block text-sm font-medium">{option.label}</span>
                     {option.description && (
                       <span className="block text-xs text-muted-foreground mt-0.5 line-clamp-2">
                         {option.description}
@@ -229,14 +305,29 @@ export function AppSelect({
             })
           )}
         </div>
+
+        {useMobileSheet && (
+          <div className="shrink-0 border-t border-border p-3 safe-bottom sm:hidden">
+            <button type="button" onClick={closePanel} className="btn btn-primary w-full min-h-[48px]">
+              {selected ? `Select · ${selected.label}` : 'Close'}
+            </button>
+          </div>
+        )}
       </div>
     </>
   ) : null
 
   return (
-    <div className={cn('relative w-full', className)}>
-      {label && (
-        <span className="block text-xs text-muted-foreground mb-1">{label}</span>
+    <div className={cn('relative min-w-0', fullWidth && 'w-full', className)}>
+      {label && !useMobileSheet && (
+        <span
+          className={cn(
+            'block text-xs mb-1',
+            variant === 'on-dark' ? 'text-paper/70' : 'text-muted-foreground',
+          )}
+        >
+          {label}
+        </span>
       )}
       {name && <input type="hidden" name={name} value={value ?? ''} readOnly />}
       <button
@@ -248,19 +339,22 @@ export function AppSelect({
         aria-controls={open ? listId : undefined}
         onClick={toggleOpen}
         className={cn(
-          'w-full flex items-center justify-between gap-2 border border-border rounded-md px-3 py-2 text-sm bg-background text-left transition-colors',
-          'hover:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30',
+          'w-full flex items-center justify-between gap-2 border rounded-[14px] px-4 text-[15px] backdrop-blur-sm text-left transition-all duration-[280ms] ios-shadow-sm min-h-[48px] sm:min-h-[44px]',
+          'focus-visible:outline-none focus-visible:ring-[3px]',
+          triggerVariants[variant],
           disabled && 'opacity-50 cursor-not-allowed',
-          open && 'border-accent/50 ring-2 ring-accent/20',
+          open && variant !== 'on-dark' && 'border-accent/45 ring-[3px] ring-accent/15 bg-card',
+          open && variant === 'on-dark' && 'border-accent/50 ring-[3px] ring-accent/25',
           triggerClassName,
         )}
       >
-        <span className={cn('truncate', !selected && 'text-muted-foreground')}>
+        <span className={cn('truncate', !selected && (variant === 'on-dark' ? 'text-paper/55' : 'text-muted-foreground'))}>
           {selected?.label ?? placeholder}
         </span>
         <ChevronDown
           className={cn(
-            'w-4 h-4 text-muted-foreground shrink-0 transition-transform',
+            'w-4 h-4 shrink-0 transition-transform',
+            variant === 'on-dark' ? 'text-paper/70' : 'text-muted-foreground',
             open && 'rotate-180',
           )}
         />
@@ -277,9 +371,12 @@ interface AppSelectFieldProps extends AppSelectProps {
 
 export function AppSelectField({ children, className, ...props }: AppSelectFieldProps) {
   return (
-    <label className={cn('block', className)}>
+    <label className={cn('block min-w-0', className)}>
       <AppSelect {...props} />
       {children}
     </label>
   )
 }
+
+/** Alias for design-system docs */
+export { AppSelect as AppDropdown }
