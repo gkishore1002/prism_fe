@@ -1,8 +1,24 @@
 import { useRef, useState } from 'react'
-import { Upload, Download, CheckCircle2, XCircle } from 'lucide-react'
+import {
+  Upload,
+  Download,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  FileSpreadsheet,
+  FileJson,
+  ClipboardCheck,
+  BookMarked,
+} from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
-import { QUESTION_UPLOAD_PREVIEW } from '@/lib/questionUploadTemplate'
+import {
+  downloadQuestionExcelTemplate,
+  downloadQuestionJsonTemplate,
+  parseQuestionUploadFile,
+  QUESTION_UPLOAD_COLUMNS,
+} from '@/lib/questionUploadParse'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
+import type { QuestionUploadRow } from '@/types'
 import { cn } from '@/lib/cn'
 
 interface QuestionUploadWorkflowProps {
@@ -10,108 +26,292 @@ interface QuestionUploadWorkflowProps {
   variant?: 'full' | 'minimal'
 }
 
+const STEPS = [
+  { id: 1, label: 'Template', icon: Download },
+  { id: 2, label: 'Upload', icon: Upload },
+  { id: 3, label: 'Validate', icon: ClipboardCheck },
+  { id: 4, label: 'Publish', icon: BookMarked },
+] as const
+
 export function QuestionUploadWorkflow({
   onPaperCreated,
   variant = 'minimal',
 }: QuestionUploadWorkflowProps) {
   const { addPaperFromUpload } = useQuestionPapers()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [rows, setRows] = useState<QuestionUploadRow[]>([])
   const [uploaded, setUploaded] = useState(false)
-  const [committed, setCommitted] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [parsing, setParsing] = useState(false)
   const [paperName, setPaperName] = useState('')
   const [fileLabel, setFileLabel] = useState<string | null>(null)
+  const [parseError, setParseError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
-  const validRows = QUESTION_UPLOAD_PREVIEW.filter((r) => r.valid)
-  const invalidRows = QUESTION_UPLOAD_PREVIEW.filter((r) => !r.valid)
+  const validRows = rows.filter((r) => r.valid)
+  const invalidRows = rows.filter((r) => !r.valid)
+  const activeStep = uploaded ? 3 : fileLabel ? 2 : 1
 
-  function handleSimulateUpload(name?: string) {
-    setUploaded(true)
-    setCommitted(false)
+  async function handleFile(file: File | undefined) {
+    if (!file) return
+    setParsing(true)
+    setParseError(null)
+    setSaveError(null)
+    try {
+      const result = await parseQuestionUploadFile(file)
+      if (!result.ok) {
+        setUploaded(false)
+        setRows([])
+        setFileLabel(null)
+        setParseError(result.error)
+        return
+      }
+      setRows(result.rows)
+      setUploaded(true)
+      setFileLabel(file.name)
+      if (result.suggestedName) setPaperName(result.suggestedName)
+      else {
+        const base = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')
+        setPaperName(base)
+      }
+    } finally {
+      setParsing(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  function resetPreview() {
+    setUploaded(false)
+    setRows([])
+    setFileLabel(null)
     setPaperName('')
-    setFileLabel(name ?? 'grade8_math_questions.xlsx')
+    setParseError(null)
+    setSaveError(null)
   }
 
   async function handleCommit(e: React.FormEvent) {
     e.preventDefault()
-    if (!paperName.trim()) return
-    const paper = await addPaperFromUpload(paperName.trim(), QUESTION_UPLOAD_PREVIEW)
-    setCommitted(true)
-    onPaperCreated?.(paper.id)
+    if (!paperName.trim() || validRows.length === 0 || saving) return
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const paper = await addPaperFromUpload(paperName.trim(), rows)
+      onPaperCreated?.(paper.id)
+      resetPreview()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save question paper')
+    } finally {
+      setSaving(false)
+    }
   }
 
+  const stepRail = (
+    <ol className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
+      {STEPS.map(({ id, label, icon: Icon }) => {
+        const done = activeStep > id || (id === 4 && saving)
+        const current = activeStep === id
+        return (
+          <li
+            key={id}
+            className={cn(
+              'flex items-center gap-2 rounded-[10px] border px-3 py-2 text-xs',
+              current
+                ? 'border-accent/50 bg-accent/10 text-foreground'
+                : done
+                  ? 'border-leaf/30 bg-leaf/5 text-leaf'
+                  : 'border-border bg-card text-muted-foreground',
+            )}
+          >
+            <span
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold',
+                current ? 'bg-accent text-accent-foreground' : done ? 'bg-leaf text-white' : 'bg-secondary',
+              )}
+            >
+              {done && !current ? '✓' : id}
+            </span>
+            <Icon className="w-3.5 h-3.5 shrink-0 opacity-70" />
+            <span className="font-medium">{label}</span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept=".xlsx,.xls,.csv,.json,application/json,text/csv"
+      className="hidden"
+      onChange={(e) => void handleFile(e.target.files?.[0])}
+    />
+  )
+
+  const templateActions = (
+    <div className="grid sm:grid-cols-2 gap-3">
+      <button
+        type="button"
+        onClick={() => downloadQuestionExcelTemplate()}
+        className="flex items-start gap-3 rounded-[12px] border border-border bg-card p-3.5 text-left hover:border-accent/40 hover:bg-accent/5 transition-colors"
+      >
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink text-paper shrink-0">
+          <FileSpreadsheet className="w-4 h-4 text-accent" />
+        </span>
+        <span>
+          <span className="block text-sm font-semibold text-foreground">Excel / CSV template</span>
+          <span className="block text-xs text-muted-foreground mt-0.5">
+            Spreadsheet columns for bulk question intake
+          </span>
+        </span>
+        <Download className="w-4 h-4 text-muted-foreground ml-auto shrink-0 mt-1" />
+      </button>
+      <button
+        type="button"
+        onClick={() => downloadQuestionJsonTemplate()}
+        className="flex items-start gap-3 rounded-[12px] border border-border bg-card p-3.5 text-left hover:border-accent/40 hover:bg-accent/5 transition-colors"
+      >
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink text-paper shrink-0">
+          <FileJson className="w-4 h-4 text-accent" />
+        </span>
+        <span>
+          <span className="block text-sm font-semibold text-foreground">JSON template</span>
+          <span className="block text-xs text-muted-foreground mt-0.5">
+            API-friendly payload with optional paper name
+          </span>
+        </span>
+        <Download className="w-4 h-4 text-muted-foreground ml-auto shrink-0 mt-1" />
+      </button>
+    </div>
+  )
+
+  const dropZone = (
+    <div
+      className={cn(
+        'rounded-[14px] border-2 border-dashed border-border bg-ink/[0.02] p-6 sm:p-8 text-center',
+        'hover:border-accent/45 hover:bg-accent/[0.04] transition-colors cursor-pointer',
+        parsing && 'opacity-60 pointer-events-none',
+      )}
+      onClick={() => fileInputRef.current?.click()}
+      onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+      onDragOver={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        void handleFile(e.dataTransfer.files?.[0])
+      }}
+      role="button"
+      tabIndex={0}
+    >
+      {parsing ? (
+        <Loader2 className="w-8 h-8 text-muted-foreground mx-auto mb-3 animate-spin" />
+      ) : (
+        <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+      )}
+      <p className="text-sm font-semibold text-foreground">
+        {parsing ? 'Validating file…' : 'Drop file or click to browse'}
+      </p>
+      <p className="text-xs text-muted-foreground mt-1">.xlsx · .xls · .csv · .json</p>
+      {fileLabel && (
+        <p className="text-xs text-leaf mt-2 inline-flex items-center gap-1">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          {fileLabel}
+        </p>
+      )}
+    </div>
+  )
+
   const preview = uploaded ? (
-    <AppCard className={variant === 'minimal' ? 'mt-3' : undefined}>
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+    <div className="rounded-[14px] border border-border overflow-hidden bg-card">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 px-4 py-4 border-b border-border bg-ink/[0.03]">
         <div>
-          <h3 className="font-display text-lg text-foreground">Validation preview</h3>
-          <p className="text-sm text-muted-foreground">
-            {validRows.length} valid · {invalidRows.length} need fixes
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
+            Step 3–4 · Validate & publish
+          </div>
+          <h3 className="font-display text-lg text-foreground mt-1">Import review</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            <span className="text-leaf font-medium">{validRows.length} valid</span>
+            {' · '}
+            <span className={invalidRows.length ? 'text-rose font-medium' : ''}>
+              {invalidRows.length} need fixes
+            </span>
             {fileLabel ? ` · ${fileLabel}` : ''}
           </p>
         </div>
-        {!committed && (
-          <form onSubmit={handleCommit} className="flex flex-col sm:flex-row gap-2 sm:items-end w-full sm:w-auto">
-            <label className="flex-1 sm:min-w-[220px]">
-              <span className="text-xs text-muted-foreground">Question paper name *</span>
-              <input
-                required
-                value={paperName}
-                onChange={(e) => setPaperName(e.target.value)}
-                placeholder="e.g. Grade 8 Algebra — Full paper"
-                className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
-              />
-            </label>
+        <form
+          onSubmit={(e) => void handleCommit(e)}
+          className="flex flex-col sm:flex-row gap-2 sm:items-end w-full lg:w-auto"
+        >
+          <label className="flex-1 sm:min-w-[240px]">
+            <span className="text-xs text-muted-foreground">Paper title in library *</span>
+            <input
+              required
+              value={paperName}
+              onChange={(e) => setPaperName(e.target.value)}
+              placeholder="e.g. Grade 8 Algebra — Term 1"
+              className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+            />
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={resetPreview}
+              className="px-3 py-2 rounded-md text-sm border border-border hover:bg-secondary/60"
+            >
+              Cancel
+            </button>
             <button
               type="submit"
-              className="bg-accent text-accent-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90 shrink-0"
+              disabled={validRows.length === 0 || saving}
+              className="btn btn-primary px-4 py-2 text-sm disabled:opacity-40"
             >
-              Save as question paper
+              {saving ? 'Publishing…' : `Publish ${validRows.length} Qs`}
             </button>
-          </form>
-        )}
-        {committed && (
-          <span className="text-sm text-leaf inline-flex items-center gap-1">
-            <CheckCircle2 className="w-4 h-4" />
-            Saved as question paper
-          </span>
-        )}
+          </div>
+        </form>
       </div>
 
-      <div className="overflow-x-auto">
+      {saveError && <p className="text-sm text-rose px-4 pt-3">{saveError}</p>}
+
+      <div className="overflow-x-auto max-h-[420px]">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-muted-foreground border-b border-border">
-              <th className="pb-3 font-medium">Row</th>
-              <th className="pb-3 font-medium">Question</th>
-              <th className="pb-3 font-medium">Hierarchy</th>
-              <th className="pb-3 font-medium">Tags</th>
-              <th className="pb-3 font-medium">Status</th>
+          <thead className="sticky top-0 bg-card z-[1]">
+            <tr className="text-left text-[10px] uppercase tracking-[0.12em] text-muted-foreground border-b border-border">
+              <th className="px-4 py-2.5 font-semibold">Row</th>
+              <th className="px-4 py-2.5 font-semibold">Question</th>
+              <th className="px-4 py-2.5 font-semibold">Academic path</th>
+              <th className="px-4 py-2.5 font-semibold">Meta</th>
+              <th className="px-4 py-2.5 font-semibold">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {QUESTION_UPLOAD_PREVIEW.map((row) => (
+            {rows.map((row) => (
               <tr key={row.row} className={row.valid ? '' : 'bg-rose/5'}>
-                <td className="py-3 font-mono-data text-muted-foreground">{row.row}</td>
-                <td className="py-3 max-w-xs">
-                  <p className="line-clamp-2 text-foreground">{row.text}</p>
+                <td className="px-4 py-2.5 font-mono-data text-muted-foreground">{row.row}</td>
+                <td className="px-4 py-2.5 max-w-xs">
+                  <p className="line-clamp-2 text-foreground">{row.text || '—'}</p>
                 </td>
-                <td className="py-3 text-xs text-muted-foreground">
-                  {row.board} · G{row.grade || '—'}
+                <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                  {row.board || '—'} · G{row.grade || '—'}
                   <br />
-                  {row.subject} / {row.chapter} / {row.topic}
+                  {row.subject || '—'} / {row.chapter || '—'} / {row.topic || '—'}
                 </td>
-                <td className="py-3 text-xs text-muted-foreground">
-                  {row.difficulty} · {row.marks}m · {row.questionType}
+                <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                  {row.difficulty || '—'} · {Number.isFinite(row.marks) ? `${row.marks}m` : '—'} ·{' '}
+                  {row.questionType || '—'}
                 </td>
-                <td className="py-3">
+                <td className="px-4 py-2.5">
                   {row.valid ? (
-                    <span className="inline-flex items-center gap-1 text-leaf text-xs">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Valid
+                    <span className="inline-flex items-center gap-1 text-leaf text-xs font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Ready
                     </span>
                   ) : (
                     <div>
-                      <span className="inline-flex items-center gap-1 text-rose text-xs">
-                        <XCircle className="w-3.5 h-3.5" /> Invalid
+                      <span className="inline-flex items-center gap-1 text-rose text-xs font-medium">
+                        <XCircle className="w-3.5 h-3.5" /> Blocked
                       </span>
                       <p className="text-[10px] text-rose mt-0.5">{row.errors.join(', ')}</p>
                     </div>
@@ -123,109 +323,58 @@ export function QuestionUploadWorkflow({
         </table>
       </div>
 
-      {invalidRows.length > 0 && !committed && (
-        <p className="text-xs text-muted-foreground mt-4">
-          Fix flagged rows in your file and re-upload. Valid rows can be saved as a paper now.
+      {invalidRows.length > 0 && (
+        <p className="text-xs text-muted-foreground px-4 py-3 border-t border-border">
+          Fix blocked rows in the source file and re-upload. Only ready rows are published.
         </p>
       )}
-    </AppCard>
+    </div>
   ) : null
 
   if (variant === 'minimal') {
     return (
       <div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <button
-            type="button"
-            className="inline-flex items-center justify-center gap-2 border border-border px-3 py-2 rounded-md text-sm hover:bg-secondary/60 shrink-0"
-          >
-            <Download className="w-4 h-4" />
-            Download template
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-            onChange={(e) => handleSimulateUpload(e.target.files?.[0]?.name)}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className={cn(
-              'flex-1 inline-flex items-center justify-center gap-2 border border-dashed border-border rounded-md px-4 py-2.5 text-sm',
-              'hover:border-accent/40 hover:bg-accent/5 transition-colors',
-            )}
-          >
-            <Upload className="w-4 h-4 text-muted-foreground" />
-            {fileLabel ? (
-              <span className="text-leaf inline-flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                {fileLabel}
-              </span>
-            ) : (
-              <span>Choose Excel or CSV file</span>
-            )}
-          </button>
-        </div>
+        {fileInput}
+        {stepRail}
+        {templateActions}
+        <div className="mt-3">{dropZone}</div>
         <p className="text-xs text-muted-foreground mt-2">
-          Valid rows save as one question paper, grouped by topic from your file.
+          Learning portal intake: validated rows publish as one reusable paper.
         </p>
-        {preview}
+        {parseError && <p className="text-sm text-rose mt-2">{parseError}</p>}
+        {preview && <div className="mt-4">{preview}</div>}
       </div>
     )
   }
 
-  const templateColumns = [
-    'Board', 'Grade', 'Subject', 'Chapter', 'Topic',
-    'Difficulty', 'Marks', 'Question Type', 'Question Text',
-    'Option A', 'Option B', 'Option C', 'Option D', 'Correct Answer',
-  ]
-
   return (
-    <div className="space-y-6">
-      <AppCard>
-        <h3 className="font-display text-lg text-foreground mb-1">Upload Excel → question paper</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Upload questions in Excel or CSV. Valid rows are saved directly as a question paper — topics are
-          taken from the Topic column for filtering when you create assessments.
-        </p>
-
-        <div
-          className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-accent/40 transition-colors cursor-pointer"
-          onClick={() => handleSimulateUpload()}
-          onKeyDown={(e) => e.key === 'Enter' && handleSimulateUpload()}
-          role="button"
-          tabIndex={0}
-        >
-          <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm font-medium text-foreground">
-            Drop your file here or click to browse
+    <div className="space-y-4">
+      {fileInput}
+      <AppCard className="p-4 sm:p-5">
+        {stepRail}
+        <div className="mb-4">
+          <h3 className="font-display text-lg text-foreground">Content import console</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Bring question inventory from spreadsheets or JSON into the assessment library — same
+            pattern as ERP bulk masters.
           </p>
-          <p className="text-xs text-muted-foreground mt-1">Accepts .xlsx, .xls, .csv</p>
         </div>
-
-        <div className="flex flex-wrap gap-2 mt-4">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 border border-border px-3 py-1.5 rounded-md text-xs hover:bg-secondary/60"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Download Excel template
-          </button>
-        </div>
+        {templateActions}
+        <div className="mt-4">{dropZone}</div>
+        {parseError && <p className="text-sm text-rose mt-3">{parseError}</p>}
       </AppCard>
 
-      <AppCard>
-        <h3 className="font-display text-lg text-foreground mb-1">Template columns</h3>
-        <p className="text-sm text-muted-foreground mb-3">
-          Mandatory tags per BRD — Board, Grade, Subject, Chapter, Topic, Difficulty, Marks, Question Type.
+      <AppCard className="p-4 sm:p-5">
+        <h3 className="text-sm font-semibold text-foreground mb-1">Required schema</h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Board → Grade → Subject → Chapter → Topic, plus difficulty, marks, type, and text. JSON may
+          use {'{ "name": "…", "questions": […] }'}.
         </p>
         <div className="flex flex-wrap gap-1.5">
-          {templateColumns.map((col) => (
+          {QUESTION_UPLOAD_COLUMNS.map((col) => (
             <span
               key={col}
-              className="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-secondary text-muted-foreground"
+              className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-md bg-secondary text-muted-foreground font-medium"
             >
               {col}
             </span>

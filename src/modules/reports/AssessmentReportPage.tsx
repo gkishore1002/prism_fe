@@ -64,7 +64,7 @@ export function AssessmentReportPage({
     )
   }
 
-  const stats = [
+  const stats: { value: string | number; unit?: string; label: string }[] = [
     { value: report.accuracy, unit: '%', label: 'Your score' },
     { value: `${report.score}/${report.maxScore}`, label: 'Raw marks' },
   ]
@@ -139,7 +139,7 @@ export function AssessmentReportPage({
             />
           </div>
           <div>
-            <h4 className="lg-mono text-[0.62rem] uppercase tracking-widest text-[#a8402f] mb-2">
+            <h4 className="lg-mono text-[0.62rem] uppercase tracking-widest text-[#EF4444] mb-2">
               Focus topics
             </h4>
             <LgKpiRow

@@ -30,7 +30,7 @@ import {
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 
-const COLORS = ['#163a66', '#e8b820', '#3d8b5a']
+const COLORS = ['#4F46E5', '#0EA5E9', '#8B5CF6', '#10B981', '#F59E0B']
 
 export function AdminDashboardPage() {
   useAnalyticsPage('adminDashboard')

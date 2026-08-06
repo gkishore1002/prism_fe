@@ -22,9 +22,9 @@ const roleAccents: Record<UserRole, string> = {
 }
 
 const roleIconBg: Record<UserRole, string> = {
-  student: 'bg-blue-100 text-blue-600',
-  tutor: 'bg-yellow-100 text-yellow-700',
-  admin: 'bg-indigo-100 text-indigo-600',
+  student: 'bg-sky-100 text-sky-600',
+  tutor: 'bg-indigo-100 text-indigo-600',
+  admin: 'bg-violet-100 text-violet-600',
 }
 
 const loginCardClass =

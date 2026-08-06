@@ -43,21 +43,21 @@ export function PrismLogoMark({
     >
       <defs>
         <linearGradient id={gold} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FFD966" />
-          <stop offset="50%" stopColor="#E8B820" />
-          <stop offset="100%" stopColor="#D4A008" />
+          <stop offset="0%" stopColor="#818CF8" />
+          <stop offset="50%" stopColor="#4F46E5" />
+          <stop offset="100%" stopColor="#8B5CF6" />
         </linearGradient>
         <linearGradient id={navy} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#2A60A8" />
-          <stop offset="100%" stopColor="#163A66" />
+          <stop offset="0%" stopColor="#4338CA" />
+          <stop offset="100%" stopColor="#0F172A" />
         </linearGradient>
         <linearGradient id={beam} x1="0%" y1="50%" x2="100%" y2="50%">
-          <stop offset="0%" stopColor="#E8B820" stopOpacity="0.15" />
-          <stop offset="40%" stopColor="#E8B820" stopOpacity="0.95" />
-          <stop offset="100%" stopColor="#5290DA" stopOpacity="0.85" />
+          <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.15" />
+          <stop offset="40%" stopColor="#4F46E5" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#0EA5E9" stopOpacity="0.85" />
         </linearGradient>
         <radialGradient id={glow} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#E8B820" stopOpacity="0.35" />
+          <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.35" />
           <stop offset="100%" stopColor="#E8B820" stopOpacity="0" />
         </radialGradient>
       </defs>

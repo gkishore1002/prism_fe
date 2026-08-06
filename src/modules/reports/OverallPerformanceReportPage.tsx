@@ -79,7 +79,7 @@ export function OverallPerformanceReportPage({
   const topicChartData = report.topicBreakdown.slice(0, 6).map((t) => ({
     name: t.topic.length > 14 ? `${t.topic.slice(0, 12)}…` : t.topic,
     mastery: t.mastery,
-    fill: t.mastery >= 75 ? '#2f6b4f' : t.mastery >= 55 ? '#b7862e' : '#a8402f',
+    fill: t.mastery >= 75 ? '#10B981' : t.mastery >= 55 ? '#F59E0B' : '#EF4444',
   }))
   const healthForBullets = {
     overall: report.health,
@@ -175,7 +175,7 @@ export function OverallPerformanceReportPage({
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(28,26,21,0.12)" />
                   <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#5b5748' }} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#5b5748' }} />
-                  <Line type="monotone" dataKey="score" stroke="#c9a24b" strokeWidth={2} dot={{ r: 3, fill: '#0b1f3a' }} />
+                  <Line type="monotone" dataKey="score" stroke="#4F46E5" strokeWidth={2} dot={{ r: 3, fill: '#8B5CF6' }} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (

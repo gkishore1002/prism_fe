@@ -73,8 +73,18 @@ function manualInputToCreateBody(input: ManualQuestionInput) {
   }
 }
 
+function mapUploadQuestionType(
+  value: string,
+): QuestionBankEntry['questionType'] {
+  const t = value.toLowerCase()
+  if (t.includes('short')) return 'short'
+  if (t.includes('long') || t.includes('essay')) return 'long'
+  return 'mcq'
+}
+
 function uploadRowToCreateBody(row: QuestionUploadRow) {
-  const isMcq = !row.questionType.toLowerCase().includes('short')
+  const questionType = mapUploadQuestionType(row.questionType)
+  const isMcq = questionType === 'mcq'
   return {
     board: row.board,
     grade: normalizeGrade(row.grade),
@@ -84,7 +94,7 @@ function uploadRowToCreateBody(row: QuestionUploadRow) {
     text: row.text,
     difficulty: normalizeDifficulty(row.difficulty),
     marks: row.marks,
-    questionType: isMcq ? 'mcq' : 'short',
+    questionType,
     optionA: row.optionA ?? (isMcq ? 'Option A' : undefined),
     optionB: row.optionB ?? (isMcq ? 'Option B' : undefined),
     optionC: row.optionC ?? (isMcq ? 'Option C' : undefined),
@@ -185,6 +195,9 @@ export async function createPaperFromUpload(
   rows: QuestionUploadRow[],
 ): Promise<QuestionPaper> {
   const valid = rows.filter((r) => r.valid)
+  if (valid.length === 0) {
+    throw new Error('No valid questions to save. Fix errors and re-upload.')
+  }
   return createPaperBulk(
     name,
     valid.map((row) => uploadRowToCreateBody(row)),

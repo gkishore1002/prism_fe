@@ -1,7 +1,7 @@
 import type { QuestionUploadRow } from '@/types'
 
-/** Sample rows shown after simulated upload — validates client-side before commit to API */
-export const QUESTION_UPLOAD_PREVIEW: QuestionUploadRow[] = [
+/** Sample rows used in Excel/JSON templates and as documentation examples. */
+export const QUESTION_UPLOAD_TEMPLATE_ROWS: QuestionUploadRow[] = [
   {
     row: 2,
     board: 'CBSE',
@@ -43,34 +43,6 @@ export const QUESTION_UPLOAD_PREVIEW: QuestionUploadRow[] = [
   {
     row: 4,
     board: 'CBSE',
-    grade: '',
-    subject: 'Mathematics',
-    chapter: 'Algebra',
-    topic: 'Linear Equations',
-    difficulty: 'Easy',
-    marks: 1,
-    questionType: 'MCQ',
-    text: 'What is 2 + 2?',
-    valid: false,
-    errors: ['Grade is required'],
-  },
-  {
-    row: 5,
-    board: 'CBSE',
-    grade: '8',
-    subject: 'Mathematics',
-    chapter: 'Algebra',
-    topic: 'Linear Equations',
-    difficulty: 'Invalid',
-    marks: 2,
-    questionType: 'MCQ',
-    text: 'Solve x + 1 = 5',
-    valid: false,
-    errors: ['Difficulty must be Easy / Medium / Hard'],
-  },
-  {
-    row: 6,
-    board: 'CBSE',
     grade: '8',
     subject: 'Science',
     chapter: 'Physics',
@@ -88,3 +60,6 @@ export const QUESTION_UPLOAD_PREVIEW: QuestionUploadRow[] = [
     errors: [],
   },
 ]
+
+/** @deprecated Use QUESTION_UPLOAD_TEMPLATE_ROWS */
+export const QUESTION_UPLOAD_PREVIEW = QUESTION_UPLOAD_TEMPLATE_ROWS

@@ -1,24 +1,24 @@
 import { colors } from './tokens'
 
-/** Shared UI class tokens — Prism iOS-inspired design system */
+/** Shared UI class tokens — Prism modern academic SaaS */
 export const baseTheme = {
-  shell: 'rounded-[14px] border border-border glass-card',
-  panel: 'rounded-[14px] border border-border glass-card',
-  panelSoft: 'rounded-[14px] border border-border bg-secondary/35 backdrop-blur-md',
+  shell: 'rounded-[20px] border border-border glass-card',
+  panel: 'rounded-[20px] border border-border glass-card',
+  panelSoft: 'rounded-[20px] border border-border bg-secondary/80',
   input: 'ios-input',
   buttonPrimary: 'btn btn-primary px-5 py-2.5 text-[13px]',
   buttonAction: 'btn btn-action px-5 py-2.5 text-[13px]',
   buttonSecondary: 'btn btn-secondary px-5 py-2.5 text-[13px]',
   buttonGhost: 'btn btn-ghost px-5 py-2.5 text-[13px]',
-  chip: 'inline-flex items-center gap-1 rounded-[20px] px-3 py-1 text-[11px] font-display font-medium',
-  statCard: 'rounded-[14px] border border-border glass-card p-5 border-l-[4px]',
+  chip: 'inline-flex items-center gap-1 rounded-lg px-3 py-1 text-[11px] font-display font-medium',
+  statCard: 'rounded-[20px] border border-border glass-card p-5',
   cardHover:
-    'transition-all duration-[280ms] ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:-translate-y-0.5 hover:shadow-card-raised active:scale-[0.995]',
+    'transition-all duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:shadow-card-raised active:scale-[0.995]',
 } as const
 
 export const toneStyles = {
   blue: {
-    solid: 'bg-ink text-paper',
+    solid: 'bg-blue-600 text-white',
     soft: 'bg-blue-50 text-blue-700 border-blue-100',
     muted: 'bg-blue-100 text-blue-700',
     border: 'border-blue-200',
@@ -26,7 +26,7 @@ export const toneStyles = {
     icon: 'bg-blue-100 text-blue-600',
   },
   yellow: {
-    solid: 'bg-accent text-ink',
+    solid: 'bg-yellow-400 text-ink',
     soft: 'bg-yellow-50 text-yellow-700 border-yellow-100',
     muted: 'bg-yellow-100 text-yellow-700',
     border: 'border-yellow-200',

@@ -10,9 +10,9 @@ interface ScoreRingProps {
 }
 
 const strokeMap = {
-  brand: { stroke: '#3575c4', track: '#d8e2ef', text: 'text-blue-800' },
-  gold: { stroke: '#e8b820', track: '#ffecb3', text: 'text-yellow-600' },
-  emerald: { stroke: '#10b981', track: '#d1fae5', text: 'text-emerald-700' },
+  brand: { stroke: '#4F46E5', track: '#E0E7FF', text: 'text-foreground' },
+  gold: { stroke: '#8B5CF6', track: '#EDE9FE', text: 'text-indigo-600' },
+  emerald: { stroke: '#10B981', track: '#DCFCE7', text: 'text-leaf' },
 }
 
 export function ScoreRing({

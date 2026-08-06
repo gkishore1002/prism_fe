@@ -1,9 +1,25 @@
-import { useMemo, useState, useEffect, type ReactNode } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Eye, FilePlus2, ChevronDown, ChevronUp, Upload, CheckSquare, Square, PenLine } from 'lucide-react'
+import {
+  FileText,
+  Eye,
+  FilePlus2,
+  ChevronDown,
+  ChevronUp,
+  CheckSquare,
+  Square,
+  PenLine,
+  Library,
+  Sparkles,
+  CheckCircle2,
+  Copy,
+  BarChart3,
+} from 'lucide-react'
+import { motion } from 'framer-motion'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { QuestionUploadWorkflow } from '@/components/academic/QuestionUploadWorkflow'
 import { ManualQuestionEntry } from '@/components/academic/ManualQuestionEntry'
+import { EmptyState, SectionLabel } from '@/components/design/InsightCard'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
 import { useAuth } from '@/hooks/useAuth'
 import { topicCounts, totalMarksForQuestions } from '@/lib/questionPaperUtils'
@@ -15,83 +31,30 @@ interface QuestionBankPageProps {
   readOnly?: boolean
 }
 
-function SectionHeading({
-  icon: Icon,
-  title,
-  sub,
-}: {
-  icon: typeof FileText
-  title: string
-  sub?: string
-}) {
-  return (
-    <div className="mb-4">
-      <div className="flex items-center gap-2">
-        <Icon className="w-5 h-5 text-accent shrink-0" />
-        <h2 className="font-display text-xl text-foreground">{title}</h2>
-      </div>
-      {sub && <p className="text-sm text-muted-foreground mt-1 ml-7">{sub}</p>}
-    </div>
-  )
-}
+type WorkspaceTab = 'library' | 'create' | 'import'
 
-function CollapsibleSection({
-  icon: Icon,
-  title,
-  sub,
-  open,
-  onToggle,
-  children,
-}: {
-  icon: typeof FileText
-  title: string
-  sub?: string
-  open: boolean
-  onToggle: () => void
-  children: ReactNode
-}) {
-  return (
-    <section className="mb-4">
-      <AppCard className="p-0 overflow-hidden">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          className="w-full flex items-start justify-between gap-4 p-4 text-left hover:bg-secondary/30 transition-colors"
-        >
-          <div className="flex items-start gap-2 min-w-0">
-            <Icon className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-            <div>
-              <h2 className="font-display text-lg text-foreground">{title}</h2>
-              {sub && <p className="text-sm text-muted-foreground mt-0.5">{sub}</p>}
-            </div>
-          </div>
-          {open ? (
-            <ChevronUp className="w-5 h-5 text-muted-foreground shrink-0" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" />
-          )}
-        </button>
-        {open && <div className="border-t border-border p-4">{children}</div>}
-      </AppCard>
-    </section>
-  )
+const SOURCE_LABEL: Record<string, string> = {
+  upload: 'Imported',
+  manual: 'Manual',
+  custom: 'Custom',
 }
 
 export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionBankPageProps) {
   const { user } = useAuth()
-  const { questionPapers, questions, createCustomPaper, removePaper, ensureLoaded } = useQuestionPapers()
+  const { questionPapers, questions, createCustomPaper, removePaper, ensureLoaded } =
+    useQuestionPapers()
   const { confirm } = useConfirmModal()
 
   useEffect(() => {
     void ensureLoaded()
   }, [ensureLoaded])
+
+  const [tab, setTab] = useState<WorkspaceTab>('library')
+  const [flash, setFlash] = useState<string | null>(null)
   const [customPaperId, setCustomPaperId] = useState<string | null>(null)
   const [customName, setCustomName] = useState('')
   const [customSelectedTopics, setCustomSelectedTopics] = useState<string[]>([])
   const [customQuestionIds, setCustomQuestionIds] = useState<string[]>([])
-  const [manualOpen, setManualOpen] = useState(false)
-  const [uploadOpen, setUploadOpen] = useState(false)
 
   const paperPreviewBase =
     role === 'tutor' ? '/tutor/question-bank/papers' : '/admin/question-bank/papers'
@@ -107,6 +70,11 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
     })
   }, [customParent, questions, customSelectedTopics])
 
+  function showFlash(message: string) {
+    setFlash(message)
+    window.setTimeout(() => setFlash(null), 3500)
+  }
+
   function questionIdsForTopic(paperId: string, topic: string) {
     const paper = questionPapers.find((p) => p.id === paperId)
     if (!paper) return []
@@ -120,12 +88,12 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
     setCustomName('')
     setCustomSelectedTopics([])
     setCustomQuestionIds([])
+    setTab('library')
   }
 
   function toggleCustomTopic(topic: string, paperId: string) {
     const adding = !customSelectedTopics.includes(topic)
     const topicQuestionIds = questionIdsForTopic(paperId, topic)
-
     setCustomSelectedTopics((prev) =>
       adding ? [...prev, topic] : prev.filter((t) => t !== topic),
     )
@@ -166,238 +134,289 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
   async function handleCreateCustom(e: React.FormEvent, parentId: string) {
     e.preventDefault()
     if (!customName.trim() || customQuestionIds.length === 0) return
-    await createCustomPaper(
-      customName.trim(),
-      parentId,
-      customQuestionIds,
-      user.id,
-    )
+    await createCustomPaper(customName.trim(), parentId, customQuestionIds, user.id)
     setCustomPaperId(null)
     setCustomName('')
     setCustomSelectedTopics([])
     setCustomQuestionIds([])
+    showFlash('Custom paper published to the library.')
   }
 
-  const customSelectedQuestions = questions.filter((q) => customQuestionIds.includes(q.id))
+  const selectedForCustom = questions.filter((q) => customQuestionIds.includes(q.id))
+  const totalQuestions = questionPapers.reduce((n, p) => n + p.questionIds.length, 0)
+  const topicCount = [...new Set(questionPapers.flatMap((p) => p.topics))].length
+
+  const tabs: { id: WorkspaceTab; label: string; hide?: boolean }[] = [
+    { id: 'library', label: 'Library' },
+    { id: 'create', label: 'Create', hide: readOnly },
+    { id: 'import', label: 'Import', hide: readOnly },
+  ]
 
   return (
     <>
       <PageHeader
-        eyebrow="Board → Grade → Subject → Chapter → Topic → Question"
+        eyebrow="Content intelligence"
         title="Question Bank"
         sub={
           readOnly
-            ? 'Browse tutor-uploaded question papers organized by topic. Creation and uploads are tutor-only.'
-            : 'Browse saved papers first. Expand add or upload below when you need to build a new question paper.'
+            ? 'Browse published papers. Creation and import are tutor-only.'
+            : 'Modern content library — author, import, and reuse assessment-ready papers.'
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <AppStat label="Question papers" value={questionPapers.length} />
-        <AppStat
-          label="Total questions"
-          value={questionPapers.reduce((n, p) => n + p.questionIds.length, 0)}
-          hint="Across all papers"
-        />
-        <AppStat
-          label="Topics covered"
-          value={[...new Set(questionPapers.flatMap((p) => p.topics))].length}
-          tone="leaf"
-        />
+      {flash && (
+        <div className="mb-4 flex items-center gap-2 rounded-2xl border border-leaf/30 bg-leaf/10 px-4 py-3 text-sm text-leaf">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {flash}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <AppStat label="Papers" value={questionPapers.length} />
+        <AppStat label="Questions" value={totalQuestions} hint="Inventory" />
+        <AppStat label="Topics" value={topicCount} tone="leaf" />
       </div>
 
-      <section className="mb-8">
-        <SectionHeading
-          icon={FileText}
-          title={`Question papers (${questionPapers.length})`}
-          sub="View saved papers or create a custom paper from selected topics and questions."
-        />
-
-        <div className="space-y-3">
-          {questionPapers.length === 0 ? (
-            <AppCard className="text-center py-10">
-              <p className="text-muted-foreground">No question papers yet.</p>
-              {!readOnly && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  Expand <strong className="font-medium text-foreground">Add manually</strong> or{' '}
-                  <strong className="font-medium text-foreground">Upload Excel</strong> below to create your first paper.
-                </p>
+      <div
+        className="ln-tabs-bar inline-flex flex-wrap gap-1 mb-6"
+        role="tablist"
+        aria-label="Question bank"
+      >
+        {tabs
+          .filter((t) => !t.hide)
+          .map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'px-4 py-2 rounded-[10px] text-sm font-medium transition-colors',
+                tab === t.id
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
               )}
-            </AppCard>
+            >
+              {t.label}
+            </button>
+          ))}
+      </div>
+
+      {tab === 'library' && (
+        <section>
+          {questionPapers.length === 0 ? (
+            <EmptyState
+              icon={Library}
+              title="No papers yet"
+              description="Create manually or import Excel / JSON to publish your first assessment-ready paper."
+              action={
+                !readOnly ? (
+                  <div className="flex gap-2">
+                    <button type="button" className="btn btn-secondary text-sm" onClick={() => setTab('create')}>
+                      Create
+                    </button>
+                    <button type="button" className="btn btn-primary text-sm" onClick={() => setTab('import')}>
+                      Import
+                    </button>
+                  </div>
+                ) : undefined
+              }
+            />
           ) : (
-            questionPapers.map((paper) => {
-              const counts = topicCounts(paper, questions)
-              const showCustom = customPaperId === paper.id
-              return (
-                <AppCard key={paper.id} className="flex flex-col gap-4">
-                  <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <FileText className="w-4 h-4 text-accent shrink-0" />
-                        <p className="font-display text-lg">{paper.name}</p>
-                        {paper.source === 'custom' && (
-                          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                            Custom paper
-                          </span>
-                        )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {questionPapers.map((paper, idx) => {
+                const counts = topicCounts(paper, questions)
+                const showCustom = customPaperId === paper.id
+                const paperQuestions = questions.filter((q) => paper.questionIds.includes(q.id))
+                return (
+                  <motion.div
+                    key={paper.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.04 }}
+                  >
+                    <AppCard className="h-full flex flex-col gap-4 hover:border-indigo-200 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/15 text-accent shrink-0">
+                          <FileText className="w-5 h-5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-display text-lg text-foreground truncate">
+                              {paper.name}
+                            </h3>
+                            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-muted-foreground">
+                              {SOURCE_LABEL[paper.source] ?? paper.source}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {paper.board} · {paper.grade} · {paper.subject}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {paper.board} · {paper.grade} · {paper.subject} · Created {paper.createdAt}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5 mt-3">
-                        {counts.map(({ topic, count }) => (
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-xl bg-secondary px-3 py-2">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Qs</p>
+                          <p className="font-display text-lg font-semibold">{paper.questionIds.length}</p>
+                        </div>
+                        <div className="rounded-xl bg-secondary px-3 py-2">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Marks</p>
+                          <p className="font-display text-lg font-semibold">{paper.totalMarks}</p>
+                        </div>
+                        <div className="rounded-xl bg-secondary px-3 py-2">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Topics</p>
+                          <p className="font-display text-lg font-semibold">{counts.length}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {counts.slice(0, 5).map(({ topic, count }) => (
                           <span
                             key={topic}
-                            className="text-[10px] px-2 py-1 rounded-full bg-accent/10 text-accent"
+                            className="text-[10px] px-2 py-1 rounded-md bg-slate-100 text-muted-foreground"
                           >
-                            {topic} ({count})
+                            {topic} · {count}
                           </span>
                         ))}
                       </div>
-                    </div>
-                    <div className="flex gap-6 text-sm shrink-0">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                          Questions
-                        </div>
-                        <div className="font-mono-data text-lg">{paper.questionIds.length}</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                          Marks
-                        </div>
-                        <div className="font-mono-data text-lg">{paper.totalMarks}</div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2 shrink-0">
-                      <Link
-                        to={`${paperPreviewBase}/${paper.id}`}
-                        className="btn btn-primary gap-1.5 text-sm px-4 py-2"
-                      >
-                        <Eye className="w-4 h-4" /> View paper
-                      </Link>
-                      {!readOnly && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void confirm({
-                              title: 'Delete question paper?',
-                              message: `Delete paper "${paper.name}"? All linked custom papers may be affected.`,
-                              confirmLabel: 'Delete',
-                              variant: 'danger',
-                            }).then((ok) => {
-                              if (ok) void removePaper(paper.id)
-                            })
-                          }}
-                          className="text-xs text-rose hover:underline"
-                        >
-                          Delete paper
-                        </button>
-                      )}
-                      {!readOnly && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            showCustom ? setCustomPaperId(null) : openCustomForm(paper.id)
-                          }
-                          className="inline-flex items-center justify-center gap-1.5 text-sm border border-border px-4 py-2 rounded-md hover:bg-secondary/60"
-                        >
-                          <FilePlus2 className="w-4 h-4" />
-                          {showCustom ? (
-                            <>
-                              Cancel <ChevronUp className="w-3.5 h-3.5" />
-                            </>
-                          ) : (
-                            <>
-                              Create custom paper <ChevronDown className="w-3.5 h-3.5" />
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
 
-                  {showCustom && !readOnly && (
-                    <form
-                      onSubmit={(e) => handleCreateCustom(e, paper.id)}
-                      className="border-t border-border pt-4 space-y-4"
-                    >
-                      <p className="text-sm text-muted-foreground">
-                        Build a new question paper from &ldquo;{paper.name}&rdquo; — choose topics
-                        (questions are selected automatically) or fine-tune individual questions below.
-                      </p>
-                      <label className="block">
-                        <span className="text-xs text-muted-foreground">Custom paper name *</span>
-                        <input
-                          required
-                          value={customName}
-                          onChange={(e) => setCustomName(e.target.value)}
-                          placeholder="e.g. Algebra — selected questions"
-                          className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
-                        />
-                      </label>
+                      {/* Sample question content cards */}
+                      <div className="space-y-2">
+                        <SectionLabel>Preview</SectionLabel>
+                        {paperQuestions.slice(0, 2).map((q) => (
+                          <div
+                            key={q.id}
+                            className="rounded-2xl border border-border bg-secondary/80 p-3"
+                          >
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                              <span className="text-[10px] px-2 py-0.5 rounded-md bg-accent/15 text-accent capitalize">
+                                {q.difficulty}
+                              </span>
+                              <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-muted-foreground">
+                                {q.topic}
+                              </span>
+                              <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-muted-foreground">
+                                {q.marks}m · {q.questionType}
+                              </span>
+                            </div>
+                            <p className="text-sm text-foreground line-clamp-2">{q.text}</p>
+                            <div className="mt-2 flex gap-2 text-[10px] text-muted-foreground">
+                              <span className="inline-flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" /> AI explain
+                              </span>
+                              <span className="inline-flex items-center gap-1">
+                                <BarChart3 className="w-3 h-3" /> Analytics
+                              </span>
+                              <span className="inline-flex items-center gap-1">
+                                <Copy className="w-3 h-3" /> Duplicate
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
 
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-muted-foreground">Select topics</span>
+                      <div className="mt-auto flex flex-wrap gap-2 pt-1">
+                        <Link
+                          to={`${paperPreviewBase}/${paper.id}`}
+                          className="btn btn-primary text-xs px-3 py-2 gap-1.5"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Open
+                        </Link>
+                        {!readOnly && (
                           <button
                             type="button"
-                            onClick={() => toggleAllCustomTopics(paper)}
-                            className="text-xs text-accent hover:underline"
+                            onClick={() =>
+                              showCustom ? setCustomPaperId(null) : openCustomForm(paper.id)
+                            }
+                            className="btn btn-secondary text-xs px-3 py-2 gap-1.5"
                           >
-                            {customSelectedTopics.length === paper.topics.length
-                              ? 'Clear all topics'
-                              : 'Select all topics'}
+                            <FilePlus2 className="w-3.5 h-3.5" />
+                            Custom
+                            {showCustom ? (
+                              <ChevronUp className="w-3 h-3" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3" />
+                            )}
                           </button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {counts.map(({ topic, count }) => {
-                            const active = customSelectedTopics.includes(topic)
-                            return (
-                              <button
-                                key={topic}
-                                type="button"
-                                onClick={() => toggleCustomTopic(topic, paper.id)}
-                                className={cn(
-                                  'text-xs px-3 py-1.5 rounded-md border transition-colors',
-                                  active
-                                    ? 'border-accent bg-accent/10 text-foreground'
-                                    : 'border-border text-muted-foreground hover:bg-secondary/50',
-                                )}
-                              >
-                                {topic} ({count})
-                              </button>
-                            )
-                          })}
-                        </div>
-                        {customSelectedTopics.length > 0 && (
-                          <p className="text-[10px] text-muted-foreground mt-2">
-                            {customSelectedTopics.length} topic{customSelectedTopics.length !== 1 ? 's' : ''}{' '}
-                            selected — matching questions are checked automatically.
-                          </p>
+                        )}
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void confirm({
+                                title: 'Delete question paper?',
+                                message: `Delete "${paper.name}"?`,
+                                confirmLabel: 'Delete',
+                                variant: 'danger',
+                              }).then((ok) => {
+                                if (ok) void removePaper(paper.id)
+                              })
+                            }}
+                            className="btn btn-ghost text-xs px-3 py-2 text-rose"
+                          >
+                            Delete
+                          </button>
                         )}
                       </div>
 
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-muted-foreground">Select questions *</span>
-                          <button
-                            type="button"
-                            onClick={selectAllVisibleQuestions}
-                            className="text-xs text-accent hover:underline"
-                          >
-                            {customVisibleQuestions.every((q) => customQuestionIds.includes(q.id))
-                              ? 'Deselect visible'
-                              : 'Select all visible'}
-                          </button>
-                        </div>
-                        <div className="max-h-64 overflow-y-auto space-y-2 border border-border rounded-md p-2">
-                          {customVisibleQuestions.length === 0 ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">
-                              Select a topic above to see and include its questions.
-                            </p>
-                          ) : (
-                            customVisibleQuestions.map((q) => {
+                      {showCustom && !readOnly && (
+                        <form
+                          onSubmit={(e) => handleCreateCustom(e, paper.id)}
+                          className="border-t border-border pt-4 space-y-4"
+                        >
+                          <label className="block">
+                            <span className="text-xs text-muted-foreground">Custom paper name *</span>
+                            <input
+                              required
+                              value={customName}
+                              onChange={(e) => setCustomName(e.target.value)}
+                              className="ios-input mt-1"
+                              placeholder="e.g. Algebra focus set"
+                            />
+                          </label>
+                          <div>
+                            <div className="flex justify-between mb-2">
+                              <span className="text-xs text-muted-foreground">Topics</span>
+                              <button
+                                type="button"
+                                onClick={() => toggleAllCustomTopics(paper)}
+                                className="text-xs text-accent"
+                              >
+                                Toggle all
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {counts.map(({ topic, count }) => (
+                                <button
+                                  key={topic}
+                                  type="button"
+                                  onClick={() => toggleCustomTopic(topic, paper.id)}
+                                  className={cn(
+                                    'text-xs px-3 py-1.5 rounded-lg border',
+                                    customSelectedTopics.includes(topic)
+                                      ? 'border-accent bg-accent/15 text-foreground'
+                                      : 'border-border text-muted-foreground',
+                                  )}
+                                >
+                                  {topic} ({count})
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto space-y-2 scrollbar-thin">
+                            <div className="flex justify-between">
+                              <span className="text-xs text-muted-foreground">Questions</span>
+                              <button
+                                type="button"
+                                onClick={selectAllVisibleQuestions}
+                                className="text-xs text-accent"
+                              >
+                                Select visible
+                              </button>
+                            </div>
+                            {customVisibleQuestions.map((q) => {
                               const selected = customQuestionIds.includes(q.id)
                               return (
                                 <button
@@ -405,10 +424,10 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                                   type="button"
                                   onClick={() => toggleCustomQuestion(q.id)}
                                   className={cn(
-                                    'w-full flex items-start gap-3 p-3 rounded-md text-left transition-colors',
+                                    'w-full flex items-start gap-3 p-3 rounded-xl text-left border',
                                     selected
-                                      ? 'bg-accent/10 border border-accent/30'
-                                      : 'hover:bg-secondary/50 border border-transparent',
+                                      ? 'border-accent/40 bg-accent/10'
+                                      : 'border-transparent hover:bg-slate-50',
                                   )}
                                 >
                                   {selected ? (
@@ -416,61 +435,55 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                                   ) : (
                                     <Square className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
                                   )}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm text-foreground line-clamp-2">{q.text}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      {q.topic} · {q.difficulty} · {q.marks} marks
-                                    </p>
-                                  </div>
+                                  <span className="text-sm line-clamp-2">{q.text}</span>
                                 </button>
                               )
-                            })
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {customQuestionIds.length} question{customQuestionIds.length !== 1 ? 's' : ''}{' '}
-                          selected · {totalMarksForQuestions(customSelectedQuestions)} marks
-                        </p>
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={customQuestionIds.length === 0}
-                        className="bg-accent text-accent-foreground px-4 py-2 rounded-md text-sm font-medium disabled:opacity-40"
-                      >
-                        Save custom paper
-                      </button>
-                    </form>
-                  )}
-                </AppCard>
-              )
-            })
+                            })}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {customQuestionIds.length} selected ·{' '}
+                            {totalMarksForQuestions(selectedForCustom)} marks
+                          </p>
+                          <button
+                            type="submit"
+                            disabled={customQuestionIds.length === 0}
+                            className="btn btn-primary text-sm disabled:opacity-40"
+                          >
+                            Publish custom paper
+                          </button>
+                        </form>
+                      )}
+                    </AppCard>
+                  </motion.div>
+                )
+              })}
+            </div>
           )}
-        </div>
-      </section>
+        </section>
+      )}
 
-      {!readOnly && (
-        <>
-          <CollapsibleSection
-            icon={PenLine}
-            title="Add manually"
-            sub="Add multiple questions on one screen, save a local draft, then publish as a question paper."
-            open={manualOpen}
-            onToggle={() => setManualOpen((v) => !v)}
-          >
+      {tab === 'create' && !readOnly && (
+        <section>
+          <AppCard>
+            <div className="flex items-center gap-2 mb-4">
+              <PenLine className="w-4 h-4 text-accent" />
+              <h2 className="font-display text-lg">Author paper</h2>
+            </div>
             <ManualQuestionEntry />
-          </CollapsibleSection>
+          </AppCard>
+        </section>
+      )}
 
-          <CollapsibleSection
-            icon={Upload}
-            title="Upload Excel"
-            sub="Download the template, upload your file, and save valid rows as a question paper."
-            open={uploadOpen}
-            onToggle={() => setUploadOpen((v) => !v)}
-          >
-            <QuestionUploadWorkflow variant="minimal" />
-          </CollapsibleSection>
-        </>
+      {tab === 'import' && !readOnly && (
+        <section>
+          <QuestionUploadWorkflow
+            variant="full"
+            onPaperCreated={() => {
+              showFlash('Paper imported into the library.')
+              setTab('library')
+            }}
+          />
+        </section>
       )}
     </>
   )
