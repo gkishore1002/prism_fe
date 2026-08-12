@@ -1,7 +1,9 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { RouterRoot } from '@/components/layout/RouteTransitionOverlay'
 import { LoginPage } from '@/modules/auth/pages/LoginPage'
+import { SetupPage } from '@/modules/auth/pages/SetupPage'
 import { GuestRoute, RoleProtectedRoute } from '@/modules/auth/components/ProtectedRoute'
+import { SetupOnlyRoute, SetupRequiredRoute } from '@/modules/auth/components/SetupRoute'
 import { StudentDashboard } from '@/modules/student/StudentDashboard'
 import { TutorDashboard } from '@/modules/tutor/TutorDashboard'
 import { AdminDashboard } from '@/modules/admin/AdminDashboard'
@@ -16,28 +18,48 @@ function HomeRedirect() {
   return <Navigate to="/login" replace />
 }
 
+function AuthenticatedHomeRedirect() {
+  return (
+    <SetupRequiredRoute>
+      <HomeRedirect />
+    </SetupRequiredRoute>
+  )
+}
+
 export const router = createBrowserRouter([
   {
     element: <RouterRoot />,
     children: [
       {
         path: '/',
-        element: <HomeRedirect />,
+        element: <AuthenticatedHomeRedirect />,
+      },
+      {
+        path: '/setup',
+        element: (
+          <SetupOnlyRoute>
+            <SetupPage />
+          </SetupOnlyRoute>
+        ),
       },
       {
         path: '/login',
         element: (
-          <GuestRoute>
-            <LoginPage />
-          </GuestRoute>
+          <SetupRequiredRoute>
+            <GuestRoute>
+              <LoginPage />
+            </GuestRoute>
+          </SetupRequiredRoute>
         ),
       },
       {
         path: '/student/*',
         element: (
-          <RoleProtectedRoute allowed="student">
-            <StudentDashboard />
-          </RoleProtectedRoute>
+          <SetupRequiredRoute>
+            <RoleProtectedRoute allowed="student">
+              <StudentDashboard />
+            </RoleProtectedRoute>
+          </SetupRequiredRoute>
         ),
       },
       {
@@ -47,17 +69,21 @@ export const router = createBrowserRouter([
       {
         path: '/tutor/*',
         element: (
-          <RoleProtectedRoute allowed="tutor">
-            <TutorDashboard />
-          </RoleProtectedRoute>
+          <SetupRequiredRoute>
+            <RoleProtectedRoute allowed="tutor">
+              <TutorDashboard />
+            </RoleProtectedRoute>
+          </SetupRequiredRoute>
         ),
       },
       {
         path: '/admin/*',
         element: (
-          <RoleProtectedRoute allowed="admin">
-            <AdminDashboard />
-          </RoleProtectedRoute>
+          <SetupRequiredRoute>
+            <RoleProtectedRoute allowed="admin">
+              <AdminDashboard />
+            </RoleProtectedRoute>
+          </SetupRequiredRoute>
         ),
       },
       {

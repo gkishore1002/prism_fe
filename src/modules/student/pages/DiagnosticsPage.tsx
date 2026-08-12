@@ -18,11 +18,11 @@ import {
 } from 'recharts'
 
 const barColors: Record<string, string> = {
-  weak: '#f43f5e',
-  ok: '#e8b820',
-  strong: '#10b981',
-  fair: '#e8b820',
-  good: '#10b981',
+  weak: '#e5484d',
+  ok: '#ff950a',
+  strong: '#0fa96e',
+  fair: '#ff950a',
+  good: '#0065f3',
 }
 
 export function StudentDiagnosticsPage() {

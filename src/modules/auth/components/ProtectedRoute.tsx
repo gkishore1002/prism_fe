@@ -30,7 +30,7 @@ export function RoleProtectedRoute({
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
 
-  if (!roles.includes(role)) {
+  if (!roles.includes(role) && !(role === 'super_user' && roles.includes('admin'))) {
     return <Navigate to={dashboardPathForRole(role)} replace />
   }
 

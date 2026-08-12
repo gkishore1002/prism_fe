@@ -1,13 +1,24 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { Link } from 'react-router-dom'
-import { Play, Clock, Calendar, Sparkles, Lock, CheckCircle2 } from 'lucide-react'
+import { Play, Clock, Calendar, Lock, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { useAuth } from '@/hooks/useAuth'
 import { useAssessments } from '@/hooks/useAssessments'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { resolveStudentProfile, scopeLabelFromProfile } from '@/modules/student/lib/studentProfile'
 import { scopeLabel } from '@/lib/academicScope'
+import { RequestReassignmentModal } from '@/modules/student/components/RequestReassignmentModal'
+import { useNotifications } from '@/hooks/useNotifications'
+import { CscFullReportModal } from '@/modules/student/components/CscFullReportModal'
+import { btnClass } from '@/components/ui/Button'
+import {
+  AccessRequestStatusBadge,
+  accessRequestTheme,
+  accessRequestToneStyles,
+  descriptionForAccessRequestStatus,
+  toneForAccessRequestStatus,
+} from '@/lib/accessRequestTheme'
 
 export function StudentAssessmentsPage() {
   const { user } = useAuth()
@@ -15,6 +26,9 @@ export function StudentAssessmentsPage() {
   const { getAssessmentsForStudent, canStudentAttend, loading: assessmentsLoading, error, refresh, ensureLoaded } =
     useAssessments()
   const { loading: analyticsLoading, recentAssessments, studentProfile } = useAnalytics()
+  const [reassignTarget, setReassignTarget] = useState<{ id: string; title: string } | null>(null)
+  const [fullReportTarget, setFullReportTarget] = useState<string | null>(null)
+  const { refresh: refreshNotifications } = useNotifications()
 
   useEffect(() => {
     void ensureLoaded()
@@ -37,10 +51,13 @@ export function StudentAssessmentsPage() {
   const query = { studentId: profile.id || user.id, ...academicScope }
   const assigned = getAssessmentsForStudent(query)
   const availableNow = assigned.filter(
-    (a) => a.status === 'live' && !a.studentSubmitted,
+    (a) => (a.canAttend ?? (a.status === 'live' && !a.studentSubmitted)) && !a.timingOver,
+  )
+  const timingOver = assigned.filter(
+    (a) => a.timingOver && !a.studentSubmitted && a.mode === 'assessment',
   )
   const upcoming = assigned.filter(
-    (a) => a.status === 'scheduled' && !a.studentSubmitted,
+    (a) => a.status === 'scheduled' && !a.studentSubmitted && !a.timingOver,
   )
   const awaitingResults = assigned.filter(
     (a) => a.studentSubmitted && a.status !== 'completed',
@@ -128,6 +145,70 @@ export function StudentAssessmentsPage() {
         </div>
       )}
 
+      {timingOver.length > 0 && (
+        <AppCard className={`mb-8 border-2 ${accessRequestTheme.section}`}>
+          <h3 className="font-display text-lg text-foreground mb-1 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-accent" />
+            Exam timing over
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Missed deadlines — request reassignment or wait for tutor approval.
+          </p>
+          <div className="space-y-3">
+            {timingOver.map((a) => {
+              const tone = toneForAccessRequestStatus(a.accessRequestStatus)
+              const styles = accessRequestToneStyles[tone]
+              const isPending = a.accessRequestStatus === 'pending'
+              return (
+                <div
+                  key={a.id}
+                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border ${styles.card}`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <AccessRequestStatusBadge status={a.accessRequestStatus} emphasis={isPending} />
+                    </div>
+                    <p className="font-medium text-foreground">{a.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Deadline was {a.availableUntil || a.scheduledAt || '—'}
+                    </p>
+                    <p className="text-xs mt-1.5 text-muted-foreground">
+                      {descriptionForAccessRequestStatus(a.accessRequestStatus)}
+                    </p>
+                  </div>
+                  {a.accessRequestStatus === 'approved' ? (
+                    <Link
+                      to={`/student/assessments/${a.id}/take`}
+                      className={`${btnClass.primary} text-sm px-4 py-2 inline-flex items-center gap-2 ${accessRequestTheme.approveBtn} shrink-0`}
+                    >
+                      <Play className="w-4 h-4" /> Start exam
+                    </Link>
+                  ) : a.accessRequestStatus === 'pending' ? (
+                    <span
+                      className={`text-xs font-semibold uppercase tracking-wide px-3 py-2 rounded-lg shrink-0 ${accessRequestTheme.badgeEmphasis}`}
+                    >
+                      Awaiting tutor approval
+                    </span>
+                  ) : a.accessRequestStatus === 'rejected' ? (
+                    <span className="text-xs text-muted-foreground font-medium shrink-0">
+                      Contact tutor or CSC
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setReassignTarget({ id: a.id, title: a.title })}
+                      className={`${btnClass.secondary} text-sm px-4 py-2 shrink-0`}
+                    >
+                      Request reassignment
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </AppCard>
+      )}
+
       {upcoming.length > 0 && (
         <AppCard className="mb-8">
           <h3 className="font-display text-lg text-foreground mb-4">Upcoming — waiting for tutor to go live</h3>
@@ -191,10 +272,10 @@ export function StudentAssessmentsPage() {
       )}
 
       <div className="space-y-4">
-        <h3 className="font-display text-lg text-foreground">Your results</h3>
+        <h3 className="font-display text-lg text-foreground">Previously attended</h3>
 
         {availableNow.length === 0 && upcoming.length === 0 && !latest && earlier.length === 0 && awaitingResults.length === 0 && (
-          <AppCard><p className="text-sm text-muted-foreground">No assessments yet.</p></AppCard>
+          <AppCard><p className="text-sm text-muted-foreground">No completed assessments yet.</p></AppCard>
         )}
 
         {latest && (
@@ -209,27 +290,23 @@ export function StudentAssessmentsPage() {
                   <Calendar className="w-3 h-3" />
                   {latest.date} · {latest.subjectName}
                 </p>
-                <div className="flex items-start gap-2 mt-4 p-3 rounded-md bg-secondary/50">
-                  <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                  <p className="text-sm text-muted-foreground">{latest.insight}</p>
-                </div>
-                {latest.weakTopics.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-3">
-                    Work on: {latest.weakTopics.join(', ')}
-                  </p>
-                )}
-                {latest.assessmentId && (
-                  <Link
-                    to={`/student/reports/assessment/${latest.assessmentId}`}
-                    className="text-xs text-accent hover:underline mt-3 inline-block"
-                  >
-                    View assessment report →
-                  </Link>
-                )}
+                <p className="text-sm text-muted-foreground mt-3">
+                  {latest.insight || `You scored ${latest.accuracy}% on ${latest.title}.`}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1 italic" lang="ta">
+                  {latest.title} தேர்வில் நீங்கள் {latest.accuracy}% மதிப்பெண் பெற்றுள்ளீர்கள்.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setFullReportTarget(latest.title)}
+                  className="text-xs text-accent hover:underline mt-3 inline-block"
+                >
+                  View full report →
+                </button>
               </div>
               <div className="text-center shrink-0">
                 <div className="font-mono-data text-4xl font-bold text-foreground">{latest.accuracy}%</div>
-                <div className="text-xs text-muted-foreground mt-1">accuracy</div>
+                <div className="text-xs text-muted-foreground mt-1">score</div>
               </div>
             </div>
           </AppCard>
@@ -237,7 +314,7 @@ export function StudentAssessmentsPage() {
 
         {earlier.length > 0 && (
           <AppCard>
-            <h4 className="text-sm font-medium text-muted-foreground mb-3">Earlier results</h4>
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Earlier</h4>
             <div className="space-y-2">
               {earlier.map((a) => (
                 <div
@@ -249,26 +326,48 @@ export function StudentAssessmentsPage() {
                     <p className="text-xs text-muted-foreground">
                       {a.date} · {a.subjectName}
                     </p>
-                    {a.assessmentId && (
-                      <Link
-                        to={`/student/reports/assessment/${a.assessmentId}`}
-                        className="text-[10px] text-accent hover:underline mt-1 inline-block"
-                      >
-                        View report
-                      </Link>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {a.insight || `You scored ${a.accuracy}% on ${a.title}.`}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 italic" lang="ta">
+                      {a.title} தேர்வில் {a.accuracy}% மதிப்பெண்.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setFullReportTarget(a.title)}
+                      className="text-[10px] text-accent hover:underline mt-1 inline-block"
+                    >
+                      View full report
+                    </button>
                   </div>
-                  <span className="font-mono-data text-lg font-semibold">{a.accuracy}%</span>
+                  <span className="font-mono-data text-lg font-semibold shrink-0 ml-3">{a.accuracy}%</span>
                 </div>
               ))}
             </div>
           </AppCard>
         )}
 
-        {!latest && earlier.length === 0 && (
+        {!latest && earlier.length === 0 && awaitingResults.length === 0 && (
           <AppCard><p className="text-sm text-muted-foreground">No completed assessments yet.</p></AppCard>
         )}
       </div>
+
+      <CscFullReportModal
+        open={fullReportTarget != null}
+        onClose={() => setFullReportTarget(null)}
+        assessmentTitle={fullReportTarget ?? undefined}
+      />
+
+      <RequestReassignmentModal
+        open={reassignTarget != null}
+        onClose={() => setReassignTarget(null)}
+        assessmentId={reassignTarget?.id ?? ''}
+        assessmentTitle={reassignTarget?.title ?? ''}
+        onSubmitted={() => {
+          void refresh()
+          void refreshNotifications()
+        }}
+      />
     </>
   )
 }

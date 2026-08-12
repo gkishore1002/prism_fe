@@ -24,10 +24,10 @@ function getInitials(name: string) {
 }
 
 const gradients = [
-  'bg-gradient-to-br from-indigo-500 to-indigo-700',
-  'bg-gradient-to-br from-violet-400 to-indigo-600',
-  'bg-gradient-to-br from-sky-400 to-sky-600',
-  'bg-gradient-to-br from-indigo-400 to-violet-600',
+  'bg-gradient-to-br from-[#2A7DFF] to-[#0065F3]',
+  'bg-gradient-to-br from-[#FF950A] to-[#E88600]',
+  'bg-gradient-to-br from-[#0FA96E] to-[#0C8F5C]',
+  'bg-gradient-to-br from-[#7C6CF0] to-[#0065F3]',
 ]
 
 export function Avatar({ name, src, size = 'md', className, dark }: AvatarProps) {

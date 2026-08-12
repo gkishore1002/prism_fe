@@ -6,24 +6,38 @@ interface Node {
   vx: number
   vy: number
   radius: number
-  hue: 'blue' | 'yellow'
+  hue: 'blue' | 'amber'
   pulse: number
   pulseSpeed: number
 }
 
-const NODE_COUNT = 70
-const LINK_DISTANCE = 140
-const MOUSE_INFLUENCE = 220
+const NODE_COUNT = 58
+const LINK_DISTANCE = 130
+const MOUSE_INFLUENCE = 200
 
-const COLORS = {
-  blue: { core: '#7AADE6', glow: 'rgba(82, 144, 218, 0.5)', line: 'rgba(53, 117, 196, 0.4)' },
-  yellow: { core: '#F5C830', glow: 'rgba(232, 184, 32, 0.45)', line: 'rgba(212, 160, 8, 0.35)' },
+const PALETTES = {
+  light: {
+    blue: { core: '#0065F3', glow: 'rgba(0, 101, 243, 0.22)', line: 'rgba(0, 101, 243, 0.14)' },
+    amber: { core: '#FF950A', glow: 'rgba(255, 149, 10, 0.18)', line: 'rgba(255, 149, 10, 0.12)' },
+    hub: { inner: 'rgba(0, 101, 243, 0.12)', mid: 'rgba(255, 149, 10, 0.06)', cursor: 'rgba(0, 101, 243, 0.85)' },
+    cross: 'rgba(124, 108, 240, 0.12)',
+  },
+  dark: {
+    blue: { core: '#7AADE6', glow: 'rgba(82, 144, 218, 0.5)', line: 'rgba(53, 117, 196, 0.4)' },
+    amber: { core: '#F5C830', glow: 'rgba(232, 184, 32, 0.45)', line: 'rgba(212, 160, 8, 0.35)' },
+    hub: { inner: 'rgba(245, 215, 110, 0.22)', mid: 'rgba(107, 159, 212, 0.08)', cursor: 'rgba(255, 244, 214, 0.9)' },
+    cross: 'rgba(147, 184, 232, 0.2)',
+  },
+} as const
+
+interface ParticleBackgroundProps {
+  variant?: keyof typeof PALETTES
 }
 
 /**
- * Neural mesh with strong cursor interaction — particles swirl & follow the mouse.
+ * Neural mesh with cursor interaction — tuned for light app theme or dark panels.
  */
-export function ParticleBackground() {
+export function ParticleBackground({ variant = 'light' }: ParticleBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const nodesRef = useRef<Node[]>([])
   const mouseRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0, active: false })
@@ -39,6 +53,8 @@ export function ParticleBackground() {
     const container = canvas.parentElement
     if (!container) return
 
+    const palette = PALETTES[variant]
+
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
       canvas.width = container.clientWidth * dpr
@@ -52,12 +68,12 @@ export function ParticleBackground() {
       nodesRef.current = Array.from({ length: NODE_COUNT }, () => ({
         x: Math.random() * w,
         y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.35,
-        vy: (Math.random() - 0.5) * 0.35,
-        radius: Math.random() * 2.2 + 1.2,
-        hue: Math.random() > 0.35 ? 'blue' : 'yellow',
+        vx: (Math.random() - 0.5) * 0.28,
+        vy: (Math.random() - 0.5) * 0.28,
+        radius: Math.random() * 1.8 + 1,
+        hue: Math.random() > 0.4 ? 'blue' : 'amber',
         pulse: Math.random() * Math.PI * 2,
-        pulseSpeed: 0.015 + Math.random() * 0.02,
+        pulseSpeed: 0.012 + Math.random() * 0.018,
       }))
     }
 
@@ -91,23 +107,23 @@ export function ParticleBackground() {
     container.addEventListener('touchend', onLeave)
 
     const drawNode = (node: Node, x: number, y: number) => {
-      const palette = COLORS[node.hue]
+      const colors = palette[node.hue]
       const pulse = 0.85 + Math.sin(node.pulse) * 0.15
       const r = node.radius * pulse
 
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, r * 6)
-      gradient.addColorStop(0, palette.glow)
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, r * 5)
+      gradient.addColorStop(0, colors.glow)
       gradient.addColorStop(1, 'transparent')
       ctx.beginPath()
-      ctx.arc(x, y, r * 6, 0, Math.PI * 2)
+      ctx.arc(x, y, r * 5, 0, Math.PI * 2)
       ctx.fillStyle = gradient
       ctx.fill()
 
       ctx.beginPath()
       ctx.arc(x, y, r, 0, Math.PI * 2)
-      ctx.fillStyle = palette.core
-      ctx.shadowBlur = 12
-      ctx.shadowColor = palette.core
+      ctx.fillStyle = colors.core
+      ctx.shadowBlur = variant === 'light' ? 6 : 12
+      ctx.shadowColor = colors.core
       ctx.fill()
       ctx.shadowBlur = 0
     }
@@ -137,21 +153,17 @@ export function ParticleBackground() {
           if (dist > 0 && dist < MOUSE_INFLUENCE) {
             const t = 1 - dist / MOUSE_INFLUENCE
             const strength = t * t
-
-            // Pull toward cursor
-            node.vx += (dx / dist) * strength * 0.35
-            node.vy += (dy / dist) * strength * 0.35
-
-            // Orbit swirl around cursor
-            node.vx += (-dy / dist) * strength * 0.18
-            node.vy += (dx / dist) * strength * 0.18
+            node.vx += (dx / dist) * strength * 0.28
+            node.vy += (dy / dist) * strength * 0.28
+            node.vx += (-dy / dist) * strength * 0.14
+            node.vy += (dx / dist) * strength * 0.14
           }
         }
 
-        node.vx += Math.sin(timeRef.current * 0.3 + node.pulse) * 0.002
-        node.vy += Math.cos(timeRef.current * 0.25 + node.pulse) * 0.002
-        node.vx *= 0.96
-        node.vy *= 0.96
+        node.vx += Math.sin(timeRef.current * 0.3 + node.pulse) * 0.0018
+        node.vy += Math.cos(timeRef.current * 0.25 + node.pulse) * 0.0018
+        node.vx *= 0.965
+        node.vy *= 0.965
 
         node.x += node.vx
         node.y += node.vy
@@ -172,16 +184,15 @@ export function ParticleBackground() {
           const dy = a.y - b.y
           const dist = Math.hypot(dx, dy)
           if (dist < LINK_DISTANCE) {
-            const alpha = (1 - dist / LINK_DISTANCE) * 0.55
-            const lineColor = a.node.hue === b.node.hue
-              ? COLORS[a.node.hue].line
-              : 'rgba(147, 184, 232, 0.2)'
+            const alpha = (1 - dist / LINK_DISTANCE) * (variant === 'light' ? 0.45 : 0.55)
+            const lineColor =
+              a.node.hue === b.node.hue ? palette[a.node.hue].line : palette.cross
 
             ctx.beginPath()
             ctx.moveTo(a.x, a.y)
             ctx.lineTo(b.x, b.y)
             ctx.strokeStyle = lineColor.replace(/[\d.]+\)$/, `${alpha})`)
-            ctx.lineWidth = 0.8
+            ctx.lineWidth = 0.7
             ctx.stroke()
           }
         }
@@ -190,31 +201,31 @@ export function ParticleBackground() {
       if (mouse.active) {
         for (const { x, y } of positions) {
           const dist = Math.hypot(mouse.x - x, mouse.y - y)
-          if (dist < LINK_DISTANCE * 1.4) {
-            const alpha = (1 - dist / (LINK_DISTANCE * 1.4)) * 0.85
+          if (dist < LINK_DISTANCE * 1.35) {
+            const alpha = (1 - dist / (LINK_DISTANCE * 1.35)) * 0.7
             ctx.beginPath()
             ctx.moveTo(mouse.x, mouse.y)
             ctx.lineTo(x, y)
-            ctx.strokeStyle = `rgba(245, 215, 110, ${alpha * 0.55})`
-            ctx.lineWidth = 1.2
+            ctx.strokeStyle = palette.blue.line.replace(/[\d.]+\)$/, `${alpha * 0.5})`)
+            ctx.lineWidth = 1
             ctx.stroke()
           }
         }
 
-        const hubGlow = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 55)
-        hubGlow.addColorStop(0, 'rgba(245, 215, 110, 0.22)')
-        hubGlow.addColorStop(0.5, 'rgba(107, 159, 212, 0.08)')
+        const hubGlow = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 48)
+        hubGlow.addColorStop(0, palette.hub.inner)
+        hubGlow.addColorStop(0.5, palette.hub.mid)
         hubGlow.addColorStop(1, 'transparent')
         ctx.beginPath()
-        ctx.arc(mouse.x, mouse.y, 55, 0, Math.PI * 2)
+        ctx.arc(mouse.x, mouse.y, 48, 0, Math.PI * 2)
         ctx.fillStyle = hubGlow
         ctx.fill()
 
         ctx.beginPath()
-        ctx.arc(mouse.x, mouse.y, 4, 0, Math.PI * 2)
-        ctx.fillStyle = 'rgba(255, 244, 214, 0.9)'
-        ctx.shadowBlur = 16
-        ctx.shadowColor = '#F5C830'
+        ctx.arc(mouse.x, mouse.y, 3, 0, Math.PI * 2)
+        ctx.fillStyle = palette.hub.cursor
+        ctx.shadowBlur = variant === 'light' ? 8 : 16
+        ctx.shadowColor = palette.blue.core
         ctx.fill()
         ctx.shadowBlur = 0
       }
@@ -236,7 +247,7 @@ export function ParticleBackground() {
       container.removeEventListener('touchend', onLeave)
       cancelAnimationFrame(frameRef.current)
     }
-  }, [])
+  }, [variant])
 
   return (
     <canvas

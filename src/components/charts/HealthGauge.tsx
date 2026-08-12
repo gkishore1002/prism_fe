@@ -8,11 +8,11 @@ interface HealthGaugeProps {
 }
 
 function getGaugeColor(value: number) {
-  if (value >= 85) return { stroke: '#10b981', text: 'text-emerald-600' }
-  if (value >= 70) return { stroke: '#22c55e', text: 'text-green-600' }
-  if (value >= 55) return { stroke: '#f59e0b', text: 'text-amber-600' }
-  if (value >= 40) return { stroke: '#f97316', text: 'text-orange-600' }
-  return { stroke: '#ef4444', text: 'text-red-600' }
+  if (value >= 85) return { stroke: '#0fa96e', text: 'text-emerald-600' }
+  if (value >= 70) return { stroke: '#0065f3', text: 'text-blue-600' }
+  if (value >= 55) return { stroke: '#ff950a', text: 'text-yellow-600' }
+  if (value >= 40) return { stroke: '#ff950a', text: 'text-yellow-600' }
+  return { stroke: '#e5484d', text: 'text-rose-600' }
 }
 
 export function HealthGauge({ value, size = 160, label = 'Academic Health', className }: HealthGaugeProps) {

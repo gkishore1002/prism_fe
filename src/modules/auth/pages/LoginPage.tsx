@@ -1,67 +1,174 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { Eye, EyeOff, GraduationCap, Users, Shield, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { InlineLoader } from '@/components/ui/PrismLoader'
+import { useToast } from '@/components/ui/Toast'
 import { useAuth } from '@/hooks/useAuth'
 import { authTheme } from '@/modules/auth/lib/authTheme'
+import { fetchLoginOrganizations, roleOptionKey, type LoginOrganization, type RoleOption } from '@/modules/auth/lib/authApi'
 import { LoginHeroPanel } from '@/modules/auth/components/LoginHeroPanel'
-import { CscLogo } from '@/modules/auth/components/CscLogo'
+import { PrismBrandLockup } from '@/components/brand/PrismLogo'
+import { fadeUp, scaleIn, staggerContainer, staggerItem } from '@/lib/motion'
 import type { UserRole } from '@/types'
 
 const roleIcons: Record<UserRole, React.ComponentType<{ className?: string }>> = {
   student: GraduationCap,
   tutor: Users,
   admin: Shield,
+  super_user: Shield,
 }
 
 const roleAccents: Record<UserRole, string> = {
   student: 'accent-blue',
   tutor: 'accent-yellow',
   admin: 'accent-indigo',
+  super_user: 'accent-indigo',
 }
 
 const roleIconBg: Record<UserRole, string> = {
-  student: 'bg-sky-100 text-sky-600',
-  tutor: 'bg-indigo-100 text-indigo-600',
-  admin: 'bg-violet-100 text-violet-600',
+  student: 'bg-blue-100 text-accent',
+  tutor: 'bg-yellow-100 text-amber',
+  admin: 'bg-emerald-50 text-emerald-600',
+  super_user: 'bg-emerald-50 text-emerald-600',
 }
 
-const loginCardClass =
-  'glass-card border border-border rounded-[14px] p-6 sm:p-8 ios-shadow-lg'
+const DEFAULT_DEMO_ORG_CODE = 'DEMO001'
+
+function pickDefaultOrgCode(orgs: LoginOrganization[], stored: string): string {
+  if (stored && orgs.some((o) => o.code === stored)) return stored
+  const demo = orgs.find((o) => o.code === DEFAULT_DEMO_ORG_CODE)
+  if (demo) return demo.code
+  return orgs[0]?.code ?? ''
+}
+
+function orgOptionLabel(org: LoginOrganization): string {
+  return `${org.name} (${org.code})`
+}
+
+const loginCardClass = 'rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-card'
+
+const LAST_ORG_KEY = 'prism_last_org_code'
+
+function LoginFormPanel({
+  children,
+  title,
+  subtitle,
+}: {
+  children: React.ReactNode
+  title: string
+  subtitle?: string
+}) {
+  return (
+    <div className={`flex-1 ${authTheme.lightPanel} flex items-center justify-center p-4 sm:p-6 lg:p-8 min-h-screen`}>
+      <motion.div
+        className="w-full max-w-[340px]"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.div variants={fadeUp} className="mb-5 flex justify-center lg:hidden">
+          <PrismBrandLockup variant="light" />
+        </motion.div>
+
+        <motion.div variants={scaleIn} className={loginCardClass}>
+          <div className="mb-4">
+            <h2 className="font-display text-base font-semibold text-ink">{title}</h2>
+            {subtitle && (
+              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{subtitle}</p>
+            )}
+          </div>
+          {children}
+        </motion.div>
+      </motion.div>
+    </div>
+  )
+}
 
 export function LoginPage() {
   const navigate = useNavigate()
   const { login, selectRole, pendingRoleSelection, cancelRoleSelection } = useAuth()
+  const { showToast } = useToast()
 
-  const [email, setEmail] = useState('demo@prism.app')
-  const [password, setPassword] = useState('demo123')
-  const [institutionCode, setInstitutionCode] = useState('BRIGHTPATH')
+  const [organizations, setOrganizations] = useState<LoginOrganization[]>([])
+  const [orgsLoading, setOrgsLoading] = useState(true)
+  const [selectedOrgCode, setSelectedOrgCode] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchLoginOrganizations()
+      .then((orgs) => {
+        if (cancelled) return
+        setOrganizations(orgs)
+        const stored = sessionStorage.getItem(LAST_ORG_KEY) ?? ''
+        setSelectedOrgCode(pickDefaultOrgCode(orgs, stored))
+      })
+      .catch(() => {
+        if (!cancelled) setOrganizations([])
+      })
+      .finally(() => {
+        if (!cancelled) setOrgsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const selectedOrg = useMemo(
+    () => organizations.find((o) => o.code === selectedOrgCode) ?? null,
+    [organizations, selectedOrgCode],
+  )
+
+  function showLoginError(message: string, title = 'Sign in failed') {
+    showToast({
+      title,
+      message,
+      variant: 'urgent',
+      placement: 'center',
+      actionLabel: 'OK',
+    })
+  }
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
+    if (!selectedOrgCode) {
+      showLoginError('Select an organization to continue.', 'Organization required')
+      return
+    }
     setLoading(true)
     try {
-      const path = await login(email, password, institutionCode)
+      sessionStorage.setItem(LAST_ORG_KEY, selectedOrgCode)
+      const path = await login(email, password, selectedOrgCode)
       if (path) navigate(path, { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed')
+      const message = err instanceof Error ? err.message : 'Sign in failed'
+      const title =
+        message.toLowerCase().includes('disabled') || message.toLowerCase().includes('csc')
+          ? 'Account disabled'
+          : 'Sign in failed'
+      showLoginError(message, title)
     } finally {
       setLoading(false)
     }
   }
 
-  const handlePickRole = async (role: UserRole) => {
+  const handlePickRole = async (option: RoleOption) => {
     setLoading(true)
     try {
-      const path = await selectRole(role)
+      const path = await selectRole(option)
       navigate(path, { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Role selection failed')
+      const message = err instanceof Error ? err.message : 'Role selection failed'
+      const title =
+        message.toLowerCase().includes('disabled') || message.toLowerCase().includes('csc')
+          ? 'Account disabled'
+          : 'Could not continue'
+      showLoginError(message, title)
     } finally {
       setLoading(false)
     }
@@ -69,211 +176,179 @@ export function LoginPage() {
 
   if (pendingRoleSelection) {
     return (
-      <div className="min-h-screen flex">
+      <div className="min-h-screen flex bg-background">
         <LoginHeroPanel
           headline="Choose your portal"
           subtitle="Your account has access to multiple roles. Select how you're working today."
-          footer="BrightPath Academy"
         />
 
-        <div className={`flex-1 ${authTheme.lightPanel} flex items-center justify-center p-5 sm:p-8`}>
-          <div className={`w-full max-w-[420px] ${loginCardClass}`}>
-            <div className="flex justify-center mb-6 lg:hidden">
-              <CscLogo size="sm" variant="onLight" />
-            </div>
-
-            <div className="hidden lg:block mb-6 pb-5 border-b border-secondary">
-              <p className="text-[10px] font-display font-semibold uppercase tracking-[0.22em] text-blue-700">
-                Computer Software College
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Centre · Prism Software</p>
-            </div>
-
-            <h2 className="text-xl font-display font-bold text-foreground text-center lg:text-left">
-              Select your role
-            </h2>
-            <p className="text-[12px] text-muted-foreground text-center lg:text-left mt-1 mb-6 truncate" title={pendingRoleSelection.email}>
-              {pendingRoleSelection.email}
-            </p>
-
-            {error && (
-              <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" role="alert">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {pendingRoleSelection.roles.map((r) => {
-                const Icon = roleIcons[r.role]
-                return (
-                  <button
-                    key={r.role}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => handlePickRole(r.role)}
-                    className={`w-full text-left ${authTheme.roleCard} p-4 ${roleAccents[r.role]} disabled:opacity-50`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center shrink-0 ${roleIconBg[r.role]}`}>
-                        <Icon className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="font-display font-semibold text-foreground text-[14px]">{r.label}</p>
-                        <p className="text-[12px] text-muted-foreground font-sans">{r.description}</p>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto shrink-0" />
+        <LoginFormPanel title="Select your role" subtitle={pendingRoleSelection.email}>
+          <motion.div
+            className="space-y-2 max-h-72 overflow-y-auto"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+          >
+            {pendingRoleSelection.roles.map((r) => {
+              const Icon = roleIcons[r.role]
+              const optionKey = `${r.role}-${r.adminPortal ?? 'default'}`
+              return (
+                <motion.button
+                  key={optionKey}
+                  type="button"
+                  disabled={loading}
+                  variants={staggerItem}
+                  whileHover={{ x: 2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => void handlePickRole(r)}
+                  className={`w-full text-left ${authTheme.roleCard} p-3 ${roleAccents[r.role]} disabled:opacity-50`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${roleIconBg[r.role]}`}
+                    >
+                      <Icon className="w-4 h-4" />
                     </div>
-                  </button>
-                )
-              })}
-            </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground text-sm">{r.label}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{r.description}</p>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-muted-foreground ml-auto shrink-0" />
+                  </div>
+                </motion.button>
+              )
+            })}
+          </motion.div>
 
-            <button
-              type="button"
-              onClick={cancelRoleSelection}
-              className="mt-5 w-full text-xs font-display font-medium text-muted-foreground hover:text-foreground"
-            >
-              Back to sign in
-            </button>
-          </div>
-        </div>
+          <button
+            type="button"
+            onClick={cancelRoleSelection}
+            className="mt-4 w-full text-xs text-muted-foreground hover:text-foreground"
+          >
+            Back to sign in
+          </button>
+        </LoginFormPanel>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-background">
       <LoginHeroPanel
         headline="Transform assessments into academic intelligence"
         subtitle="Diagnose learning gaps, predict exam readiness, and guide every learner toward measurable improvement."
         footer="Board → Grade → Subject → Chapter → Topic → Question"
       />
 
-      <div className={`flex-1 ${authTheme.lightPanel} flex items-center justify-center p-5 sm:p-8`}>
-        <div className="w-full max-w-[420px]">
-          <div className="mb-8 text-center lg:hidden">
-            <CscLogo size="md" variant="onLight" />
+      <LoginFormPanel
+        title="Sign in"
+        subtitle="Select your organization, then sign in with phone@gmail.com and password."
+      >
+        {orgsLoading ? (
+          <div className="py-6 flex justify-center">
+            <InlineLoader size="sm" aria-label="Loading organizations" />
           </div>
-
-          <div className={loginCardClass}>
-            <div className="hidden lg:flex items-start gap-4 mb-6 pb-6 border-b border-secondary">
-              <div className="w-11 h-11 rounded-[16px] gradient-brand-icon flex items-center justify-center shrink-0 ios-shadow-sm">
-                <span className="font-display font-black text-[13px] text-ink tracking-tight">CSC</span>
-              </div>
-              <div className="min-w-0 pt-0.5">
-                <p className="text-[10px] font-display font-bold uppercase tracking-[0.2em] text-ink leading-snug">
-                  Computer Software College
+        ) : organizations.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No organizations available yet. Restart the backend with demo seed enabled (SEED_DEMO=true).
+          </p>
+        ) : (
+          <motion.form
+            className="space-y-3"
+            onSubmit={handleSignIn}
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.div variants={staggerItem}>
+              <label htmlFor="organization" className="mb-1 block text-xs font-medium text-foreground">
+                Organization
+              </label>
+              <select
+                id="organization"
+                required
+                value={selectedOrgCode}
+                onChange={(e) => setSelectedOrgCode(e.target.value)}
+                className={authTheme.inputCompact}
+              >
+                <option value="" disabled>
+                  Select organization
+                </option>
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.code}>
+                    {orgOptionLabel(org)}
+                  </option>
+                ))}
+              </select>
+              {selectedOrg && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Code: <span className="font-medium text-foreground">{selectedOrg.code}</span>
+                  {selectedOrg.code === 'SYSTEM'
+                    ? ' · platform'
+                    : selectedOrg.code === DEFAULT_DEMO_ORG_CODE
+                      ? ' · demo'
+                      : ''}
                 </p>
-                <p className="text-[12px] font-display font-semibold text-foreground mt-1">
-                  Centre · <span className="text-gradient">Prism</span> Software
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 font-sans">Academic Intelligence Platform</p>
-              </div>
-            </div>
+              )}
+            </motion.div>
 
-            <div className="mb-6">
-              <p className="text-[10px] font-display font-semibold uppercase tracking-[0.2em] text-muted-foreground lg:hidden">
-                Computer Software College
-              </p>
-              <h2 className="mt-1 lg:mt-0 text-xl sm:text-[22px] font-display font-bold text-foreground leading-tight">
-                Sign in to <span className="text-gradient">Prism</span>
-              </h2>
-              <p className="mt-2 text-[12px] text-muted-foreground font-sans leading-relaxed">
-                Use your institution credentials. Demo password:{' '}
-                <span className="font-mono-data text-foreground">demo123</span>
-              </p>
-            </div>
+            <motion.div variants={staggerItem}>
+              <label htmlFor="email" className="mb-1 block text-xs font-medium text-foreground">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                autoComplete="username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={authTheme.inputCompact}
+                placeholder="9876543210@gmail.com"
+              />
+            </motion.div>
 
-            {error && (
-              <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" role="alert">
-                {error}
-              </div>
-            )}
-
-            <form className="space-y-4" onSubmit={handleSignIn}>
-              <div>
-                <label htmlFor="institution" className="mb-1.5 block text-xs font-display font-semibold text-foreground">
-                  Institution code
-                </label>
+            <motion.div variants={staggerItem}>
+              <label htmlFor="password" className="mb-1 block text-xs font-medium text-foreground">
+                Password
+              </label>
+              <div className="relative">
                 <input
-                  id="institution"
-                  type="text"
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
-                  value={institutionCode}
-                  onChange={(e) => setInstitutionCode(e.target.value.toUpperCase())}
-                  className={authTheme.input}
-                  placeholder="BRIGHTPATH"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={`${authTheme.inputCompact} pr-10`}
+                  placeholder="••••••••"
                 />
-                <p className="mt-1 text-[10px] text-muted-foreground font-sans">
-                  Your institute&apos;s login code — not a center/branch ID. After login, add more centers under Admin → Centers.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground hover:bg-secondary"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
               </div>
+            </motion.div>
 
-              <div>
-                <label htmlFor="email" className="mb-1.5 block text-xs font-display font-semibold text-foreground">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={authTheme.input}
-                  placeholder="demo@prism.app"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="password" className="mb-1.5 block text-xs font-display font-semibold text-foreground">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={`${authTheme.input} pr-11`}
-                    placeholder="demo123"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-muted-foreground hover:bg-secondary"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <Button type="submit" variant="action" size="lg" className="w-full" disabled={loading}>
+            <motion.div variants={staggerItem} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
+              <Button type="submit" variant="primary" size="md" className="w-full mt-1" disabled={loading}>
                 {loading ? (
                   <span className="inline-flex items-center justify-center gap-2">
                     <InlineLoader size="xs" aria-label="Signing in" />
                     Signing in…
                   </span>
                 ) : (
-                  'Sign in to Prism'
+                  'Sign in'
                 )}
               </Button>
-            </form>
-
-            <p className="mt-5 pt-4 border-t border-secondary text-[11px] text-muted-foreground text-center font-sans leading-relaxed">
-              Try <span className="font-mono-data text-foreground">arjun@brightpath.edu</span>
-              {' '}or <span className="font-mono-data text-foreground">demo@prism.app</span>
-            </p>
-          </div>
-
-          <p className="mt-5 text-center text-[10px] text-muted-foreground/60 font-display uppercase tracking-[0.18em] hidden lg:block">
-            Computer Software College · Centre Prism Software
-          </p>
-        </div>
-      </div>
+            </motion.div>
+          </motion.form>
+        )}
+      </LoginFormPanel>
     </div>
   )
 }

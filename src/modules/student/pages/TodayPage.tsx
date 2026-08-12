@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { ScoreRing } from '../components/ScoreRing'
 import { SubjectStrip } from '../components/SubjectStrip'
 import { StudentProfileHeader } from '../components/StudentProfileHeader'
+import { LiveAssessmentPrompt } from '../components/LiveAssessmentPrompt'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useAuth } from '@/hooks/useAuth'
 import { resolveStudentProfile } from '@/modules/student/lib/studentProfile'
@@ -80,6 +81,8 @@ export function StudentTodayPage() {
         Your academic overview — health, focus topics, and what to study next.
       </p>
 
+      <LiveAssessmentPrompt />
+
       {/* Health + plan rings */}
       {studentHealth && (
         <AppCard className="mb-6">
@@ -100,7 +103,7 @@ export function StudentTodayPage() {
                 <p className="text-[11px] font-display font-semibold uppercase tracking-wide text-muted-foreground">
                   Subjects
                 </p>
-                <Link to="/student/reports" className="text-[11px] text-accent font-medium hover:underline">
+                <Link to="/student/assessments" className="text-[11px] text-accent font-medium hover:underline">
                   See all
                 </Link>
               </div>
@@ -130,10 +133,10 @@ export function StudentTodayPage() {
             )}
           </div>
           <Link
-            to={nextStep ? '/student/reports' : '/student/assessments'}
+            to="/student/assessments"
             className="inline-flex items-center gap-2 bg-accent text-accent-foreground px-6 py-3 rounded-md font-medium hover:opacity-90 shrink-0"
           >
-            <Play className="w-4 h-4" /> {nextStep ? 'View recovery plan' : 'Start practice'}
+            <Play className="w-4 h-4" /> {nextStep ? 'View assessments' : 'Start practice'}
           </Link>
         </div>
       </div>
@@ -168,7 +171,7 @@ export function StudentTodayPage() {
       )}
 
       {nextStep && (
-        <Link to="/student/reports" className="block group mb-8">
+        <Link to="/student/assessments" className="block group mb-8">
           <AppCard className="group-hover:border-accent/40 transition-colors">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
@@ -201,8 +204,8 @@ export function StudentTodayPage() {
                   : '—'}
               </div>
             </div>
-            <Link to="/student/reports" className="text-xs text-accent inline-flex items-center gap-1 hover:underline">
-              View reports <ArrowRight className="w-3 h-3" />
+            <Link to="/student/assessments" className="text-xs text-accent inline-flex items-center gap-1 hover:underline">
+              View assessments <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
           {improvementTrend.length > 0 ? (

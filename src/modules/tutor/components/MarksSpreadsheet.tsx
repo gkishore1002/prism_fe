@@ -1,6 +1,6 @@
 import { ChevronDown, Plus, Settings2, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { AppSelect } from '@/components/ui/AppSelect'
+import { AppDropdown } from '@/components/ui/AppDropdown'
 import { cn } from '@/lib/cn'
 
 export interface MarksColumnConfig {
@@ -133,7 +133,7 @@ export function MarksSpreadsheet({
           {settingsOpen && (
             <div className="grid sm:grid-cols-3 gap-3 px-4 pb-3">
               <div className="block">
-                <AppSelect
+                <AppDropdown
                   label="Subject"
                   value={activeColumn.subject || null}
                   onChange={(v) => onColumnChange?.(activeColumn.id, { subject: v })}

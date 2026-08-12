@@ -3,10 +3,6 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { StudentTodayPage } from './pages/TodayPage'
 import { StudentAssessmentsPage } from './pages/AssessmentsPage'
 import { StudentTakeAssessmentPage } from './pages/TakeAssessmentPage'
-import { StudentReportsPage } from './pages/ReportsPage'
-import { StudentReportDetailPage } from './pages/ReportDetailPage'
-import { StudentOverallReportPage } from '@/modules/reports/OverallReportRoute'
-import { StudentAssessmentReportPage } from '@/modules/reports/AssessmentReportRoute'
 import { NotificationsPage } from '@/components/notifications/NotificationsPage'
 
 export function StudentDashboard() {
@@ -17,20 +13,18 @@ export function StudentDashboard() {
         <Route index element={<StudentTodayPage />} />
         <Route path="study-plan" element={<Navigate to="/student" replace />} />
         <Route path="assessments" element={<StudentAssessmentsPage />} />
-        <Route path="reports" element={<StudentReportsPage />} />
-        <Route path="reports/overall" element={<StudentOverallReportPage />} />
-        <Route path="reports/assessment/:assessmentId" element={<StudentAssessmentReportPage />} />
-        <Route path="reports/:period" element={<StudentReportDetailPage />} />
+        <Route path="reports" element={<Navigate to="/student/assessments" replace />} />
+        <Route path="reports/*" element={<Navigate to="/student/assessments" replace />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="today" element={<Navigate to="/student" replace />} />
         <Route path="practice" element={<Navigate to="/student/assessments" replace />} />
-        <Route path="diagnostics" element={<Navigate to="/student/reports" replace />} />
-        <Route path="alerts" element={<Navigate to="/student/reports" replace />} />
-        <Route path="health" element={<Navigate to="/student/reports" replace />} />
+        <Route path="diagnostics" element={<Navigate to="/student/assessments" replace />} />
+        <Route path="alerts" element={<Navigate to="/student/assessments" replace />} />
+        <Route path="health" element={<Navigate to="/student/assessments" replace />} />
         <Route path="plan" element={<Navigate to="/student" replace />} />
-        <Route path="gaps" element={<Navigate to="/student/reports" replace />} />
+        <Route path="gaps" element={<Navigate to="/student/assessments" replace />} />
         <Route path="recovery" element={<Navigate to="/student" replace />} />
-        <Route path="readiness" element={<Navigate to="/student/reports" replace />} />
+        <Route path="readiness" element={<Navigate to="/student/assessments" replace />} />
       </Route>
     </Routes>
   )

@@ -23,8 +23,8 @@ export function TrendChart({ data, dataKey = 'week', height = 200, className }: 
         <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
           <defs>
             <linearGradient id="healthGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#6366f1" stopOpacity={0.2} />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+              <stop offset="0%" stopColor="#0065F3" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="#0065F3" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
@@ -53,7 +53,7 @@ export function TrendChart({ data, dataKey = 'week', height = 200, className }: 
           <Area
             type="monotone"
             dataKey="health"
-            stroke="#6366f1"
+            stroke="#0065F3"
             strokeWidth={2}
             fill="url(#healthGradient)"
           />

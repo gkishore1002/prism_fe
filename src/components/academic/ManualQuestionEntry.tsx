@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Plus, PenLine, Trash2, Save, FileStack, RotateCcw } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
-import { AppSelect } from '@/components/ui/AppSelect'
+import { AppDropdown } from '@/components/ui/AppDropdown'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
 import type { QuestionBankEntry } from '@/types'
@@ -96,21 +96,21 @@ function QuestionBlock({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <AppSelect
+        <AppDropdown
           label="Board"
           value={question.board}
           onChange={(v) => onChange({ board: v })}
           options={boards.map((b) => ({ value: b, label: b }))}
           placeholder="Board"
         />
-        <AppSelect
+        <AppDropdown
           label="Grade"
           value={question.grade}
           onChange={(v) => onChange({ grade: v })}
           options={(boardData?.grades ?? []).map((g) => ({ value: g.grade, label: g.grade }))}
           placeholder="Grade"
         />
-        <AppSelect
+        <AppDropdown
           label="Subject"
           value={question.subject}
           onChange={(v) => onChange({ subject: v })}
@@ -136,7 +136,7 @@ function QuestionBlock({
           />
         </label>
         <div className="grid grid-cols-3 gap-3 md:col-span-2">
-          <AppSelect
+          <AppDropdown
             label="Difficulty"
             value={question.difficulty}
             onChange={(v) => onChange({ difficulty: v as DraftQuestion['difficulty'] })}
@@ -156,7 +156,7 @@ function QuestionBlock({
               className={inputClass}
             />
           </label>
-          <AppSelect
+          <AppDropdown
             label="Type"
             value={question.questionType}
             onChange={(v) => onChange({ questionType: v as DraftQuestion['questionType'] })}
@@ -191,7 +191,7 @@ function QuestionBlock({
                 />
               </label>
             ))}
-            <AppSelect
+            <AppDropdown
               label="Correct answer"
               value={question.correctAnswer ?? 'A'}
               onChange={(v) => onChange({ correctAnswer: v })}

@@ -1,11 +1,12 @@
 import { useParams } from 'react-router-dom'
 import { AssessmentReportPage } from '@/modules/reports/AssessmentReportPage'
+import { StudentAssessmentSummaryPage } from '@/modules/student/pages/StudentAssessmentSummaryPage'
 
 export function StudentAssessmentReportPage() {
   const { assessmentId } = useParams<{ assessmentId: string }>()
   if (!assessmentId) return null
   return (
-    <AssessmentReportPage
+    <StudentAssessmentSummaryPage
       assessmentId={assessmentId}
       backHref="/student/reports"
       backLabel="All reports"

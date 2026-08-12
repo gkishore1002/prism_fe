@@ -51,6 +51,10 @@ export interface ApiStudentSummary {
   batch?: string | null
   centerId?: string | null
   academicYear?: string | null
+  lastCscInteractionAt?: string | null
+  daysUntilCscDisable?: number | null
+  lastCollectedByName?: string | null
+  lastCollectionGuardianName?: string | null
 }
 
 export function mapStudent(s: ApiStudentSummary): StudentSummary {
@@ -68,6 +72,10 @@ export function mapStudent(s: ApiStudentSummary): StudentSummary {
     lastAssessment: s.lastAssessment,
     criticalGaps: s.criticalGaps,
     improving: s.improving,
+    lastCscInteractionAt: s.lastCscInteractionAt ?? undefined,
+    daysUntilCscDisable: s.daysUntilCscDisable ?? undefined,
+    lastCollectedByName: s.lastCollectedByName ?? undefined,
+    lastCollectionGuardianName: s.lastCollectionGuardianName ?? undefined,
   }
 }
 
@@ -183,6 +191,7 @@ export interface ApiAssessment {
   questionCount: number
   durationMinutes: number
   scheduledAt: string
+  availableUntil?: string
   status: TutorAssessmentSchedule['status']
   classAvg?: number | null
   centerIds: string[]
@@ -195,6 +204,9 @@ export interface ApiAssessment {
   paperCoverage?: TutorAssessmentSchedule['paperCoverage']
   selectedTopics?: string[] | null
   studentSubmitted?: boolean
+  timingOver?: boolean
+  accessRequestStatus?: TutorAssessmentSchedule['accessRequestStatus']
+  canAttend?: boolean
 }
 
 export function mapAssessment(a: ApiAssessment): TutorAssessmentSchedule {
@@ -210,6 +222,7 @@ export function mapAssessment(a: ApiAssessment): TutorAssessmentSchedule {
     questionCount: a.questionCount,
     durationMinutes: a.durationMinutes,
     scheduledAt: a.scheduledAt,
+    availableUntil: a.availableUntil ?? a.scheduledAt,
     status: a.status,
     classAvg: a.classAvg ?? undefined,
     centerIds: a.centerIds,
@@ -222,6 +235,9 @@ export function mapAssessment(a: ApiAssessment): TutorAssessmentSchedule {
     paperCoverage: a.paperCoverage ?? undefined,
     selectedTopics: a.selectedTopics ?? undefined,
     studentSubmitted: Boolean(a.studentSubmitted),
+    timingOver: Boolean(a.timingOver),
+    accessRequestStatus: a.accessRequestStatus ?? undefined,
+    canAttend: a.canAttend,
   }
 }
 
@@ -256,10 +272,14 @@ export function attendancePercentage(record: AssessmentAttendanceRecord): number
 
 export interface ApiNotification {
   id: string
+  userId?: string | null
   role: UserRole
+  type?: string
   kind: AppNotification['kind']
   title: string
   message: string
+  entityType?: string | null
+  entityId?: string | null
   createdAt: string
   read: boolean
   href?: string | null
@@ -268,10 +288,14 @@ export interface ApiNotification {
 export function mapNotification(n: ApiNotification): AppNotification {
   return {
     id: n.id,
+    userId: n.userId,
     role: n.role,
+    type: n.type ?? 'general',
     kind: n.kind,
     title: n.title,
     message: n.message,
+    entityType: n.entityType,
+    entityId: n.entityId,
     createdAt: n.createdAt,
     read: n.read,
     href: n.href ?? undefined,
@@ -283,7 +307,9 @@ export function mapNotification(n: ApiNotification): AppNotification {
 export interface ApiCenter {
   id: string
   name: string
+  code?: string
   city: string
+  active?: boolean
   studentCount: number
   batchCount: number
 }
@@ -292,7 +318,9 @@ export function mapCenter(c: ApiCenter): InstitutionCenter {
   return {
     id: c.id,
     name: c.name,
+    code: c.code,
     city: c.city,
+    active: c.active ?? true,
     studentCount: c.studentCount,
     batchCount: c.batchCount,
   }

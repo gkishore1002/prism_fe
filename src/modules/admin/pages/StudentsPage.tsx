@@ -1,14 +1,22 @@
+import { useEffect, useState } from 'react'
 import { PageHeader, AppStat } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { StudentManagementPanel } from '@/components/academic/StudentManagementPanel'
-import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
+import { useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useCenters } from '@/hooks/useCenters'
+import { fetchStudentsMasterStats, type StudentMasterStats } from '@/lib/api/studentsApi'
 
 export function AdminStudentsPage() {
   useAnalyticsPage('adminStudents')
-  const { studentMaster, loading } = useAnalytics()
   const { centers } = useCenters()
-  const active = studentMaster.filter((s) => s.status === 'active')
+  const [stats, setStats] = useState<StudentMasterStats | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    void fetchStudentsMasterStats()
+      .then(setStats)
+      .finally(() => setLoading(false))
+  }, [])
 
   if (loading) {
     return <PageLoader />
@@ -19,23 +27,16 @@ export function AdminStudentsPage() {
       <PageHeader
         eyebrow="Student master profile · BRD §3.3"
         title="Students"
-        sub="Institute owners add and manage all students — board, grade, batch, branch, and academic year."
+        sub="Organization owners and branch admins add students, view reports, manage assessments, question papers, and curriculum — branch admins within assigned branches."
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <AppStat label="Total Students" value={studentMaster.length} />
-        <AppStat label="Active" value={active.length} tone="leaf" />
+        <AppStat label="Total Students" value={stats?.total ?? 0} />
+        <AppStat label="Active" value={stats?.active ?? 0} tone="leaf" />
         <AppStat label="Branches" value={centers.length} hint="Across institute" />
       </div>
 
-      <StudentManagementPanel
-        scope="admin"
-        students={studentMaster.map((s) => ({
-          ...s,
-          schoolName: s.schoolName ?? undefined,
-          email: s.email ?? undefined,
-        }))}
-      />
+      <StudentManagementPanel scope="admin" />
     </>
   )
 }

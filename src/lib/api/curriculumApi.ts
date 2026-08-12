@@ -144,6 +144,9 @@ export async function createStudent(student: {
   batchId?: string
   centerId?: string
   academicYear?: string
+  phone?: string
+  password?: string
+  schoolName?: string
 }): Promise<{ id: string; name: string }> {
   const data = await apiFetch<{ id: string; name: string }>('/students', {
     method: 'POST',
@@ -155,6 +158,9 @@ export async function createStudent(student: {
       batchId: student.batchId,
       centerId: student.centerId ?? '',
       academicYear: student.academicYear ?? '2025-26',
+      phone: student.phone,
+      password: student.password,
+      schoolName: student.schoolName,
     }),
   })
   return { id: data.id, name: data.name }

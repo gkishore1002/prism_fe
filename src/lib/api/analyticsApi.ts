@@ -3,6 +3,7 @@ import type {
   AcademicHealth,
   AssessmentResult,
   AssessmentReport,
+  StudentAssessmentSummary,
   BatchTopicWeakness,
   ClassInsight,
   Institution,
@@ -12,6 +13,7 @@ import type {
   ReadinessPrediction,
   RecoveryStep,
   StudentWiseReport,
+  TopicReadinessPrediction,
 } from '@/types'
 
 export interface InstitutionOverview {
@@ -24,6 +26,19 @@ export interface InstitutionOverview {
   retention: number
   avgHealth: number
   avgReadiness: number
+}
+
+export interface InstitutionOperationalStats {
+  totalStudents: number
+  activeStudents: number
+  inactiveStudents: number
+  totalCenters: number
+  cscDueSoon: number
+  cscInactive: number
+  cscNeverVisited: number
+  reassignmentPending: number
+  reassignmentApproved: number
+  reassignmentRejected: number
 }
 
 export interface StudentProfileAnalytics {
@@ -102,10 +117,20 @@ export interface StudentMasterRow {
   schoolName?: string | null
   email?: string | null
   status: 'active' | 'inactive'
+  lastCscInteractionAt?: string | null
+  disableReason?: string | null
+  daysUntilCscDisable?: number | null
 }
 
 export const analyticsApi = {
-  institutionOverview: () => apiFetch<InstitutionOverview>('/analytics/institution/overview'),
+  institutionOverview: (centerId?: string) =>
+    apiFetch<InstitutionOverview>(
+      `/analytics/institution/overview${centerId ? `?center_id=${encodeURIComponent(centerId)}` : ''}`,
+    ),
+  institutionOperationalStats: (centerId?: string) =>
+    apiFetch<InstitutionOperationalStats>(
+      `/analytics/institution/operational-stats${centerId ? `?center_id=${encodeURIComponent(centerId)}` : ''}`,
+    ),
   institutionCenters: () => apiFetch<CenterAnalytics[]>('/analytics/institution/centers'),
   institutionBoards: () => apiFetch<BoardReportRow[]>('/analytics/institution/boards'),
   institutionTeachers: () => apiFetch<TeacherRow[]>('/analytics/institution/teachers'),
@@ -129,7 +154,9 @@ export const analyticsApi = {
   improvementTrend: (studentId?: string) =>
     apiFetch<{ month: string; score: number }[]>(`/analytics/student/improvement-trend${studentId ? `?student_id=${studentId}` : ''}`),
   topicBreakdown: (studentId?: string) =>
-    apiFetch<{ topic: string; subject: string; mastery: number; status: string }[]>(`/analytics/student/topic-breakdown${studentId ? `?student_id=${studentId}` : ''}`),
+    apiFetch<TopicReadinessPrediction[]>(`/analytics/student/topic-breakdown${studentId ? `?student_id=${studentId}` : ''}`),
+  topicReadiness: (studentId?: string) =>
+    apiFetch<TopicReadinessPrediction[]>(`/analytics/student/topic-readiness${studentId ? `?student_id=${studentId}` : ''}`),
   studentSubjects: (studentId?: string) =>
     apiFetch<{ name: string; health: number; status: string }[]>(`/analytics/student/subjects${studentId ? `?student_id=${studentId}` : ''}`),
   recentAssessments: (studentId?: string) =>
@@ -143,6 +170,10 @@ export const analyticsApi = {
   assessmentReport: (assessmentId: string, studentId?: string) =>
     apiFetch<AssessmentReport>(
       `/analytics/student/assessment-reports/${encodeURIComponent(assessmentId)}${studentId ? `?student_id=${studentId}` : ''}`,
+    ),
+  assessmentReportSummary: (assessmentId: string, studentId?: string) =>
+    apiFetch<StudentAssessmentSummary>(
+      `/analytics/student/assessment-reports/${encodeURIComponent(assessmentId)}/summary${studentId ? `?student_id=${studentId}` : ''}`,
     ),
   monthlyReports: (studentId?: string) =>
     apiFetch<{ period: string; health: number; readiness: number; improvement: number }[]>(`/analytics/student/monthly-reports${studentId ? `?student_id=${studentId}` : ''}`),

@@ -15,7 +15,7 @@ export function AiCopilotFab() {
         className={cn(
           'prism-ai-fab fixed bottom-5 right-5 z-ln-fab',
           'flex h-12 w-12 items-center justify-center rounded-full',
-          'bg-violet-500 text-white shadow-[0_12px_40px_rgba(139,92,246,0.4)]',
+          'bg-[#7C6CF0] text-white shadow-[0_12px_40px_rgba(124,108,240,0.4)]',
           'ai-pulse focus-visible:outline-none',
         )}
         aria-label="Open Prism AI assistant"

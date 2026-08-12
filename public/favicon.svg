@@ -1,30 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 48 48">
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="none" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFD966"/>
-      <stop offset="50%" stop-color="#E8B820"/>
-      <stop offset="100%" stop-color="#D4A008"/>
+    <linearGradient id="body" x1="20%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A3A6E"/>
+      <stop offset="55%" stop-color="#131B2E"/>
+      <stop offset="100%" stop-color="#0F1B2D"/>
     </linearGradient>
-    <linearGradient id="navy" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#2A60A8"/>
-      <stop offset="100%" stop-color="#163A66"/>
+    <linearGradient id="prism" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="45%" stop-color="#0065F3"/>
+      <stop offset="100%" stop-color="#FF950A"/>
     </linearGradient>
-    <linearGradient id="beam" x1="0%" y1="50%" x2="100%" y2="50%">
-      <stop offset="0%" stop-color="#E8B820" stop-opacity="0.15"/>
-      <stop offset="40%" stop-color="#E8B820" stop-opacity="0.95"/>
-      <stop offset="100%" stop-color="#5290DA" stop-opacity="0.85"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#E8B820" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#E8B820" stop-opacity="0"/>
-    </radialGradient>
   </defs>
-  <rect width="48" height="48" rx="12" fill="url(#navy)"/>
-  <circle cx="24" cy="24" r="18" fill="url(#glow)"/>
-  <path d="M6 24 H18" stroke="url(#beam)" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M20 12 L34 24 L20 36 Z" fill="url(#gold)" stroke="#FFECB3" stroke-width="1" stroke-linejoin="round"/>
-  <path d="M34 24 L44 14" stroke="#E8B820" stroke-width="2.2" stroke-linecap="round"/>
-  <path d="M34 24 L44 24" stroke="#5290DA" stroke-width="2.2" stroke-linecap="round"/>
-  <path d="M34 24 L44 34" stroke="#10B981" stroke-width="2.2" stroke-linecap="round"/>
-  <path d="M23 18 L30 24 L23 30 Z" fill="#fff" fill-opacity="0.22"/>
+  <rect width="64" height="64" rx="14" fill="#F7F9FC"/>
+  <rect x="4" y="16" width="14" height="3.5" rx="1.75" fill="#8B5CF6"/>
+  <rect x="2" y="24" width="18" height="3.5" rx="1.75" fill="#0065F3"/>
+  <rect x="6" y="32" width="12" height="3.5" rx="1.75" fill="#2DD4BF"/>
+  <rect x="4" y="40" width="15" height="3.5" rx="1.75" fill="#22C55E"/>
+  <rect x="8" y="48" width="10" height="3.5" rx="1.75" fill="#FF950A"/>
+  <path d="M24 10 H42 C52 10 58 16.5 58 26 C58 35.5 52 42 42 42 H34 V54 H24 V10 Z" fill="url(#body)"/>
+  <path d="M34 18 L48 28 L34 38 Z" fill="url(#prism)"/>
+  <path d="M34 18 L48 28 L34 28 Z" fill="#fff" fill-opacity="0.18"/>
 </svg>

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Users } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
+import { AccessRequestsPanel } from '@/components/academic/AccessRequestsPanel'
 import { useAssessments } from '@/hooks/useAssessments'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useCenters } from '@/hooks/useCenters'
@@ -30,8 +31,12 @@ export function AdminAssessmentsManagementPage() {
       <PageHeader
         eyebrow="Owner · Test oversight"
         title="Assessments & results"
-        sub="View-only. Tutors create assessments and question papers — you monitor who was invited, who attended, and class outcomes."
+        sub="Monitor tests institute-wide and review late-exam reassignment requests."
       />
+
+      <div className="mb-8">
+        <AccessRequestsPanel scope="admin" />
+      </div>
 
       <div className="grid md:grid-cols-4 gap-4 mb-8">
         <AppStat label="Tutor tests" value={rows.length} hint="Institute-wide" />

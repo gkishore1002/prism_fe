@@ -5,8 +5,12 @@ import { PageLoader } from '@/components/ui/PrismLoader'
 import { AppModal } from '@/components/ui/AppModal'
 import { ResponsiveTable } from '@/components/ui/ResponsiveTable'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
+import { useCenters } from '@/hooks/useCenters'
 import { createTutor, fetchTutors, updateTutor, type TutorAccount } from '@/lib/api/teachersApi'
 import type { TeacherRow } from '@/lib/api/analyticsApi'
+import { PhoneCredentialFields } from '@/components/auth/PhoneCredentialFields'
+import { isValidPhone, phoneToLoginEmail, resolvePassword } from '@/lib/phoneAuth'
+import { formatCenterLabel } from '@/lib/centerLabel'
 
 const inputClass = 'mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background'
 const primaryBtnClass =
@@ -29,13 +33,18 @@ function mergeTeachers(accounts: TutorAccount[], analytics: TeacherRow[]) {
 
 export function AdminTeachersPage() {
   useAnalyticsPage('adminTeachers')
+  const { centers, canManageTenant } = useCenters()
   const { teachers, loading, refresh } = useAnalytics()
   const [accounts, setAccounts] = useState<TutorAccount[]>([])
   const [accountsLoading, setAccountsLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<TutorAccount | null>(null)
   const [formName, setFormName] = useState('')
+  const [formPhone, setFormPhone] = useState('')
+  const [formPassword, setFormPassword] = useState('')
   const [formEmail, setFormEmail] = useState('')
+  const [alsoAdmin, setAlsoAdmin] = useState(false)
+  const [selectedBranches, setSelectedBranches] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -66,7 +75,11 @@ export function AdminTeachersPage() {
   function openCreate() {
     setEditing(null)
     setFormName('')
+    setFormPhone('')
+    setFormPassword('')
     setFormEmail('')
+    setAlsoAdmin(false)
+    setSelectedBranches([])
     setError(null)
     setShowForm(true)
   }
@@ -87,7 +100,17 @@ export function AdminTeachersPage() {
       if (editing) {
         await updateTutor(editing.id, { name: formName.trim(), email: formEmail.trim() })
       } else {
-        await createTutor({ name: formName.trim(), email: formEmail.trim() })
+        if (!isValidPhone(formPhone)) {
+          setError('Enter a valid 10-digit phone number.')
+          return
+        }
+        await createTutor({
+          name: formName.trim(),
+          phone: formPhone.trim(),
+          password: formPassword.trim() || undefined,
+          alsoAdmin: alsoAdmin || undefined,
+          centerIds: alsoAdmin ? selectedBranches : undefined,
+        })
       }
       await Promise.all([loadAccounts(), refresh('adminTeachers')])
       setShowForm(false)
@@ -132,7 +155,7 @@ export function AdminTeachersPage() {
           <div>
             <h2 className="font-display text-lg text-foreground">Team management</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Tutors log in with their email. New accounts use the institute demo password until reset.
+              Tutors sign in with phone@gmail.com. Default password is the phone number unless you set another.
             </p>
           </div>
           {rows.length > 0 && (
@@ -249,7 +272,9 @@ export function AdminTeachersPage() {
         open={showForm}
         onClose={() => setShowForm(false)}
         title={editing ? 'Edit tutor' : 'Add tutor'}
-        description={editing ? editing.email : 'Create a tutor account for your institute'}
+        description={
+          editing ? editing.email : 'Phone becomes the login email (phone@gmail.com). Password defaults to the phone number.'
+        }
         size="md"
         footer={
           <div className="flex gap-2 justify-end w-full">
@@ -282,21 +307,68 @@ export function AdminTeachersPage() {
               placeholder="Priya Sharma"
             />
           </label>
-          <label className="block">
-            <span className="text-xs text-muted-foreground">Email *</span>
-            <input
-              required
-              type="email"
-              value={formEmail}
-              onChange={(e) => setFormEmail(e.target.value)}
-              className={inputClass}
-              placeholder="priya@brightpath.edu"
-            />
-          </label>
-          {!editing && (
-            <p className="text-xs text-muted-foreground">
-              Initial password is the institute demo password. The tutor can sign in immediately after creation.
-            </p>
+          {editing ? (
+            <label className="block">
+              <span className="text-xs text-muted-foreground">Login email *</span>
+              <input
+                required
+                type="email"
+                value={formEmail}
+                onChange={(e) => setFormEmail(e.target.value)}
+                className={inputClass}
+              />
+            </label>
+          ) : (
+            <>
+              <PhoneCredentialFields
+                phone={formPhone}
+                onPhoneChange={setFormPhone}
+                password={formPassword}
+                onPasswordChange={setFormPassword}
+                idPrefix="tutor-create"
+              />
+              {isValidPhone(formPhone) && (
+                <p className="text-xs text-muted-foreground">
+                  Login: {phoneToLoginEmail(formPhone)} · Password: {resolvePassword(formPhone, formPassword)}
+                </p>
+              )}
+              {canManageTenant && (
+                <>
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={alsoAdmin}
+                      onChange={(e) => setAlsoAdmin(e.target.checked)}
+                    />
+                    Also grant branch admin access (same login — user picks admin or tutor portal)
+                  </label>
+                  {alsoAdmin && (
+                    <fieldset>
+                      <legend className="text-xs text-muted-foreground mb-2">Branch access for admin portal</legend>
+                      <div className="flex flex-wrap gap-2">
+                        {centers.map((c) => (
+                          <label
+                            key={c.id}
+                            className="inline-flex items-center gap-2 text-sm border border-border rounded-md px-3 py-1.5"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedBranches.includes(c.id)}
+                              onChange={(e) =>
+                                setSelectedBranches((prev) =>
+                                  e.target.checked ? [...prev, c.id] : prev.filter((id) => id !== c.id),
+                                )
+                              }
+                            />
+                            {formatCenterLabel(c)}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  )}
+                </>
+              )}
+            </>
           )}
           {error && <p className="text-sm text-rose">{error}</p>}
         </form>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowUpDown, FileText, Target, Users } from 'lucide-react'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { AppCard, AppStat } from '@/components/layout/AppShell'
-import { AppSelect } from '@/components/ui/AppSelect'
+import { AppDropdown } from '@/components/ui/AppDropdown'
 import { AnalyticsInsightsCard } from '@/components/ui/AnalyticsInsightsCard'
 import { HealthBadge } from '@/components/ui/HealthBadge'
 import { ResponsiveTable } from '@/components/ui/ResponsiveTable'
@@ -198,7 +198,7 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
 
       <AppCard>
         <div className="grid sm:grid-cols-3 gap-4">
-          <AppSelect
+          <AppDropdown
             label="Board"
             value={board}
             onChange={(value) => {
@@ -209,7 +209,7 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
             }}
             options={boardOptions}
           />
-          <AppSelect
+          <AppDropdown
             label="Grade"
             value={grade}
             onChange={(value) => {
@@ -219,7 +219,7 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
             }}
             options={gradeOptions}
           />
-          <AppSelect
+          <AppDropdown
             label="Subject"
             value={subject}
             onChange={setSubject}
@@ -348,7 +348,7 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
               </div>
               <div className="flex items-center gap-2">
                 <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
-                <AppSelect
+                <AppDropdown
                   variant="compact"
                   value={sortKey}
                   onChange={(value) => setSortKey(value as SortKey)}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Check, X, ArrowRight, FlaskConical, PartyPopper } from 'lucide-react'
+import { Check, X, ArrowRight, FlaskConical, PartyPopper, Clock } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { btnClass } from '@/components/ui/Button'
@@ -18,6 +18,13 @@ import {
 import { ApiError, isApiEnabled } from '@/lib/apiClient'
 import { useAnalytics } from '@/hooks/useAnalytics'
 import { cn } from '@/lib/cn'
+import {
+  AccessRequestStatusBadge,
+  accessRequestTheme,
+  accessRequestToneStyles,
+  descriptionForAccessRequestStatus,
+  toneForAccessRequestStatus,
+} from '@/lib/accessRequestTheme'
 
 import type { QuestionBankEntry } from '@/types'
 
@@ -152,7 +159,8 @@ export function StudentTakeAssessmentPage() {
           setQuestionsError(null)
         } else {
           setQuestions([])
-          setQuestionsError(e instanceof Error ? e.message : 'Failed to load questions')
+          const msg = e instanceof Error ? e.message : 'Failed to load questions'
+          setQuestionsError(msg)
         }
       } finally {
         if (!cancelled) setQuestionsLoading(false)
@@ -354,7 +362,40 @@ export function StudentTakeAssessmentPage() {
     )
   }
 
-  if (assessment.status !== 'live') {
+  if (assessment.timingOver && assessment.accessRequestStatus !== 'approved') {
+    const tone = toneForAccessRequestStatus(assessment.accessRequestStatus)
+    const styles = accessRequestToneStyles[tone]
+    return (
+      <div className="min-h-dvh flex items-center justify-center p-4 app-page-bg">
+        <AppCard className={`text-center py-12 max-w-md w-full space-y-4 border-2 ${styles.section}`}>
+          <div className={`w-14 h-14 rounded-full grid place-items-center mx-auto ${styles.icon}`}>
+            <Clock className="w-7 h-7" />
+          </div>
+          <div>
+            <AccessRequestStatusBadge
+              status={assessment.accessRequestStatus}
+              emphasis={assessment.accessRequestStatus === 'pending'}
+              className="mb-3"
+            />
+            <p className="text-[11px] uppercase tracking-[0.2em] font-medium mb-2 text-muted-foreground">
+              Exam timing over
+            </p>
+            <h1 className="font-display text-xl text-foreground">{assessment.title}</h1>
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            The deadline to attend this exam has passed
+            {assessment.availableUntil ? ` (${assessment.availableUntil})` : ''}.{' '}
+            {descriptionForAccessRequestStatus(assessment.accessRequestStatus)}
+          </p>
+          <Link to="/student/assessments" className={`${btnClass.primary} inline-flex gap-2 px-4 py-2 text-sm`}>
+            Back to assessments <ArrowRight className="w-4 h-4" />
+          </Link>
+        </AppCard>
+      </div>
+    )
+  }
+
+  if (assessment.status !== 'live' && assessment.accessRequestStatus !== 'approved') {
     return (
       <div className="min-h-dvh flex items-center justify-center p-4 app-page-bg">
         <AppCard className="text-center py-12 max-w-md w-full space-y-3">
@@ -381,9 +422,15 @@ export function StudentTakeAssessmentPage() {
   }
 
   if (questionsError) {
+    const timingOver = questionsError.toLowerCase().includes('timing over')
     return (
       <div className="min-h-dvh flex items-center justify-center p-4 app-page-bg">
-        <AppCard className="text-center py-12 max-w-md w-full">
+        <AppCard className="text-center py-12 max-w-md w-full space-y-4">
+          {timingOver && (
+            <div className={`w-14 h-14 rounded-full grid place-items-center mx-auto ${accessRequestTheme.icon}`}>
+              <Clock className="w-7 h-7" />
+            </div>
+          )}
           <p className="text-muted-foreground">{questionsError}</p>
           <Link to="/student/assessments" className="text-sm text-accent mt-4 inline-block">
             Back to assessments

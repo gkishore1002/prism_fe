@@ -72,7 +72,8 @@ export function NotificationsPage() {
       )}
 
       <div className="mt-6 text-xs text-muted-foreground">
-        Tip: notifications are role-specific (student / tutor / admin).{' '}
+        Notifications are delivered to your account for the active role. Reassignment and CSC alerts
+        appear here automatically — no need to refresh the page.{' '}
         <Link to={`/${role}`} className="text-accent hover:underline">
           Back to dashboard
         </Link>

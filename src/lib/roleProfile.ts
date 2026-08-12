@@ -1,5 +1,11 @@
 import type { User, UserRole } from '@/types'
 import type { ModuleId } from '@/lib/modules'
+import {
+  adminPortalLabel,
+  isBranchScopedAdminPortal,
+  isOrganizationOwner,
+  isPlatformSuperUser,
+} from '@/lib/roles'
 
 export interface RoleProfile {
   name: string
@@ -11,7 +17,12 @@ export interface RoleProfile {
 export function getSidebarProfile(
   moduleId: ModuleId,
   authUser: User,
-  options?: { subtitle?: string },
+  options?: {
+    subtitle?: string
+    isPlatformSuperUserInContext?: boolean
+    adminPortal?: 'organization' | 'branch'
+    canManageTenant?: boolean
+  },
 ): RoleProfile {
   const parts = authUser.name.trim().split(/\s+/)
   const initials = parts
@@ -38,16 +49,59 @@ export function getSidebarProfile(
     }
   }
 
+  const platformContext = options?.isPlatformSuperUserInContext ?? isPlatformSuperUser(authUser.role)
+  const branchScoped = isBranchScopedAdminPortal(
+    options?.adminPortal,
+    authUser.role,
+    options?.canManageTenant ?? Boolean(authUser.isOwner),
+  )
+
+  if (platformContext && isPlatformSuperUser(authUser.role)) {
+    return {
+      name: authUser.name,
+      roleLabel: 'Platform Super User',
+      subtitle: options?.subtitle ?? 'Platform console',
+      initials,
+    }
+  }
+
+  if (moduleId === 'admin' && authUser.role === 'admin') {
+    const roleLabel = adminPortalLabel(
+      options?.adminPortal,
+      authUser.role,
+      options?.canManageTenant ?? Boolean(authUser.isOwner),
+    )
+    return {
+      name: authUser.name,
+      roleLabel,
+      subtitle:
+        options?.subtitle ??
+        (branchScoped ? 'Assigned branch operations' : 'Organization-wide administration'),
+      initials,
+    }
+  }
+
+  if (isOrganizationOwner(authUser.role, Boolean(authUser.isOwner))) {
+    return {
+      name: authUser.name,
+      roleLabel: 'Organization Owner',
+      subtitle: options?.subtitle ?? 'Organization owner',
+      initials,
+    }
+  }
+
   return {
     name: authUser.name,
-    roleLabel: 'Institute Owner',
-    subtitle: options?.subtitle ?? 'BrightPath Academy',
+    roleLabel: adminPortalLabel(options?.adminPortal, authUser.role, false),
+    subtitle: options?.subtitle ?? 'Branch admin',
     initials,
   }
 }
 
-export function roleLabelFor(role: UserRole): string {
-  if (role === 'student') return 'Student'
+export function roleLabelFor(role: UserRole, isOwner = false): string {
+  if (isOrganizationOwner(role, isOwner)) return 'Organization Owner'
+  if (role === 'admin') return 'Branch Admin'
   if (role === 'tutor') return 'Tutor'
-  return 'Owner'
+  if (isPlatformSuperUser(role)) return 'Platform Super User'
+  return 'Student'
 }

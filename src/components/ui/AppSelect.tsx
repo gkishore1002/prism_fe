@@ -19,7 +19,7 @@ export interface AppSelectOption {
   disabled?: boolean
 }
 
-export type AppSelectVariant = 'default' | 'compact' | 'on-dark'
+export type AppSelectVariant = 'default' | 'compact' | 'inline' | 'on-dark'
 
 interface AppSelectProps {
   value: string | null | undefined
@@ -46,6 +46,8 @@ const triggerVariants: Record<AppSelectVariant, string> = {
     'border-border bg-card/85 text-foreground hover:border-accent/35 focus-visible:ring-accent/20',
   compact:
     'border-border bg-card/90 text-foreground py-2 min-h-[40px] text-sm hover:border-accent/35',
+  inline:
+    'border-border bg-background text-foreground text-xs min-h-[36px] px-2.5 py-1 rounded-md hover:border-accent/35 focus-visible:ring-accent/20',
   'on-dark':
     'border-paper/25 bg-paper/10 text-paper hover:border-paper/40 focus-visible:ring-accent/30 placeholder:text-paper/50',
 }
@@ -339,8 +341,10 @@ export function AppSelect({
         aria-controls={open ? listId : undefined}
         onClick={toggleOpen}
         className={cn(
-          'w-full flex items-center justify-between gap-2 border rounded-[14px] px-4 text-[15px] backdrop-blur-sm text-left transition-all duration-[280ms] ios-shadow-sm min-h-[48px] sm:min-h-[44px]',
-          'focus-visible:outline-none focus-visible:ring-[3px]',
+          'flex items-center justify-between gap-2 border backdrop-blur-sm text-left transition-all duration-[280ms] focus-visible:outline-none focus-visible:ring-[3px]',
+          variant === 'inline'
+            ? 'w-auto min-w-[4.5rem] rounded-md ios-shadow-sm'
+            : 'w-full rounded-[14px] px-4 text-[15px] ios-shadow-sm min-h-[48px] sm:min-h-[44px]',
           triggerVariants[variant],
           disabled && 'opacity-50 cursor-not-allowed',
           open && variant !== 'on-dark' && 'border-accent/45 ring-[3px] ring-accent/15 bg-card',

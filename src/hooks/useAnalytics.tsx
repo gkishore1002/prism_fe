@@ -15,6 +15,7 @@ import {
   type BoardReportRow,
   type CenterAnalytics,
   type InstitutionOverview,
+  type InstitutionOperationalStats,
   type StudentMasterRow,
   type StudentProfileAnalytics,
   type TeacherRow,
@@ -29,6 +30,7 @@ import type {
   ReadinessPrediction,
   RecoveryStep,
   StudentWiseReport,
+  TopicReadinessPrediction,
 } from '@/types'
 
 export type AnalyticsLoadKey =
@@ -65,6 +67,7 @@ interface AnalyticsContextValue {
   load: (key: AnalyticsLoadKey | AnalyticsLoadKey[]) => Promise<void>
   refresh: (key?: AnalyticsLoadKey | AnalyticsLoadKey[]) => Promise<void>
   overview: InstitutionOverview | null
+  operationalStats: InstitutionOperationalStats | null
   /** Branch performance metrics — only loaded on admin Centers page. */
   centerAnalytics: CenterAnalytics[]
   boardReport: BoardReportRow[]
@@ -81,7 +84,7 @@ interface AnalyticsContextValue {
   recoveryPlan: RecoveryStep[]
   readiness: ReadinessPrediction[]
   improvementTrend: { month: string; score: number }[]
-  topicBreakdown: { topic: string; subject: string; mastery: number; status: string }[]
+  topicBreakdown: TopicReadinessPrediction[]
   studentSubjects: { name: string; health: number; status: string }[]
   recentAssessments: AssessmentResult[]
   studentReport: StudentWiseReport | null
@@ -104,6 +107,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
   const loadedRef = useRef(new Set<AnalyticsLoadKey>())
 
   const [overview, setOverview] = useState<InstitutionOverview | null>(null)
+  const [operationalStats, setOperationalStats] = useState<InstitutionOperationalStats | null>(null)
   const [centerAnalytics, setCenterAnalytics] = useState<CenterAnalytics[]>([])
   const [boardReport, setBoardReport] = useState<BoardReportRow[]>([])
   const [teachers, setTeachers] = useState<TeacherRow[]>([])
@@ -120,9 +124,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
   const [recoveryPlan, setRecoveryPlan] = useState<RecoveryStep[]>([])
   const [readiness, setReadiness] = useState<ReadinessPrediction[]>([])
   const [improvementTrend, setImprovementTrend] = useState<{ month: string; score: number }[]>([])
-  const [topicBreakdown, setTopicBreakdown] = useState<
-    { topic: string; subject: string; mastery: number; status: string }[]
-  >([])
+  const [topicBreakdown, setTopicBreakdown] = useState<TopicReadinessPrediction[]>([])
   const [studentSubjects, setStudentSubjects] = useState<{ name: string; health: number; status: string }[]>([])
   const [recentAssessments, setRecentAssessments] = useState<AssessmentResult[]>([])
   const [studentReport, setStudentReport] = useState<StudentWiseReport | null>(null)
@@ -256,8 +258,9 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
         break
       }
       case 'adminDashboard': {
-        const [inst, teacherRows, topics, trend, subjects, insights, risk] = await Promise.all([
+        const [inst, ops, teacherRows, topics, trend, subjects, insights, risk] = await Promise.all([
           analyticsApi.institutionOverview(),
+          analyticsApi.institutionOperationalStats(),
           analyticsApi.institutionTeachers(),
           analyticsApi.hardestTopics(),
           analyticsApi.monthlyTrend(),
@@ -266,6 +269,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
           analyticsApi.tutorAtRisk(),
         ])
         setOverview(inst)
+        setOperationalStats(ops)
         setTeachers(teacherRows)
         setHardestTopics(topics)
         setMonthlyTrend(trend)
@@ -389,6 +393,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       load,
       refresh,
       overview,
+      operationalStats,
       centerAnalytics,
       boardReport,
       teachers,
@@ -423,6 +428,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       load,
       refresh,
       overview,
+      operationalStats,
       centerAnalytics,
       boardReport,
       teachers,

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import {
@@ -12,6 +13,8 @@ import {
   ClipboardList,
   Sparkles,
   AlertTriangle,
+  ShieldCheck,
+  Clock,
 } from 'lucide-react'
 import {
   PieChart,
@@ -29,14 +32,32 @@ import {
 } from 'recharts'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
+import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
+import { useCenters } from '@/hooks/useCenters'
+import { analyticsApi, type InstitutionOperationalStats, type InstitutionOverview } from '@/lib/api/analyticsApi'
+import { formatCenterLabel } from '@/lib/centerLabel'
+import { adminMeta } from '@/modules/admin/lib/nav'
 
-const COLORS = ['#4F46E5', '#0EA5E9', '#8B5CF6', '#10B981', '#F59E0B']
+const COLORS = ['#0065F3', '#FF950A', '#0FA96E', '#E5484D', '#7C6CF0']
 
 export function AdminDashboardPage() {
   useAnalyticsPage('adminDashboard')
   const {
+    activeCenterId,
+    isAllBranches,
+    canSelectAllBranches,
+    centers,
+    canManageTenant,
+    ensureLoaded: ensureBranchesLoaded,
+  } = useCenters()
+  const { branchScoped, portalLabel } = useAdminPortalContext()
+  const [scopedOverview, setScopedOverview] = useState<InstitutionOverview | null>(null)
+  const [scopedOps, setScopedOps] = useState<InstitutionOperationalStats | null>(null)
+  const [scopedLoading, setScopedLoading] = useState(true)
+  const {
     loading,
     overview,
+    operationalStats,
     teachers,
     hardestTopics,
     monthlyTrend,
@@ -45,11 +66,57 @@ export function AdminDashboardPage() {
     atRisk,
   } = useAnalytics()
 
-  if (loading) {
+  useEffect(() => {
+    void ensureBranchesLoaded()
+  }, [ensureBranchesLoaded])
+
+  useEffect(() => {
+    let cancelled = false
+    setScopedLoading(true)
+    const centerParam = isAllBranches ? undefined : activeCenterId
+    Promise.all([
+      analyticsApi.institutionOverview(centerParam),
+      analyticsApi.institutionOperationalStats(centerParam),
+    ])
+      .then(([ov, ops]) => {
+        if (!cancelled) {
+          setScopedOverview(ov)
+          setScopedOps(ops)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setScopedOverview(null)
+          setScopedOps(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setScopedLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeCenterId, isAllBranches])
+
+  const inst = scopedOverview ?? overview
+  const ops = scopedOps ?? operationalStats
+  const activeCenter = centers.find((c) => c.id === activeCenterId)
+  const branchScopedAdminPortal = branchScoped
+  const studentScopeHint = branchScopedAdminPortal
+    ? centers.length <= 1 && activeCenter
+      ? formatCenterLabel(activeCenter)
+      : 'Assigned branches'
+    : isAllBranches && canSelectAllBranches
+      ? 'All branches'
+      : activeCenter
+        ? formatCenterLabel(activeCenter)
+        : 'Current branch view'
+
+  if (loading || scopedLoading) {
     return <PageLoader />
   }
 
-  if (!overview) {
+  if (!inst) {
     return (
       <>
         <PageHeader title="Institute overview" sub="No institution data available yet." />
@@ -58,21 +125,27 @@ export function AdminDashboardPage() {
     )
   }
 
-  const inst = overview
+  const studentTotal = ops?.totalStudents ?? inst.totalStudents
+  const studentActive = ops?.activeStudents ?? studentTotal
+  const studentInactive = ops?.inactiveStudents ?? 0
 
   return (
     <>
       <PageHeader
-        eyebrow={`Institution Intelligence · ${inst.institution.name}`}
-        title="Institute overview"
-        sub="Prove results, retain parents, differentiate on admissions — broken down by board and grade."
+        eyebrow={`${portalLabel} · ${inst.institution.name}`}
+        title="Dashboard"
+        sub={
+          branchScopedAdminPortal
+            ? adminMeta.branchDefaultSubtitle
+            : adminMeta.organizationDefaultSubtitle
+        }
       />
 
       <div className="grid md:grid-cols-4 gap-4 mb-8">
         <AppStat
-          label="Total students"
-          value={inst.totalStudents.toLocaleString()}
-          hint={`${inst.byBoard.length} boards`}
+          label="Students"
+          value={studentTotal.toLocaleString()}
+          hint={`${studentActive} active · ${studentInactive} inactive · ${studentScopeHint}`}
         />
         <AppStat
           label="Avg. improvement"
@@ -88,6 +161,62 @@ export function AdminDashboardPage() {
         />
         <AppStat label="Retention index" value={`${inst.retention}%`} hint="From improving cohort" />
       </div>
+
+      {ops && (
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display text-lg">Operations</h2>
+            <Link to="/admin/assessments" className="text-xs text-accent hover:underline inline-flex items-center gap-1">
+              Reassignment queue <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="grid md:grid-cols-3 gap-4 mb-8">
+            <AppStat
+              label={branchScopedAdminPortal ? 'Your branches' : 'Branches'}
+              value={(branchScopedAdminPortal ? centers.length : ops.totalCenters).toLocaleString()}
+              hint={studentScopeHint}
+              tone="accent"
+            />
+            <AppStat
+              label="CSC due soon"
+              value={ops.cscDueSoon.toLocaleString()}
+              tone={ops.cscDueSoon > 0 ? 'rose' : undefined}
+              hint={`${ops.cscInactive} inactive · ${ops.cscNeverVisited} never visited`}
+            />
+            <AppStat
+              label="Pending reassignments"
+              value={ops.reassignmentPending.toLocaleString()}
+              tone={ops.reassignmentPending > 0 ? 'accent' : undefined}
+              hint={`${ops.reassignmentApproved} approved · ${ops.reassignmentRejected} rejected`}
+            />
+          </div>
+          {(ops.cscDueSoon > 0 || ops.reassignmentPending > 0) && (
+            <AppCard className="mb-8 border-amber-200/60 bg-amber-50/40">
+              <div className="flex flex-wrap items-start gap-3">
+                <ShieldCheck className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                <div className="space-y-2 text-sm">
+                  {ops.cscDueSoon > 0 && (
+                    <p>
+                      <span className="font-medium">{ops.cscDueSoon} students</span> need a CSC visit
+                      before the inactivity window closes.
+                    </p>
+                  )}
+                  {ops.reassignmentPending > 0 && (
+                    <p className="inline-flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span className="font-medium">{ops.reassignmentPending} reassignment requests</span>{' '}
+                      awaiting review.
+                      <Link to="/admin/assessments" className="text-accent hover:underline ml-1">
+                        Review now →
+                      </Link>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </AppCard>
+          )}
+        </>
+      )}
 
       <div className="grid md:grid-cols-3 gap-4 mb-8">
         <AppCard>
@@ -292,17 +421,28 @@ export function AdminDashboardPage() {
             Quick links
           </div>
           <div className="mt-3 space-y-1">
-            {[
-              { to: '/admin/centers', icon: MapPin, label: 'Multi-center reports' },
-              { to: '/admin/boards', icon: Layers, label: 'Board-wise reports' },
-              { to: '/admin/reports', icon: BarChart3, label: 'Learning Genome reports' },
-              { to: '/admin/curriculum', icon: Network, label: 'Curriculum setup' },
-              { to: '/admin/students', icon: Users, label: 'Student management' },
-              { to: '/admin/question-bank', icon: Database, label: 'Question bank' },
-              { to: '/admin/assessments', icon: ClipboardList, label: 'Assessments' },
-              { to: '/admin/teachers', icon: Users, label: 'Teacher analytics' },
-              { to: '/admin/curriculum', icon: BookMarked, label: 'Syllabus completion' },
-            ].map(({ to, icon: Icon, label }) => (
+            {(branchScopedAdminPortal
+              ? [
+                  { to: '/admin/students', icon: Users, label: 'Student management' },
+                  { to: '/admin/reports', icon: BarChart3, label: 'Learning Genome reports' },
+                  { to: '/admin/boards', icon: Layers, label: 'Board-wise reports' },
+                  { to: '/admin/curriculum', icon: Network, label: 'Curriculum setup' },
+                  { to: '/admin/question-bank', icon: Database, label: 'Question bank' },
+                  { to: '/admin/assessments', icon: ClipboardList, label: 'Assessments' },
+                  { to: '/admin/staff', icon: Users, label: 'Staff & tutor impact' },
+                ]
+              : [
+                  { to: '/admin/centers', icon: MapPin, label: 'Branch management' },
+                  { to: '/admin/boards', icon: Layers, label: 'Board-wise reports' },
+                  { to: '/admin/reports', icon: BarChart3, label: 'Learning Genome reports' },
+                  { to: '/admin/curriculum', icon: Network, label: 'Curriculum setup' },
+                  { to: '/admin/students', icon: Users, label: 'Student management' },
+                  { to: '/admin/question-bank', icon: Database, label: 'Question bank' },
+                  { to: '/admin/assessments', icon: ClipboardList, label: 'Assessments' },
+                  { to: '/admin/staff', icon: Users, label: 'Staff & tutor impact' },
+                  { to: '/admin/settings', icon: ShieldCheck, label: 'Organization settings' },
+                ]
+            ).map(({ to, icon: Icon, label }) => (
               <Link
                 key={to}
                 to={to}

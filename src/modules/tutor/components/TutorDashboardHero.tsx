@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { useTutorDashboard } from '@/hooks/useTutorDashboard'
 import { useCurriculum } from '@/hooks/useCurriculum'
-import { AppSelect } from '@/components/ui/AppSelect'
+import { AppDropdown } from '@/components/ui/AppDropdown'
 import type { TutorDashboardHeroContent, TutorDashboardHeroSummary } from '../lib/dashboardContent'
 import { cn } from '@/lib/cn'
 
@@ -188,7 +188,7 @@ export function TutorDashboardHero({
                 </div>
                 {batchOptions.length > 1 && onBatchChange && (
                   <div className="w-full sm:w-64 min-w-0">
-                    <AppSelect
+                    <AppDropdown
                       label="Batch"
                       value={selectedBatchId}
                       onChange={onBatchChange}

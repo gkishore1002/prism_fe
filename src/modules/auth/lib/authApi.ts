@@ -6,6 +6,17 @@ export interface RoleOption {
   role: UserRole
   label: string
   description: string
+  adminPortal?: 'organization' | 'branch'
+}
+
+export function roleOptionKey(option: Pick<RoleOption, 'role' | 'adminPortal'>): string {
+  return `${option.role}-${option.adminPortal ?? 'default'}`
+}
+
+export interface RoleOptionsResponse {
+  roles: RoleOption[]
+  currentRole: UserRole
+  currentAdminPortal?: 'organization' | 'branch'
 }
 
 export interface LoginSuccess {
@@ -14,12 +25,14 @@ export interface LoginSuccess {
   role: UserRole
   user: User
   accessToken?: string
+  adminPortal?: 'organization' | 'branch'
 }
 
 export interface LoginPendingRoles {
   type: 'role_selection'
   email: string
   roles: RoleOption[]
+  institutionCode?: string
 }
 
 export type LoginResult = LoginSuccess | LoginPendingRoles
@@ -33,6 +46,8 @@ interface ApiUser {
   institutionId: string
   gradeId?: string | null
   boardId?: string | null
+  isOwner?: boolean
+  adminPortal?: 'organization' | 'branch'
 }
 
 interface ApiLoginAuthenticated {
@@ -41,12 +56,14 @@ interface ApiLoginAuthenticated {
   role: UserRole
   user: ApiUser
   accessToken: string
+  adminPortal?: 'organization' | 'branch'
 }
 
 interface ApiLoginRoleSelection {
   type: 'role_selection'
   email: string
   roles: RoleOption[]
+  institutionCode?: string
 }
 
 function mapApiUser(user: ApiUser): User {
@@ -59,7 +76,18 @@ function mapApiUser(user: ApiUser): User {
     institutionId: user.institutionId,
     gradeId: user.gradeId ?? undefined,
     boardId: user.boardId ?? undefined,
+    isOwner: user.isOwner ?? false,
   }
+}
+
+export interface LoginOrganization {
+  id: string
+  name: string
+  code: string
+}
+
+export async function fetchLoginOrganizations(): Promise<LoginOrganization[]> {
+  return apiFetch<LoginOrganization[]>('/auth/organizations', { auth: false })
 }
 
 export async function loginPrism(
@@ -74,7 +102,12 @@ export async function loginPrism(
   })
 
   if (result.type === 'role_selection') {
-    return { type: 'role_selection', email: result.email, roles: result.roles }
+    return {
+      type: 'role_selection',
+      email: result.email,
+      roles: result.roles,
+      institutionCode: result.institutionCode,
+    }
   }
 
   return {
@@ -83,14 +116,24 @@ export async function loginPrism(
     role: result.role,
     user: mapApiUser(result.user),
     accessToken: result.accessToken,
+    adminPortal: result.adminPortal ?? result.user.adminPortal,
   }
 }
 
-export async function selectRolePrism(email: string, role: UserRole): Promise<LoginSuccess> {
+export async function selectRolePrism(
+  email: string,
+  role: UserRole,
+  options?: { institutionCode?: string; adminPortal?: 'organization' | 'branch' },
+): Promise<LoginSuccess> {
   const result = await apiFetch<ApiLoginAuthenticated>('/auth/select-role', {
     method: 'POST',
     auth: false,
-    body: JSON.stringify({ email, role }),
+    body: JSON.stringify({
+      email,
+      role,
+      institutionCode: options?.institutionCode,
+      adminPortal: options?.adminPortal,
+    }),
   })
   return {
     type: 'authenticated',
@@ -98,19 +141,33 @@ export async function selectRolePrism(email: string, role: UserRole): Promise<Lo
     role: result.role,
     user: mapApiUser(result.user),
     accessToken: result.accessToken,
+    adminPortal: result.adminPortal ?? result.user.adminPortal,
   }
 }
 
-export async function fetchCurrentUser(): Promise<User | null> {
+export interface AuthSessionSync {
+  user: User
+  adminPortal?: 'organization' | 'branch'
+}
+
+export async function fetchAuthSession(): Promise<AuthSessionSync | null> {
   const session = readSession()
   if (!session?.accessToken) return null
   try {
     const user = await apiFetch<ApiUser>('/auth/me')
-    return mapApiUser(user)
+    return {
+      user: mapApiUser(user),
+      adminPortal: user.adminPortal,
+    }
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) return null
     return null
   }
+}
+
+export async function fetchCurrentUser(): Promise<User | null> {
+  const synced = await fetchAuthSession()
+  return synced?.user ?? null
 }
 
 export async function logoutPrism(): Promise<void> {
@@ -118,5 +175,27 @@ export async function logoutPrism(): Promise<void> {
     await apiFetch<void>('/auth/logout', { method: 'POST' })
   } catch {
     // stateless JWT — ignore network errors on logout
+  }
+}
+
+export async function fetchRoleOptions(): Promise<RoleOptionsResponse> {
+  return apiFetch<RoleOptionsResponse>('/auth/role-options')
+}
+
+export async function switchRolePrism(option: RoleOption): Promise<LoginSuccess> {
+  const result = await apiFetch<ApiLoginAuthenticated>('/auth/switch-role', {
+    method: 'POST',
+    body: JSON.stringify({
+      role: option.role,
+      adminPortal: option.adminPortal,
+    }),
+  })
+  return {
+    type: 'authenticated',
+    email: result.email,
+    role: result.role,
+    user: mapApiUser(result.user),
+    accessToken: result.accessToken,
+    adminPortal: result.adminPortal ?? result.user.adminPortal,
   }
 }

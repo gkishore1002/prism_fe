@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Plus, Calendar, Clock, MapPin, Users, FileText } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { AssessmentBuilder } from '@/components/academic/AssessmentBuilder'
+import { AccessRequestsPanel } from '@/components/academic/AccessRequestsPanel'
 import { useAssessments } from '@/hooks/useAssessments'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useCenters } from '@/hooks/useCenters'
@@ -35,6 +36,8 @@ interface AssessmentsPageProps {
 
 export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
   useAnalyticsPage(['tutorNames', 'adminStudents'])
+  const canManage = role === 'tutor' || role === 'admin'
+  const portalBase = `/${role}`
   const { assessments, addAssessment, removeAssessment, patchAssessment, ensureLoaded } = useAssessments()
 
   useEffect(() => {
@@ -67,6 +70,7 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
       questionCount: draft.questionCount ?? 0,
       durationMinutes: draft.durationMinutes ?? 0,
       scheduledAt: draft.scheduledAt ?? '',
+      availableUntil: draft.availableUntil ?? draft.scheduledAt ?? '',
       status: 'scheduled',
       centerIds: draft.centerIds ?? [],
       selectedQuestionIds: draft.selectedQuestionIds ?? [],
@@ -95,12 +99,12 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
         eyebrow="Assessment engine · Module 1"
         title="Assessments"
         sub={
-          role === 'tutor'
+          canManage
             ? 'Create board-wise exams from your question papers, assign students, set duration, and choose branches.'
-            : 'View tutor-created assessments.'
+            : 'View assessments.'
         }
         actions={
-          role === 'tutor' ? (
+          canManage ? (
             <button
               type="button"
               onClick={() => setBuilderOpen(true)}
@@ -112,12 +116,18 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
         }
       />
 
-      {role === 'tutor' && (
+      {canManage && (
+        <div className="mb-8">
+          <AccessRequestsPanel scope={role} />
+        </div>
+      )}
+
+      {canManage && (
         <AssessmentBuilder
           open={builderOpen}
           onClose={() => setBuilderOpen(false)}
           onSave={handleSave}
-          questionBankPath="/tutor/question-bank"
+          questionBankPath={`${portalBase}/question-bank`}
         />
       )}
 
@@ -190,16 +200,16 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                   <Clock className="w-3.5 h-3.5" />
                   {assessment.durationMinutes} min
                 </span>
-                {role === 'tutor' && (
+                {canManage && (
                   <Link
-                    to={`/tutor/assessments/${assessment.id}/paper`}
+                    to={`${portalBase}/assessments/${assessment.id}/paper`}
                     className="inline-flex items-center gap-1 text-accent hover:underline"
                   >
                     <FileText className="w-3.5 h-3.5" />
                     Question paper
                   </Link>
                 )}
-                {role === 'tutor' && assessment.status === 'scheduled' && (
+                {canManage && assessment.status === 'scheduled' && (
                   <button
                     type="button"
                     onClick={() => void patchAssessment(assessment.id, { status: 'live' })}
@@ -208,7 +218,7 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                     Go live
                   </button>
                 )}
-                {role === 'tutor' && assessment.status === 'live' && (
+                {canManage && assessment.status === 'live' && (
                   <button
                     type="button"
                     onClick={() => void patchAssessment(assessment.id, { status: 'completed' })}
@@ -219,13 +229,13 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                 )}
                 {(role === 'tutor' || role === 'admin') && (
                   <Link
-                    to={`/${role}/assessments/${assessment.id}/attendance`}
+                    to={`${portalBase}/assessments/${assessment.id}/attendance`}
                     className="text-xs text-muted-foreground hover:underline"
                   >
                     Results
                   </Link>
                 )}
-                {role === 'tutor' && (
+                {canManage && (
                   <button
                     type="button"
                     onClick={() => {
@@ -286,9 +296,9 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                   <td className="py-3 font-mono-data">{assessment.classAvg}%</td>
                   <td className="py-3">
                     <div className="flex flex-col gap-1">
-                      {role === 'tutor' && (
+                      {canManage && (
                         <Link
-                          to={`/tutor/assessments/${assessment.id}/paper`}
+                          to={`${portalBase}/assessments/${assessment.id}/paper`}
                           className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
                         >
                           <FileText className="w-3 h-3" />
@@ -296,7 +306,7 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                         </Link>
                       )}
                       <Link
-                        to={`/${role}/assessments/${assessment.id}/attendance`}
+                        to={`${portalBase}/assessments/${assessment.id}/attendance`}
                         className="text-xs text-accent hover:underline text-left"
                       >
                         View results

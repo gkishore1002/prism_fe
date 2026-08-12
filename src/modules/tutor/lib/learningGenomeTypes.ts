@@ -4,6 +4,36 @@ export interface GenomeDailyPoint {
   date: string
   subject: SubjectCode
   score: number
+  title?: string
+}
+
+export interface GenomeExamSubjectRow {
+  name: string
+  code: SubjectCode
+  pct: number
+  scored?: number | null
+  maxMarks?: number | null
+  grade: string
+  classAvg?: number | null
+  vsClass?: number | null
+}
+
+export interface GenomeExamHistoryRow {
+  title: string
+  date: string
+  overall: number
+  subjectCount: number
+  vsPrev: number | null
+  subjects: GenomeExamSubjectRow[]
+  assessmentId?: string | null
+}
+
+export interface GenomeLatestAssessment {
+  title: string
+  date: string
+  overall: number
+  assessmentId?: string | null
+  subjects: GenomeExamSubjectRow[]
 }
 
 export interface GenomeStudentProfile {
@@ -27,7 +57,11 @@ export interface GenomeStudentProfile {
   growth_potential: number
   confidence: number
   daily_curve: GenomeDailyPoint[]
+  exam_history?: GenomeExamHistoryRow[]
+  latest_assessment?: GenomeLatestAssessment | null
   rank: number
+  risk_level?: 'Low' | 'Medium' | 'High'
+  risk_score?: number
 }
 
 export interface LearningGenomeDataset {

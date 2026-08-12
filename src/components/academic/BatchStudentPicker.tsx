@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AppSelect } from '@/components/ui/AppSelect'
+import { AppDropdown } from '@/components/ui/AppDropdown'
 import { BatchStudentSearchList } from '@/components/academic/BatchStudentSearchList'
 import type { StudentSummary } from '@/types'
 
@@ -51,7 +51,7 @@ export function BatchStudentPicker({
 
   return (
     <div className="space-y-4">
-      <AppSelect
+      <AppDropdown
         label={dropdownLabel}
         value={dropdownValue}
         onChange={handleDropdownSelect}

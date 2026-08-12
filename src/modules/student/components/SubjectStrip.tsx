@@ -19,7 +19,7 @@ export function SubjectStrip({ subjects, className }: SubjectStripProps) {
       {subjects.map((s) => (
         <Link
           key={s.subjectId}
-          to="/student/reports"
+          to="/student/assessments"
           className="shrink-0 flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-card border border-border hover:border-accent/40 card-hover"
         >
           <span

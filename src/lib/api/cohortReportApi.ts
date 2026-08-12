@@ -27,7 +27,41 @@ export interface ApiGenomeStudentProfile {
   balance: string
   growthPotential: number
   confidence: number
-  dailyCurve: { date: string; subject: SubjectCode; score: number }[]
+  dailyCurve: { date: string; subject: SubjectCode; score: number; title?: string }[]
+  examHistory?: {
+    title: string
+    date: string
+    overall: number
+    subjectCount: number
+    vsPrev: number | null
+    subjects: {
+      name: string
+      code: SubjectCode
+      pct: number
+      scored?: number | null
+      maxMarks?: number | null
+      grade: string
+      classAvg?: number | null
+      vsClass?: number | null
+    }[]
+    assessmentId?: string | null
+  }[]
+  latestAssessment?: {
+    title: string
+    date: string
+    overall: number
+    assessmentId?: string | null
+    subjects: {
+      name: string
+      code: SubjectCode
+      pct: number
+      scored?: number | null
+      maxMarks?: number | null
+      grade: string
+      classAvg?: number | null
+      vsClass?: number | null
+    }[]
+  } | null
   rank: number
   studentId?: string
 }
@@ -63,6 +97,7 @@ export interface ApiStudentGenome {
   source: 'live' | 'synthesized' | 'empty'
   message?: string
   narrative?: string | null
+  narrativeTa?: string | null
   narrativeSource?: 'vertex' | 'rule-based'
 }
 
@@ -83,11 +118,14 @@ function mapProfile(p: ApiGenomeStudentProfile): GenomeStudentProfile {
     exam_shock: p.examShock,
     attendance_pct: p.attendancePct,
     absent_count: p.absentCount,
-    attendance_impact: p.attendanceImpact,
+    attendance_impact:
+      typeof p.attendanceImpact === 'number' ? p.attendanceImpact : null,
     balance: p.balance,
     growth_potential: p.growthPotential,
     confidence: p.confidence,
     daily_curve: p.dailyCurve as GenomeDailyPoint[],
+    exam_history: p.examHistory,
+    latest_assessment: p.latestAssessment ?? null,
     rank: p.rank,
   }
 }

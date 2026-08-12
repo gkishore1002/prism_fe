@@ -67,7 +67,8 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated || role === 'student') return
-    setLoading(true)
+    const isInitialLoad = curriculum.length === 0 && batches.length === 0
+    if (isInitialLoad) setLoading(true)
     setError(null)
     try {
       const data = await loadFromApi()
@@ -75,11 +76,13 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
       setBatches(data.batches)
       setStudents(data.students)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load curriculum')
+      const message = e instanceof Error ? e.message : 'Failed to load curriculum'
+      setError(message)
+      throw new Error(message)
     } finally {
-      setLoading(false)
+      if (isInitialLoad) setLoading(false)
     }
-  }, [isAuthenticated, role])
+  }, [isAuthenticated, role, curriculum.length, batches.length])
 
   const ensureLoaded = useCallback(async () => {
     if (!isAuthenticated || role === 'student') return

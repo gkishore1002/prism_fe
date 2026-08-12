@@ -9,6 +9,8 @@ import {
 } from '@/lib/api/mappers'
 import type {
   AssessmentAttendanceRecord,
+  AssessmentAccessRequest,
+  AccessRequestReviewContext,
   QuestionBankEntry,
   TutorAssessmentSchedule,
 } from '@/types'
@@ -64,6 +66,7 @@ export async function createAssessment(
       questionCount: assessment.questionCount,
       durationMinutes: assessment.durationMinutes,
       scheduledAt: assessment.scheduledAt,
+      availableUntil: assessment.availableUntil ?? assessment.scheduledAt,
       status: assessment.status,
       centerIds: assessment.centerIds ?? [],
       selectedQuestionIds: assessment.selectedQuestionIds,
@@ -84,7 +87,9 @@ export async function deleteAssessment(assessmentId: string): Promise<void> {
 
 export async function updateAssessment(
   assessmentId: string,
-  patch: Partial<Pick<TutorAssessmentSchedule, 'title' | 'status' | 'scheduledAt'>>,
+  patch: Partial<
+    Pick<TutorAssessmentSchedule, 'title' | 'status' | 'scheduledAt' | 'availableUntil'>
+  >,
 ): Promise<TutorAssessmentSchedule> {
   const data = await apiFetch<ApiAssessment>(`/assessments/${assessmentId}`, {
     method: 'PATCH',
@@ -138,4 +143,42 @@ export async function fetchMySubmission(
     }
     throw e
   }
+}
+
+export async function createAccessRequest(
+  assessmentId: string,
+  reason: string,
+): Promise<AssessmentAccessRequest> {
+  return apiFetch<AssessmentAccessRequest>(
+    `/assessments/${encodeURIComponent(assessmentId)}/access-request`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    },
+  )
+}
+
+export async function fetchAccessRequests(
+  status?: 'pending' | 'approved' | 'rejected',
+): Promise<AssessmentAccessRequest[]> {
+  const qs = status ? `?status=${status}` : ''
+  return apiFetch<AssessmentAccessRequest[]>(`/assessments/access-requests${qs}`)
+}
+
+export async function fetchAccessRequestReviewContext(
+  requestId: string,
+): Promise<AccessRequestReviewContext> {
+  return apiFetch<AccessRequestReviewContext>(
+    `/assessments/access-requests/${encodeURIComponent(requestId)}/review-context`,
+  )
+}
+
+export async function reviewAccessRequest(
+  requestId: string,
+  body: { status: 'approved' | 'rejected'; reviewNotes?: string; extensionDays?: number },
+): Promise<AssessmentAccessRequest> {
+  return apiFetch<AssessmentAccessRequest>(`/assessments/access-requests/${requestId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
 }

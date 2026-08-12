@@ -14,7 +14,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
-import { AppSelect } from '@/components/ui/AppSelect'
+import { AppDropdown } from '@/components/ui/AppDropdown'
 import { BatchStudentSearchList } from '@/components/academic/BatchStudentSearchList'
 import { BatchStudentPicker } from '@/components/academic/BatchStudentPicker'
 import { SyllabusCompletionSection } from '@/components/academic/SyllabusCompletionSection'
@@ -62,6 +62,8 @@ function InlineAddForm({
   placeholder,
   existingItems = [],
   existingLabel = 'Already added',
+  saving = false,
+  prerequisiteMessage = null,
   onSubmit,
   onCancel,
   onDuplicate,
@@ -70,40 +72,75 @@ function InlineAddForm({
   placeholder: string
   existingItems?: string[]
   existingLabel?: string
-  onSubmit: (value: string) => void
+  saving?: boolean
+  prerequisiteMessage?: string | null
+  onSubmit: (value: string) => boolean | Promise<boolean>
   onCancel: () => void
   onDuplicate?: (value: string) => void
 }) {
   const [value, setValue] = useState('')
+  const [localError, setLocalError] = useState<string | null>(null)
+
   return (
     <form
       className="mt-2 p-2 rounded-md border border-accent/30 bg-accent/5 space-y-2"
       onSubmit={(e: FormEvent) => {
         e.preventDefault()
-        const trimmed = value.trim()
-        if (!trimmed) return
-        if (existingItems.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
-          onDuplicate?.(trimmed)
-          return
-        }
-        onSubmit(trimmed)
-        setValue('')
+        void (async () => {
+          setLocalError(null)
+          if (prerequisiteMessage) {
+            setLocalError(prerequisiteMessage)
+            return
+          }
+          const trimmed = value.trim()
+          if (!trimmed) {
+            setLocalError('Enter a name before saving.')
+            return
+          }
+          if (existingItems.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
+            onDuplicate?.(trimmed)
+            setLocalError(`"${trimmed}" already exists — pick a different name.`)
+            return
+          }
+          const ok = await onSubmit(trimmed)
+          if (ok) {
+            setValue('')
+            setLocalError(null)
+          }
+        })()
       }}
     >
       <label className="block text-[10px] text-muted-foreground">{label}</label>
+      {prerequisiteMessage ? (
+        <p className="text-xs text-amber-600 dark:text-amber-400">{prerequisiteMessage}</p>
+      ) : null}
       <input
         autoFocus
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => {
+          setValue(e.target.value)
+          if (localError) setLocalError(null)
+        }}
         placeholder={placeholder}
-        className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+        disabled={saving || Boolean(prerequisiteMessage)}
+        className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background disabled:opacity-60"
       />
+      {localError ? <p className="text-xs text-rose">{localError}</p> : null}
       <ExistingItemsHint items={existingItems} label={existingLabel} />
       <div className="flex gap-2">
-        <button type="submit" className="text-xs btn btn-primary px-2 py-1">
-          Save
+        <button
+          type="submit"
+          disabled={saving || Boolean(prerequisiteMessage)}
+          className="text-xs btn btn-primary px-2 py-1 disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Save'}
         </button>
-        <button type="button" onClick={onCancel} className="text-xs text-muted-foreground px-2 py-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="text-xs text-muted-foreground px-2 py-1 disabled:opacity-50"
+        >
           Cancel
         </button>
       </div>
@@ -189,18 +226,22 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
     null,
   )
   const [saving, setSaving] = useState(false)
+  const [batchFormError, setBatchFormError] = useState<string | null>(null)
 
-  async function runAction(action: () => Promise<void>, successText: string) {
+  async function runAction(
+    action: () => Promise<void>,
+    successText: string,
+  ): Promise<{ success: boolean; error?: string }> {
     setSaving(true)
     setActionMessage(null)
     try {
       await action()
       setActionMessage({ type: 'success', text: successText })
+      return { success: true }
     } catch (e) {
-      setActionMessage({
-        type: 'error',
-        text: e instanceof Error ? e.message : 'Something went wrong',
-      })
+      const text = e instanceof Error ? e.message : 'Something went wrong'
+      setActionMessage({ type: 'error', text })
+      return { success: false, error: text }
     } finally {
       setSaving(false)
     }
@@ -323,6 +364,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
     setCreateSelectedIds([])
     setCreatePendingNames([])
     setCreateNewStudentName('')
+    setBatchFormError(null)
     setAddTarget(null)
   }
 
@@ -341,13 +383,22 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
 
   async function handleAddBatch(e: FormEvent) {
     e.preventDefault()
-    if (!batchName.trim() || !hasBatchScope) return
+    setBatchFormError(null)
+    if (!batchName.trim()) {
+      setBatchFormError('Enter a batch name before saving.')
+      return
+    }
+    if (!hasBatchScope) {
+      setBatchFormError('Select a board and grade before creating a batch.')
+      return
+    }
     const trimmed = batchName.trim()
     if (existingBatchNames.some((n) => n.toLowerCase() === trimmed.toLowerCase())) {
       reportDuplicate(trimmed)
+      setBatchFormError(`"${trimmed}" already exists — pick a different name.`)
       return
     }
-    await runAction(async () => {
+    const result = await runAction(async () => {
       const batchId = await addBatch({
         name: trimmed,
         board,
@@ -363,11 +414,17 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
       resetBatchForm()
       setSelectedBatchId(batchId)
     }, `Batch "${trimmed}" created`)
+    if (!result.success) {
+      setBatchFormError(result.error ?? 'Could not create batch.')
+    }
   }
 
   async function handleAddStudentToBatch(e: FormEvent, batchId: string) {
     e.preventDefault()
-    if (!newStudentName.trim()) return
+    if (!newStudentName.trim()) {
+      setActionMessage({ type: 'error', text: 'Enter a student name before adding.' })
+      return
+    }
     const name = newStudentName.trim()
     await runAction(async () => {
       await addStudentToBatch(batchId, name)
@@ -463,14 +520,15 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             placeholder="e.g. CBSE"
             existingItems={existingBoardNames}
             existingLabel="Existing boards"
+            saving={saving}
             onDuplicate={reportDuplicate}
-            onSubmit={(v) => {
-              void runAction(async () => {
+            onSubmit={(v) =>
+              runAction(async () => {
                 await addBoard(v)
                 setBoard(v)
                 setAddTarget(null)
-              }, `Board "${v}" added`)
-            }}
+              }, `Board "${v}" added`).then((r) => r.success)
+            }
             onCancel={() => setAddTarget(null)}
           />
         </AppCard>
@@ -483,14 +541,15 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             placeholder="e.g. ICSE"
             existingItems={existingBoardNames}
             existingLabel="Existing boards"
+            saving={saving}
             onDuplicate={reportDuplicate}
-            onSubmit={(v) => {
-              void runAction(async () => {
+            onSubmit={(v) =>
+              runAction(async () => {
                 await addBoard(v)
                 setBoard(v)
                 setAddTarget(null)
-              }, `Board "${v}" added`)
-            }}
+              }, `Board "${v}" added`).then((r) => r.success)
+            }
             onCancel={() => setAddTarget(null)}
           />
         </AppCard>
@@ -587,17 +646,18 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               placeholder="e.g. Grade 10"
               existingItems={existingGradeNames}
               existingLabel="Existing grades"
+              saving={saving}
+              prerequisiteMessage={!board ? 'Select a board before adding a grade.' : null}
               onDuplicate={reportDuplicate}
-              onSubmit={(v) => {
-                void runAction(async () => {
+              onSubmit={(v) =>
+                runAction(async () => {
+                  if (!board) throw new Error('Select a board first.')
                   await addGrade(board, v)
                   setGrade(v)
-                  setSubject(
-                    boardData?.grades.find((g) => g.grade === v)?.subjects[0]?.name ?? subject,
-                  )
+                  setSubject('Mathematics')
                   setAddTarget(null)
-                }, `Grade "${v}" added`)
-              }}
+                }, `Grade "${v}" added`).then((r) => r.success)
+              }
               onCancel={() => setAddTarget(null)}
             />
           )}
@@ -674,14 +734,19 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               placeholder="e.g. Science"
               existingItems={existingSubjectNames}
               existingLabel="Existing subjects"
+              saving={saving}
+              prerequisiteMessage={
+                !board ? 'Select a board first.' : !grade ? 'Select a grade before adding a subject.' : null
+              }
               onDuplicate={reportDuplicate}
-              onSubmit={(v) => {
-                void runAction(async () => {
+              onSubmit={(v) =>
+                runAction(async () => {
+                  if (!board || !grade) throw new Error('Select a board and grade first.')
                   await addSubject(board, grade, v)
                   setSubject(v)
                   setAddTarget(null)
-                }, `Subject "${v}" added`)
-              }}
+                }, `Subject "${v}" added`).then((r) => r.success)
+              }
               onCancel={() => setAddTarget(null)}
             />
           )}
@@ -754,14 +819,27 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               placeholder="e.g. Linear Equations"
               existingItems={existingTopicNames}
               existingLabel="Existing topics"
+              saving={saving}
+              prerequisiteMessage={
+                !board
+                  ? 'Select a board first.'
+                  : !grade
+                    ? 'Select a grade first.'
+                    : !subject
+                      ? 'Select a subject before adding a topic.'
+                      : null
+              }
               onDuplicate={reportDuplicate}
-              onSubmit={(v) => {
-                void runAction(async () => {
+              onSubmit={(v) =>
+                runAction(async () => {
+                  if (!board || !grade || !subject) {
+                    throw new Error('Select board, grade, and subject first.')
+                  }
                   await addTopic(board, grade, subject, v)
                   setSelectedTopic(v)
                   setAddTarget(null)
-                }, `Topic "${v}" added`)
-              }}
+                }, `Topic "${v}" added`).then((r) => r.success)
+              }
               onCancel={() => setAddTarget(null)}
             />
           )}
@@ -859,18 +937,21 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             className="mb-4 p-4 rounded-lg border border-accent/30 bg-accent/5 space-y-4"
           >
             <ExistingItemsHint items={existingBatchNames} label={`Existing batches for ${board} · ${grade}`} />
+            {batchFormError ? <p className="text-xs text-rose">{batchFormError}</p> : null}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <label className="block sm:col-span-2 lg:col-span-1">
                 <span className="text-xs text-muted-foreground">Batch name *</span>
                 <input
-                  required
                   value={batchName}
-                  onChange={(e) => setBatchName(e.target.value)}
+                  onChange={(e) => {
+                    setBatchName(e.target.value)
+                    if (batchFormError) setBatchFormError(null)
+                  }}
                   placeholder="e.g. Batch A"
                   className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
                 />
               </label>
-              <AppSelect
+              <AppDropdown
                 label="Subject (optional)"
                 value={batchSubject}
                 onChange={setBatchSubject}

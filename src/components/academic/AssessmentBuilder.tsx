@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Clock, MapPin, CheckSquare, Square, Users, Search } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
-import { AppSelect } from '@/components/ui/AppSelect'
+import { AppDropdown } from '@/components/ui/AppDropdown'
 import { InlineLoader } from '@/components/ui/PrismLoader'
 import { AppModal } from '@/components/ui/AppModal'
 import { AssessmentPaperPreview } from '@/components/academic/AssessmentPaperPreview'
@@ -46,6 +46,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
   const [batchName, setBatchName] = useState('')
   const [durationMinutes, setDurationMinutes] = useState(0)
   const [scheduledAt, setScheduledAt] = useState('')
+  const [availableUntil, setAvailableUntil] = useState('')
   const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null)
   const [paperCoverage, setPaperCoverage] = useState<'full' | 'selected_topics'>('full')
   const [selectedTopics, setSelectedTopics] = useState<string[]>([])
@@ -424,6 +425,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
         questionCount: selectedQuestions.length,
         durationMinutes: durationMinutes || 0,
         scheduledAt: scheduledAt.trim(),
+        availableUntil: (availableUntil || scheduledAt).trim(),
         status: 'scheduled',
         centerIds: allCenters ? institutionCenters.map((c) => c.id) : selectedCenters,
         selectedQuestionIds: selectedQuestions,
@@ -526,28 +528,28 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                       className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
                     />
                   </label>
-                  <AppSelect
+                  <AppDropdown
                     label="Board"
                     value={board}
                     onChange={onBoardChange}
                     options={boardOptions}
                     placeholder="Select board"
                   />
-                  <AppSelect
+                  <AppDropdown
                     label="Grade"
                     value={grade}
                     onChange={onGradeChange}
                     options={gradeOptions}
                     placeholder="Select grade"
                   />
-                  <AppSelect
+                  <AppDropdown
                     label="Subject"
                     value={subject}
                     onChange={onSubjectChange}
                     options={subjectOptions}
                     placeholder="Select subject"
                   />
-                  <AppSelect
+                  <AppDropdown
                     label="Batch"
                     value={batchName || null}
                     onChange={setBatchName}
@@ -555,7 +557,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                     placeholder={scopedBatches.length === 0 ? 'No batches — create in Curriculum Setup' : 'Select batch'}
                     emptyMessage="No batches for this board and grade — add one in Curriculum Setup"
                   />
-                  <AppSelect
+                  <AppDropdown
                     label="Mode"
                     value={mode}
                     onChange={(v) => setMode(v as typeof mode)}
@@ -575,7 +577,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                 <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Question paper
                 </h3>
-                <AppSelect
+                <AppDropdown
                   label="Question paper *"
                   value={selectedPaperId}
                   onChange={selectPaper}
@@ -616,7 +618,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
 
                 {selectedPaper && (
                   <div className="space-y-3">
-                    <AppSelect
+                    <AppDropdown
                       label="Full paper or topic-wise? *"
                       value={paperCoverage}
                       onChange={(v) => selectCoverage(v as 'full' | 'selected_topics')}
@@ -887,10 +889,26 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                   <input
                     type="date"
                     value={scheduledAt}
-                    onChange={(e) => setScheduledAt(e.target.value)}
+                    onChange={(e) => {
+                      setScheduledAt(e.target.value)
+                      if (!availableUntil) setAvailableUntil(e.target.value)
+                    }}
                     className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
                   />
                 </label>
+                {mode === 'assessment' && (
+                  <label className="block">
+                    <span className="text-xs text-muted-foreground">
+                      Available until (last day to attend)
+                    </span>
+                    <input
+                      type="date"
+                      value={availableUntil}
+                      onChange={(e) => setAvailableUntil(e.target.value)}
+                      className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                    />
+                  </label>
+                )}
               </div>
 
               <AppCard className="!p-4">

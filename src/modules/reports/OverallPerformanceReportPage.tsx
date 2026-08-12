@@ -1,34 +1,193 @@
 import { useEffect, useState } from 'react'
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   ResponsiveContainer,
   XAxis,
   YAxis,
   CartesianGrid,
-  BarChart,
-  Bar,
-  Cell,
 } from 'recharts'
-import { PageLoader } from '@/components/ui/PrismLoader'
+import { ReportLoader } from '@/components/ui/PrismLoader'
 import { analyticsApi } from '@/lib/api/analyticsApi'
-import { studentInsightBullets } from '@/lib/analyticsInsights'
-import type { OverallPerformanceReport } from '@/types'
+import type { AssessmentReport, OverallPerformanceReport } from '@/types'
+import { ReportNarrative } from '@/components/reports/ReportLanguageToggle'
+import { fallbackOverallSummaryTa } from '@/lib/reportBilingual'
+import {
+  formatHeroQuickFacts,
+  formatReportDate,
+  studentInsightBulletsLocalized,
+} from '@/lib/reportFormatters'
+import { translateHealthStatus, translateSeverity } from '@/lib/reportLabels'
+import { useReportLabels } from '@/lib/useReportLabels'
 import {
   LgBoardTable,
   LgFooter,
   LgHero,
   LgInsightFeed,
-  LgKpiRow,
-  LgNarrative,
   LgReportLayout,
   LgSection,
 } from '@/modules/reports/learningGenome/LearningGenomeShell'
+import { StudentAssessmentInsightsBody } from '@/modules/reports/learningGenome/StudentAssessmentInsightsBody'
 
 interface OverallPerformanceReportPageProps {
   studentId?: string
   backHref: string
   backLabel: string
+}
+
+function OverallReportContent({
+  report,
+  assessmentReports,
+  backHref,
+  backLabel,
+}: {
+  report: OverallPerformanceReport
+  assessmentReports: AssessmentReport[]
+  backHref: string
+  backLabel: string
+}) {
+  const { L, language, forecastHeaders } = useReportLabels()
+
+  const latest = [...assessmentReports].sort(
+    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+  )[0]
+
+  const dates = assessmentReports
+    .map((a) => a.submittedAt)
+    .filter(Boolean)
+    .sort()
+  const windowLabel =
+    dates.length === 0
+      ? `${report.board} · ${report.grade}`
+      : dates.length === 1
+        ? formatReportDate(dates[0], language)
+        : `${formatReportDate(dates[0], language)} – ${formatReportDate(dates[dates.length - 1], language)}`
+
+  const topicChartData = report.topicBreakdown.slice(0, 6).map((t) => ({
+    name: t.topic.length > 14 ? `${t.topic.slice(0, 12)}…` : t.topic,
+    mastery: t.currentMastery ?? t.mastery,
+    predicted: t.predictedScore ?? t.mastery,
+  }))
+
+  const insightBullets = studentInsightBulletsLocalized(
+    { overall: report.health, status: report.status, trend: report.improving ? 1 : -1 },
+    report.learningGaps,
+    report.readinessPredictions,
+    language,
+  )
+
+  const tagForIndex = (i: number) =>
+    i === 0 ? L.tagPriority : i === 1 ? L.tagStrength : L.tagWatch
+
+  return (
+    <>
+      <LgHero
+        reportKind={L.reportKindEngine}
+        title={report.studentName}
+        quickFacts={formatHeroQuickFacts(
+          { board: report.board, grade: report.grade, batch: report.batch, status: report.status },
+          language,
+        )}
+        detailLines={[
+          `${L.assessmentWindow}: ${windowLabel}`,
+          latest
+            ? `${L.thisAssessment}: ${latest.assessmentTitle} · ${L.conducted} ${formatReportDate(latest.submittedAt, language)}`
+            : `${L.criticalGaps}: ${report.criticalGaps} · ${L.improving}: ${report.improving ? L.yes : L.no}`,
+        ]}
+        stats={[
+          { value: `${report.avgAccuracy}%`, label: L.overallScore },
+          { value: translateHealthStatus(report.status, language), label: L.consistency },
+          { value: report.improving ? L.improving : L.stable, label: L.learningTrend },
+          { value: `${report.readiness}%`, label: L.predictedNext },
+          { value: `${report.health}`, label: L.confidenceScore },
+          { value: `+${report.improvement}%`, label: L.growthPotential },
+        ]}
+        statsPlacement="below"
+        showSeal
+        backHref={backHref}
+        backLabel={backLabel}
+      />
+
+      <StudentAssessmentInsightsBody overall={report} assessments={assessmentReports} />
+
+      <LgSection
+        id="summary"
+        eyebrow={L.eyebrowExecutive}
+        title={L.titleAiNarrative}
+        description={report.summarySource === 'vertex' ? L.descLiveSummary : L.descRuleSummary}
+      >
+        <ReportNarrative
+          english={report.summary}
+          tamil={
+            report.summaryTa ||
+            fallbackOverallSummaryTa(
+              report.studentName,
+              report.health,
+              report.improving,
+              report.criticalGaps,
+            )
+          }
+          englishNote={report.summarySource === 'vertex' ? L.noteEnglishLiveAi : L.noteEnglishRule}
+          tamilNote={report.summarySource === 'vertex' ? L.noteTamilLiveAi : L.noteTamilRule}
+        />
+      </LgSection>
+
+      <LgSection
+        id="insights"
+        eyebrow={L.eyebrowKeySignals}
+        title={L.titleInsightFeed}
+        description={L.descInsightFeed}
+      >
+        <LgInsightFeed
+          title={L.todaysInsights}
+          dateLabel={L.overallProfile}
+          rows={insightBullets.slice(0, 4).map((text, i) => ({
+            tag: tagForIndex(i),
+            tagClass: i === 0 ? 'lg-tag-risk' : i === 1 ? 'lg-tag-up' : 'lg-tag-watch',
+            content: text,
+          }))}
+        />
+      </LgSection>
+
+      {topicChartData.length > 0 && (
+        <LgSection
+          id="forecast"
+          eyebrow={L.eyebrowForecast}
+          title={L.titleTopicReadiness}
+          description={L.descTopicReadiness}
+        >
+          <div className="lg-chart-panel mb-3">
+            <div style={{ width: '100%', minWidth: 280, height: 160 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topicChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(28,26,21,0.12)" />
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#3f3c34' }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#3f3c34' }} />
+                  <Bar dataKey="mastery" fill="#E4DCC4" radius={[4, 4, 0, 0]} name={L.thMastery} />
+                  <Bar dataKey="predicted" fill="#0B1F3A" radius={[4, 4, 0, 0]} name={L.thPredicted} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <LgBoardTable
+            headers={forecastHeaders}
+            rows={report.topicBreakdown.slice(0, 8).map((t) => [
+              t.topic,
+              t.subject,
+              `${t.currentMastery ?? t.mastery}%`,
+              `${t.predictedScore ?? t.mastery}%`,
+              typeof t.delta === 'number' ? `${t.delta > 0 ? '+' : ''}${t.delta}` : '—',
+              <span key={`${t.topic}-c`} className="capitalize">
+                {translateSeverity(t.confidence ?? 'low', language)}
+              </span>,
+            ])}
+          />
+        </LgSection>
+      )}
+
+      <LgFooter windowLabel={windowLabel} cohortNote={report.batch} />
+    </>
+  )
 }
 
 export function OverallPerformanceReportPage({
@@ -38,17 +197,25 @@ export function OverallPerformanceReportPage({
 }: OverallPerformanceReportPageProps) {
   const [loading, setLoading] = useState(true)
   const [report, setReport] = useState<OverallPerformanceReport | null>(null)
+  const [assessmentReports, setAssessmentReports] = useState<AssessmentReport[]>([])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    void analyticsApi
-      .overallReport(studentId)
-      .then((data) => {
-        if (!cancelled) setReport(data)
+    void Promise.all([
+      analyticsApi.overallReport(studentId),
+      analyticsApi.assessmentReports(studentId).catch(() => [] as AssessmentReport[]),
+    ])
+      .then(([overallData, assessmentData]) => {
+        if (cancelled) return
+        setReport(overallData)
+        setAssessmentReports(assessmentData)
       })
       .catch(() => {
-        if (!cancelled) setReport(null)
+        if (!cancelled) {
+          setReport(null)
+          setAssessmentReports([])
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -59,191 +226,44 @@ export function OverallPerformanceReportPage({
   }, [studentId])
 
   if (loading) {
-    return <PageLoader label="Building overall performance report…" />
+    return <ReportLoader label="Building overall performance report…" />
   }
 
   if (!report) {
     return (
-      <LgReportLayout>
+      <LgReportLayout backHref={backHref} backLabel={backLabel} showExport={false}>
         <LgHero
-          reportKind="Overall performance"
+          reportKind="AI Academic Profiling Engine"
           title="Report unavailable"
           backHref={backHref}
           backLabel={backLabel}
+          showSeal
         />
       </LgReportLayout>
     )
   }
 
-  const recoveryDone = report.recoveryPlan.filter((s) => s.completed).length
-  const topicChartData = report.topicBreakdown.slice(0, 6).map((t) => ({
-    name: t.topic.length > 14 ? `${t.topic.slice(0, 12)}…` : t.topic,
-    mastery: t.mastery,
-    fill: t.mastery >= 75 ? '#10B981' : t.mastery >= 55 ? '#F59E0B' : '#EF4444',
-  }))
-  const healthForBullets = {
-    overall: report.health,
-    status: report.status,
-    trend: report.improving ? 1 : -1,
-    subjects: report.subjectHealth.map((s) => ({
-      subjectId: s.name.toLowerCase().replace(/\s/g, '-'),
-      subjectName: s.name,
-      health: s.health,
-      status: s.status as 'excellent' | 'good' | 'fair' | 'weak',
-      trend: 0,
-    })),
-  }
-  const insightBullets = studentInsightBullets(
-    healthForBullets,
-    report.learningGaps,
-    report.readinessPredictions,
-  )
-
   return (
-    <LgReportLayout>
-      <LgHero
-        reportKind="Overall performance report"
-        title={report.studentName}
-        description={`${report.board} · ${report.grade} · ${report.batch}. All metrics up to date — trends, gaps, and readiness.`}
-        meta={[
-          { label: 'Report type', value: 'Overall performance' },
-          { label: 'Health status', value: report.status },
-          { label: 'Critical gaps', value: String(report.criticalGaps) },
-        ]}
-        stats={[
-          { value: report.health, unit: '/100', label: 'Health score' },
-          { value: report.readiness, unit: '%', label: 'Readiness' },
-          { value: `+${report.improvement}`, unit: '%', label: 'Improvement' },
-          { value: report.avgAccuracy, unit: '%', label: 'Avg accuracy' },
-        ]}
+    <LgReportLayout
+      bilingual
+      printTitle={`${report.studentName} — Learning Genome Report`}
+      backHref={backHref}
+      backLabel={backLabel}
+      navLinks={(L) => [
+        { href: '#assessment-wise', label: L.navAssessment },
+        { href: '#trend-map', label: L.navTrend },
+        { href: '#history', label: L.navHistory },
+        { href: '#all-assessments', label: L.navAllTests },
+        { href: '#summary', label: L.navSummary },
+        { href: '#forecast', label: L.navForecast },
+      ]}
+    >
+      <OverallReportContent
+        report={report}
+        assessmentReports={assessmentReports}
         backHref={backHref}
         backLabel={backLabel}
       />
-
-      <LgSection
-        eyebrow="Executive summary"
-        title="AI narrative"
-        description={
-          report.summarySource === 'vertex'
-            ? 'Live summary generated from your full academic record — refreshes each view.'
-            : 'Summary based on your latest academic metrics.'
-        }
-      >
-        <LgNarrative
-          note={
-            report.summarySource === 'vertex' ? 'Live AI · not stored in database' : undefined
-          }
-        >
-          {report.summary}
-        </LgNarrative>
-      </LgSection>
-
-      <LgSection
-        eyebrow="Key signals"
-        title="Insight feed"
-        description="Patterns surfaced from health, gaps, and readiness data."
-      >
-        <LgInsightFeed
-          title="Today's insights"
-          dateLabel="OVERALL PROFILE"
-          rows={insightBullets.slice(0, 4).map((text, i) => ({
-            tag: i === 0 ? 'Priority' : i === 1 ? 'Strength' : 'Watch',
-            tagClass: i === 0 ? 'lg-tag-risk' : i === 1 ? 'lg-tag-up' : 'lg-tag-watch',
-            content: text,
-          }))}
-        />
-      </LgSection>
-
-      <LgSection eyebrow="Subject health" title="Performance by subject" description="Health score across enrolled subjects.">
-        <LgKpiRow
-          items={report.subjectHealth.map((s) => ({
-            value: `${s.health}%`,
-            label: s.name,
-          }))}
-        />
-      </LgSection>
-
-      <LgSection eyebrow="Trends" title="Improvement & topic mastery">
-        <div className="grid lg:grid-cols-2 gap-3">
-          <div className="lg-chart-panel">
-            <h4 className="lg-mono text-[0.62rem] uppercase tracking-widest text-[var(--lg-amber)] mb-2">
-              Improvement trend
-            </h4>
-            {report.improvementTrend.length > 0 ? (
-              <ResponsiveContainer width="100%" height={150}>
-                <LineChart data={report.improvementTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(28,26,21,0.12)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#5b5748' }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#5b5748' }} />
-                  <Line type="monotone" dataKey="score" stroke="#4F46E5" strokeWidth={2} dot={{ r: 3, fill: '#8B5CF6' }} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-sm text-[var(--lg-slate)]">Trend appears after more assessments.</p>
-            )}
-          </div>
-          <div className="lg-chart-panel">
-            <h4 className="lg-mono text-[0.62rem] uppercase tracking-widest text-[var(--lg-amber)] mb-2">
-              Topic mastery
-            </h4>
-            {topicChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={150}>
-                <BarChart data={topicChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(28,26,21,0.12)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#5b5748' }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#5b5748' }} />
-                  <Bar dataKey="mastery" radius={[4, 4, 0, 0]}>
-                    {topicChartData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-sm text-[var(--lg-slate)]">Topic breakdown appears after assessments.</p>
-            )}
-          </div>
-        </div>
-      </LgSection>
-
-      {report.monthlyReports.length > 0 && (
-        <LgSection eyebrow="History" title="Monthly snapshots">
-          <LgBoardTable
-            headers={['Period', 'Health', 'Readiness', 'Improvement']}
-            rows={report.monthlyReports.map((m) => [
-              m.period,
-              `${m.health}/100`,
-              `${m.readiness}%`,
-              `+${m.improvement}%`,
-            ])}
-          />
-        </LgSection>
-      )}
-
-      {report.recentAssessments.length > 0 && (
-        <LgSection eyebrow="Assessments" title="Recent test results">
-          <LgBoardTable
-            headers={['Assessment', 'Date', 'Subject', 'Score']}
-            rows={report.recentAssessments.map((a) => [
-              a.title,
-              a.date,
-              a.subjectName,
-              <span key={a.id} className="lg-mono font-semibold">{a.accuracy}%</span>,
-            ])}
-          />
-        </LgSection>
-      )}
-
-      {report.recoveryPlan.length > 0 && (
-        <LgSection eyebrow="Recovery" title="Personalized recovery plan">
-          <LgNarrative>
-            {recoveryDone} of {report.recoveryPlan.length} recovery steps completed (
-            {Math.round((recoveryDone / report.recoveryPlan.length) * 100)}%).
-          </LgNarrative>
-        </LgSection>
-      )}
-
-      <LgFooter />
     </LgReportLayout>
   )
 }

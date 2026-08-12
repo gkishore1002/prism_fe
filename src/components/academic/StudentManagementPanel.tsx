@@ -1,27 +1,43 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { Link } from 'react-router-dom'
-import { Plus, Search, FileText, MoreVertical, Eye, Pencil } from 'lucide-react'
+import { Plus, Search, FileText, Eye, Pencil, Upload } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
-import { AppSelect } from '@/components/ui/AppSelect'
-import { AppSelectMulti } from '@/components/ui/AppSelectMulti'
+import { AppDropdown, AppSelectMulti } from '@/components/ui/AppDropdown'
+import { ActionMenu, ActionMenuItem, ActionMenuLink } from '@/components/ui/ActionMenu'
 import { ResponsiveTable } from '@/components/ui/ResponsiveTable'
+import { Pagination } from '@/components/ui/Pagination'
 import { useCurriculum } from '@/hooks/useCurriculum'
-import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
+import { useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useCenters } from '@/hooks/useCenters'
 import { createStudent, deleteStudent, updateStudentApi } from '@/lib/api/curriculumApi'
+import { PhoneCredentialFields } from '@/components/auth/PhoneCredentialFields'
+import { isValidPhone, phoneToLoginEmail, resolvePassword } from '@/lib/phoneAuth'
+import { fetchStudentsMasterPaginated } from '@/lib/api/studentsApi'
+import { fetchStudentTracking } from '@/lib/api/cscApi'
 import { AppModal, useConfirmModal } from '@/components/ui/AppModal'
+import { StudentProfileView } from '@/components/academic/StudentProfileView'
+import { ReassignmentReviewModal } from '@/components/academic/ReassignmentReviewModal'
 import { formatCenterLabel, centerLabelById } from '@/lib/centerLabel'
-import type { StudentMasterProfile } from '@/types'
+import { exportStudentsCsv } from '@/lib/api/exportsApi'
+import {
+  bulkImportStudents,
+  downloadStudentsImportTemplate,
+  type StudentBulkRowPayload,
+} from '@/lib/api/importsApi'
+import { BulkCsvUploadModal } from '@/components/ui/BulkCsvUploadModal'
+import { studentRowsFromCsv } from '@/lib/csvParse'
+import { DEFAULT_PAGE_LIMIT } from '@/lib/pagination'
+import type { AssessmentAccessRequest, StudentMasterProfile, StudentTracking } from '@/types'
 
 import type { InstitutionCenter } from '@/types'
 
 interface StudentManagementPanelProps {
   scope: 'tutor' | 'admin'
-  students?: StudentMasterProfile[]
 }
 
-function centerName(id: string, centers: InstitutionCenter[]) {
+function centerName(id: string | null | undefined, centers: InstitutionCenter[]) {
+  if (!id) return '—'
   return centerLabelById(id, centers)
 }
 
@@ -32,15 +48,6 @@ function batchLabels(student: StudentMasterProfile, batches: { id: string; name:
       .join(', ')
   }
   return student.batch || '—'
-}
-
-function DetailRow({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-1 py-2 border-b border-border last:border-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-sm text-foreground">{value || '—'}</dd>
-    </div>
-  )
 }
 
 interface StudentRowActionsProps {
@@ -60,150 +67,195 @@ function StudentRowActions({
   onEdit,
   onDelete,
 }: StudentRowActionsProps) {
-  const [open, setOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [open])
-
   return (
-    <div className="relative flex justify-end" ref={menuRef}>
-      <button
-        type="button"
-        aria-label={`Actions for ${studentName}`}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-      >
-        <MoreVertical className="w-4 h-4" />
-      </button>
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full mt-1 z-50 min-w-[10rem] rounded-md border border-border bg-card shadow-lg py-1 text-sm"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              onView()
-              setOpen(false)
-            }}
-            className="flex items-center gap-2 w-full px-3 py-2 hover:bg-secondary text-left"
-          >
-            <Eye className="w-3.5 h-3.5 text-muted-foreground" />
-            View
-          </button>
-          {scope === 'admin' && onEdit && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onEdit()
-                setOpen(false)
-              }}
-              className="flex items-center gap-2 w-full px-3 py-2 hover:bg-secondary text-left"
-            >
-              <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-              Edit
-            </button>
-          )}
-          {scope === 'admin' && (
-            <Link
-              to={`/admin/students/${studentId}/report`}
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 w-full px-3 py-2 hover:bg-secondary text-foreground"
-            >
-              <FileText className="w-3.5 h-3.5 text-accent" />
-              View report
-            </Link>
-          )}
-          {scope === 'admin' && onDelete && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false)
-                onDelete()
-              }}
-              className="w-full text-left px-3 py-2 hover:bg-secondary text-rose"
-            >
-              Delete
-            </button>
-          )}
-        </div>
+    <ActionMenu label={`Actions for ${studentName}`}>
+      <ActionMenuItem onSelect={onView}>
+        <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+        View
+      </ActionMenuItem>
+      {scope === 'admin' && onEdit && (
+        <ActionMenuItem onSelect={onEdit}>
+          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+          Edit
+        </ActionMenuItem>
       )}
-    </div>
+      {scope === 'admin' && (
+        <ActionMenuLink to={`/admin/students/${studentId}/report`}>
+          <FileText className="w-3.5 h-3.5 text-accent" />
+          View report
+        </ActionMenuLink>
+      )}
+      {scope === 'admin' && onDelete && (
+        <ActionMenuItem className="text-rose" onSelect={onDelete}>
+          Delete
+        </ActionMenuItem>
+      )}
+    </ActionMenu>
   )
 }
 
-export function StudentManagementPanel({
-  scope,
-  students: studentsProp,
-}: StudentManagementPanelProps) {
+export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
   useAnalyticsPage('adminStudents')
   const { batches: tutorBatches, curriculum, refresh: refreshCurriculum, ensureLoaded: ensureCurriculumLoaded } =
     useCurriculum()
   const { confirm } = useConfirmModal()
-  const { studentMaster, loading: analyticsLoading, refresh: refreshAnalytics } = useAnalytics()
-  const { centers } = useCenters()
-  const [search, setSearch] = useState('')
+  const { centers, activeCenterId, isAllBranches, ensureLoaded: ensureCentersLoaded } = useCenters()
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [viewingStudent, setViewingStudent] = useState<StudentMasterProfile | null>(null)
+  const [studentTracking, setStudentTracking] = useState<StudentTracking | null>(null)
+  const [trackingLoading, setTrackingLoading] = useState(false)
+  const [trackingError, setTrackingError] = useState<string | null>(null)
+  const [reviewRequest, setReviewRequest] = useState<AssessmentAccessRequest | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<StudentMasterProfile | null>(null)
   const [editName, setEditName] = useState('')
   const [editCenter, setEditCenter] = useState('')
   const [centerFilter, setCenterFilter] = useState('all')
   const [list, setList] = useState<StudentMasterProfile[]>([])
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT)
+  const [total, setTotal] = useState(0)
+  const [pages, setPages] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const boards = curriculum.map((b) => b.board)
   const [formBoard, setFormBoard] = useState(boards[0] ?? 'CBSE')
   const [formGrade, setFormGrade] = useState('8')
   const [formBatch, setFormBatch] = useState(tutorBatches[0]?.id ?? '')
   const [formCenter, setFormCenter] = useState('')
   const [editBatchIds, setEditBatchIds] = useState<string[]>([])
+  const [editStatus, setEditStatus] = useState<'active' | 'inactive'>('active')
 
   useEffect(() => {
     void ensureCurriculumLoaded()
   }, [ensureCurriculumLoaded])
 
   useEffect(() => {
-    const source = studentsProp ?? studentMaster
-    setList(source as StudentMasterProfile[])
-  }, [studentsProp, studentMaster])
+    const timer = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [searchInput])
+
+  const effectiveCenter =
+    !isAllBranches && activeCenterId
+      ? activeCenterId
+      : centerFilter === 'all'
+        ? undefined
+        : centerFilter
+
+  useEffect(() => {
+    void ensureCentersLoaded()
+  }, [ensureCentersLoaded])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, effectiveCenter])
+
+  const loadStudents = useCallback(async () => {
+    setLoading(true)
+    setFetchError(null)
+    try {
+      const data = await fetchStudentsMasterPaginated({
+        page,
+        limit,
+        search: debouncedSearch || undefined,
+        center: effectiveCenter,
+      })
+      setList(data.items)
+      setTotal(data.total)
+      setPages(data.pages)
+      if (data.items.length === 0 && data.total > 0 && page > 1) {
+        setPage(data.pages)
+      }
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : 'Failed to load students')
+      setList([])
+      setTotal(0)
+      setPages(1)
+    } finally {
+      setLoading(false)
+    }
+  }, [page, limit, debouncedSearch, effectiveCenter])
+
+  useEffect(() => {
+    void loadStudents()
+  }, [loadStudents])
+
+  useEffect(() => {
+    if (!viewingStudent) {
+      setStudentTracking(null)
+      setTrackingLoading(false)
+      setTrackingError(null)
+      return
+    }
+    let cancelled = false
+    setTrackingLoading(true)
+    setTrackingError(null)
+    void fetchStudentTracking(viewingStudent.id)
+      .then((data) => {
+        if (!cancelled) setStudentTracking(data)
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setStudentTracking(null)
+          setTrackingError(e instanceof Error ? e.message : 'Failed to load activity history')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTrackingLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [viewingStudent])
+
+  async function handleExportStudents() {
+    setExporting(true)
+    try {
+      await exportStudentsCsv()
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : 'Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function refreshProfileAfterReview() {
+    if (!viewingStudent) return
+    const [tracking, listData] = await Promise.all([
+      fetchStudentTracking(viewingStudent.id),
+      fetchStudentsMasterPaginated({
+        page,
+        limit,
+        search: debouncedSearch || undefined,
+        center: effectiveCenter,
+      }),
+    ])
+    setStudentTracking(tracking)
+    const refreshed = listData.items.find((s) => s.id === viewingStudent.id)
+    if (refreshed) setViewingStudent(refreshed)
+    await loadStudents()
+  }
 
   useEffect(() => {
     if (centers[0] && !formCenter) setFormCenter(centers[0].id)
   }, [centers, formCenter])
 
-  const loading = analyticsLoading
-
-  const filtered = list.filter((s) => {
-    const matchesSearch =
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.batch.toLowerCase().includes(search.toLowerCase())
-    const matchesCenter = centerFilter === 'all' || s.centerId === centerFilter
-    return matchesSearch && matchesCenter
-  })
+  const [formPhone, setFormPhone] = useState('')
+  const [formPassword, setFormPassword] = useState('')
 
   const [saving, setSaving] = useState(false)
 
   async function refreshAfterMutation() {
     await refreshCurriculum()
-    await refreshAnalytics('adminStudents')
+    await loadStudents()
   }
 
   async function handleAddStudent(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (!isValidPhone(formPhone)) return
     const form = new FormData(e.currentTarget)
     setSaving(true)
     try {
@@ -214,11 +266,15 @@ export function StudentManagementPanel({
         batchId: String(form.get('batchId') || formBatch),
         centerId: String(form.get('centerId') || formCenter),
         academicYear: String(form.get('academicYear') || '2025-26'),
+        phone: formPhone.trim(),
+        password: formPassword.trim() || undefined,
+        schoolName: String(form.get('schoolName') || '') || undefined,
       })
       await refreshAfterMutation()
-      const source = studentsProp ?? studentMaster
-      setList(source as StudentMasterProfile[])
       setShowForm(false)
+      setFormPhone('')
+      setFormPassword('')
+      setPage(1)
       e.currentTarget.reset()
     } finally {
       setSaving(false)
@@ -233,7 +289,8 @@ export function StudentManagementPanel({
         ? student.batchIds
         : tutorBatches.filter((b) => b.studentIds.includes(student.id)).map((b) => b.id),
     )
-    setEditCenter(student.centerId)
+    setEditCenter(student.centerId ?? '')
+    setEditStatus(student.status)
   }
 
   async function handleSaveEdit() {
@@ -244,25 +301,9 @@ export function StudentManagementPanel({
         name: editName.trim(),
         batchIds: editBatchIds,
         centerId: editCenter,
+        status: editStatus,
       })
       await refreshAfterMutation()
-      const batchLabel = tutorBatches
-        .filter((b) => editBatchIds.includes(b.id))
-        .map((b) => b.name)
-        .join(', ')
-      setList((prev) =>
-        prev.map((s) =>
-          s.id === editingStudent.id
-            ? {
-                ...s,
-                name: editName.trim(),
-                batch: batchLabel,
-                batchIds: editBatchIds,
-                centerId: editCenter,
-              }
-            : s,
-        ),
-      )
       setEditingStudent(null)
     } finally {
       setSaving(false)
@@ -278,11 +319,10 @@ export function StudentManagementPanel({
     })
     if (!ok) return
     await deleteStudent(studentId)
-    setList((prev) => prev.filter((s) => s.id !== studentId))
     await refreshAfterMutation()
   }
 
-  if (loading) {
+  if (loading && list.length === 0 && !fetchError) {
     return <PageLoader />
   }
 
@@ -292,13 +332,29 @@ export function StudentManagementPanel({
         <div className="flex items-center gap-2 flex-1 max-w-md bg-secondary/40 border border-border rounded-md px-3 py-2">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search by name or batch..."
             className="text-sm outline-none bg-transparent w-full"
           />
         </div>
         <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={() => void handleExportStudents()}
+            className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary disabled:opacity-60"
+          >
+            {exporting ? 'Exporting…' : 'Export CSV'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setBulkUploadOpen(true)}
+            className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary"
+          >
+            <Upload className="w-4 h-4" />
+            Bulk upload
+          </button>
           <button
             type="button"
             onClick={() => setShowForm(!showForm)}
@@ -310,6 +366,7 @@ export function StudentManagementPanel({
         </div>
       </div>
 
+      {isAllBranches && (
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -333,6 +390,7 @@ export function StudentManagementPanel({
           </button>
         ))}
       </div>
+      )}
 
       {showForm && (
         <AppCard>
@@ -342,7 +400,7 @@ export function StudentManagementPanel({
               <span className="text-xs text-muted-foreground">Student name *</span>
               <input name="name" required className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background" />
             </label>
-            <AppSelect
+            <AppDropdown
               label="Board *"
               name="board"
               value={formBoard}
@@ -350,7 +408,7 @@ export function StudentManagementPanel({
               options={boards.map((b) => ({ value: b, label: b }))}
               placeholder="Select board"
             />
-            <AppSelect
+            <AppDropdown
               label="Grade *"
               name="grade"
               value={formGrade}
@@ -362,7 +420,7 @@ export function StudentManagementPanel({
               ]}
               placeholder="Select grade"
             />
-            <AppSelect
+            <AppDropdown
               label="Batch *"
               name="batchId"
               value={formBatch}
@@ -373,7 +431,7 @@ export function StudentManagementPanel({
               }))}
               placeholder="Select batch"
             />
-            <AppSelect
+            <AppDropdown
               label="Branch / center *"
               name="centerId"
               value={formCenter}
@@ -388,16 +446,30 @@ export function StudentManagementPanel({
               <span className="text-xs text-muted-foreground">Academic year *</span>
               <input name="academicYear" defaultValue="2025-26" className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background" />
             </label>
-            <label className="block">
+            <label className="block md:col-span-2">
               <span className="text-xs text-muted-foreground">School name</span>
               <input name="schoolName" className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background" />
             </label>
-            <label className="block">
-              <span className="text-xs text-muted-foreground">Email</span>
-              <input name="email" type="email" className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background" />
-            </label>
+            <div className="md:col-span-2">
+              <PhoneCredentialFields
+                phone={formPhone}
+                onPhoneChange={setFormPhone}
+                password={formPassword}
+                onPasswordChange={setFormPassword}
+                idPrefix="student-create"
+              />
+            </div>
+            {isValidPhone(formPhone) && (
+              <p className="md:col-span-2 text-xs text-muted-foreground">
+                Student login: {phoneToLoginEmail(formPhone)} · Password: {resolvePassword(formPhone, formPassword)}
+              </p>
+            )}
             <div className="md:col-span-2 flex gap-2">
-              <button type="submit" disabled={saving} className="bg-accent text-accent-foreground px-4 py-2 rounded-md text-sm font-medium disabled:opacity-60">
+              <button
+                type="submit"
+                disabled={saving || !isValidPhone(formPhone)}
+                className="bg-accent text-accent-foreground px-4 py-2 rounded-md text-sm font-medium disabled:opacity-60"
+              >
                 {saving ? 'Saving…' : 'Save student'}
               </button>
               <button type="button" onClick={() => setShowForm(false)} className="text-sm text-muted-foreground px-4 py-2">
@@ -409,84 +481,113 @@ export function StudentManagementPanel({
       )}
 
       <AppCard>
-        {filtered.length === 0 ? (
+        {fetchError ? (
+          <p className="text-sm text-rose py-4">{fetchError}</p>
+        ) : list.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">No students found.</p>
         ) : (
-          <ResponsiveTable minWidth={520}>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-muted-foreground border-b border-border">
-                  <th className="pb-3 font-medium">Student</th>
-                  <th className="pb-3 font-medium">Board · Grade</th>
-                  <th className="pb-3 font-medium">Batch</th>
-                  <th className="pb-3 font-medium">Status</th>
-                  <th className="pb-3 font-medium text-right w-16">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filtered.map((s) => (
-                  <tr key={s.id} className="hover:bg-secondary/30">
-                    <td className="py-3">
-                      <p className="font-medium text-foreground">{s.name}</p>
-                      {s.schoolName && (
-                        <p className="text-xs text-muted-foreground truncate max-w-[12rem]">{s.schoolName}</p>
-                      )}
-                    </td>
-                    <td className="py-3 text-muted-foreground">
-                      {s.board} · {s.grade}
-                    </td>
-                    <td className="py-3 text-muted-foreground max-w-[10rem] truncate">
-                      {batchLabels(s, tutorBatches)}
-                    </td>
-                    <td className="py-3">
-                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-leaf/15 text-leaf">
-                        {s.status}
-                      </span>
-                    </td>
-                    <td className="py-3">
-                      <StudentRowActions
-                        studentId={s.id}
-                        studentName={s.name}
-                        scope={scope}
-                        onView={() => setViewingStudent(s)}
-                        onEdit={scope === 'admin' ? () => startEdit(s) : undefined}
-                        onDelete={
-                          scope === 'admin'
-                            ? () => void handleDeleteStudent(s.id, s.name)
-                            : undefined
-                        }
-                      />
-                    </td>
+          <div className={loading ? 'opacity-60 pointer-events-none' : undefined}>
+            <ResponsiveTable minWidth={520}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                    <th className="pb-3 font-medium">Student</th>
+                    <th className="pb-3 font-medium">Board · Grade</th>
+                    <th className="pb-3 font-medium">Batch</th>
+                    <th className="pb-3 font-medium">Status</th>
+                    <th className="pb-3 font-medium text-right w-16">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </ResponsiveTable>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {list.map((s) => (
+                    <tr key={s.id} className="hover:bg-secondary/30">
+                      <td className="py-3">
+                        <p className="font-medium text-foreground">{s.name}</p>
+                        {s.schoolName && (
+                          <p className="text-xs text-muted-foreground truncate max-w-[12rem]">{s.schoolName}</p>
+                        )}
+                      </td>
+                      <td className="py-3 text-muted-foreground">
+                        {s.board} · {s.grade}
+                      </td>
+                      <td className="py-3 text-muted-foreground max-w-[10rem] truncate">
+                        {batchLabels(s, tutorBatches)}
+                      </td>
+                      <td className="py-3">
+                        <span
+                          className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            s.status === 'active'
+                              ? 'bg-leaf/15 text-leaf'
+                              : 'bg-rose/15 text-rose'
+                          }`}
+                        >
+                          {s.status}
+                        </span>
+                        {s.daysUntilCscDisable != null && s.status === 'active' && (
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            CSC: {s.daysUntilCscDisable}d left
+                          </p>
+                        )}
+                      </td>
+                      <td className="py-3">
+                        <StudentRowActions
+                          studentId={s.id}
+                          studentName={s.name}
+                          scope={scope}
+                          onView={() => setViewingStudent(s)}
+                          onEdit={scope === 'admin' ? () => startEdit(s) : undefined}
+                          onDelete={
+                            scope === 'admin'
+                              ? () => void handleDeleteStudent(s.id, s.name)
+                              : undefined
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </ResponsiveTable>
+          </div>
         )}
+
+        <Pagination
+          page={page}
+          pages={pages}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+          onLimitChange={(next) => {
+            setLimit(next)
+            setPage(1)
+          }}
+        />
       </AppCard>
 
       <AppModal
         open={viewingStudent != null}
         onClose={() => setViewingStudent(null)}
-        title={viewingStudent?.name}
-        description="Student profile details"
-        size="md"
+        title="Student profile"
+        description={viewingStudent?.name}
+        size="xl"
         footer={
-          scope === 'admin' && viewingStudent ? (
+          viewingStudent ? (
             <div className="flex flex-wrap gap-2 justify-end w-full">
-              <button
-                type="button"
-                onClick={() => {
-                  const student = viewingStudent
-                  setViewingStudent(null)
-                  startEdit(student)
-                }}
-                className="text-sm px-4 py-2 rounded-md border border-border hover:bg-secondary"
-              >
-                Edit
-              </button>
+              {scope === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const student = viewingStudent
+                    setViewingStudent(null)
+                    startEdit(student)
+                  }}
+                  className="text-sm px-4 py-2 rounded-md border border-border hover:bg-secondary"
+                >
+                  Edit
+                </button>
+              )}
               <Link
-                to={`/admin/students/${viewingStudent.id}/report`}
+                to={`/${scope}/students/${viewingStudent.id}/report`}
                 className="text-sm px-4 py-2 rounded-md bg-accent text-accent-foreground hover:opacity-90"
                 onClick={() => setViewingStudent(null)}
               >
@@ -497,26 +598,44 @@ export function StudentManagementPanel({
         }
       >
         {viewingStudent && (
-          <dl>
-            <DetailRow label="Board" value={viewingStudent.board} />
-            <DetailRow label="Grade" value={viewingStudent.grade} />
-            <DetailRow label="Batch" value={batchLabels(viewingStudent, tutorBatches)} />
-            <DetailRow label="Branch" value={centerName(viewingStudent.centerId, centers)} />
-            <DetailRow label="Academic year" value={viewingStudent.academicYear} />
-            <DetailRow label="School" value={viewingStudent.schoolName} />
-            <DetailRow label="Email" value={viewingStudent.email} />
-            <DetailRow
-              label="Status"
-              value={
-                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-leaf/15 text-leaf">
-                  {viewingStudent.status}
-                </span>
-              }
-            />
-            <DetailRow label="Student ID" value={<span className="font-mono-data text-xs">{viewingStudent.id}</span>} />
-          </dl>
+          <StudentProfileView
+            student={viewingStudent}
+            tracking={studentTracking}
+            trackingLoading={trackingLoading}
+            trackingError={trackingError}
+            batchLabel={batchLabels(viewingStudent, tutorBatches)}
+            centerLabel={centerName(viewingStudent.centerId, centers)}
+            scope={scope}
+            onReviewRequest={(req) =>
+              setReviewRequest({
+                id: req.id,
+                assessmentId: req.assessmentId,
+                assessmentTitle: req.assessmentTitle,
+                studentId: req.studentId,
+                studentName: viewingStudent.name,
+                reason: req.reason,
+                status: req.status,
+                requestedAt: req.requestedAt,
+                reviewedBy: req.reviewedBy,
+                reviewedAt: req.reviewedAt,
+                reviewNotes: req.reviewNotes,
+                accessGrantedUntil: req.accessGrantedUntil,
+              })
+            }
+          />
         )}
       </AppModal>
+
+      <ReassignmentReviewModal
+        open={reviewRequest != null}
+        request={reviewRequest}
+        scope={scope}
+        onClose={() => setReviewRequest(null)}
+        onReviewed={() => {
+          setReviewRequest(null)
+          void refreshProfileAfterReview()
+        }}
+      />
 
       <AppModal
         open={editingStudent != null}
@@ -565,7 +684,7 @@ export function StudentManagementPanel({
               }))}
               placeholder="Assign batches"
             />
-            <AppSelect
+            <AppDropdown
               label="Branch / center"
               value={editCenter}
               onChange={setEditCenter}
@@ -574,6 +693,15 @@ export function StudentManagementPanel({
                 label: formatCenterLabel(c),
               }))}
               placeholder="Select branch"
+            />
+            <AppDropdown
+              label="Account status"
+              value={editStatus}
+              onChange={(v) => setEditStatus(v as 'active' | 'inactive')}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+              ]}
             />
             <dl className="rounded-md bg-secondary/30 px-3 py-2 text-xs text-muted-foreground space-y-1">
               <div className="flex justify-between gap-4">
@@ -592,6 +720,51 @@ export function StudentManagementPanel({
           </div>
         )}
       </AppModal>
+
+      <BulkCsvUploadModal<StudentBulkRowPayload>
+        open={bulkUploadOpen}
+        onClose={() => setBulkUploadOpen(false)}
+        title="Bulk upload students"
+        description="Import many students from a CSV file. Login email will be phone@gmail.com and default password is the phone number."
+        columnsHelp={[
+          'name — full name (required)',
+          'phone — 10-digit mobile (required)',
+          'board — e.g. CBSE (required)',
+          'grade — e.g. Grade 8 (required)',
+          'batch — batch name (optional)',
+          'center — branch name (optional)',
+          'academic_year — default 2025-26',
+          'password — optional custom password',
+          'school_name — optional',
+        ]}
+        mapRows={(rows) =>
+          studentRowsFromCsv(rows).map((row) => ({
+            name: row.name,
+            phone: row.phone,
+            board: row.board,
+            grade: row.grade,
+            batch: row.batch,
+            centerName: row.centerName,
+            centerId: row.centerId,
+            academicYear: row.academicYear,
+            password: row.password,
+            schoolName: row.schoolName,
+          }))
+        }
+        validateRow={(row) => {
+          if (!row.name.trim()) return 'Name is required'
+          if (!isValidPhone(row.phone)) return 'Phone must be 10–15 digits'
+          if (!row.board.trim()) return 'Board is required'
+          if (!row.grade.trim()) return 'Grade is required'
+          return null
+        }}
+        previewRow={(row) =>
+          `${row.name} · ${row.phone} · ${row.board} · ${row.grade}${row.batch ? ` · ${row.batch}` : ''}${row.centerName ? ` · ${row.centerName}` : ''}`
+        }
+        onDownloadTemplate={downloadStudentsImportTemplate}
+        onImport={bulkImportStudents}
+        onComplete={() => void loadStudents()}
+      />
     </div>
   )
 }

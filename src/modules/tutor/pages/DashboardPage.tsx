@@ -75,6 +75,7 @@ export function TutorDashboardPage() {
       {/* AI-first insight grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <InsightCard
+          index={0}
           icon={Activity}
           title="Academic health"
           value={`${activeBatch?.avgScore ?? heroSummary.avgScore}%`}
@@ -85,6 +86,7 @@ export function TutorDashboardPage() {
           action="View analytics"
         />
         <InsightCard
+          index={1}
           icon={AlertTriangle}
           title="Students at risk"
           value={batchAtRisk.length}
@@ -94,6 +96,7 @@ export function TutorDashboardPage() {
           action="Review alerts"
         />
         <InsightCard
+          index={2}
           icon={TrendingUp}
           title="Weak topics"
           value={topicWeakness.length}
@@ -103,6 +106,7 @@ export function TutorDashboardPage() {
           action="Plan next class"
         />
         <InsightCard
+          index={3}
           icon={Clock}
           title="Active assessments"
           value={activeAssessments.length}
@@ -187,16 +191,26 @@ export function TutorDashboardPage() {
                     <p className="text-sm font-medium truncate">{topic.topic}</p>
                     <p className="text-[11px] text-muted-foreground truncate">
                       {topic.suggestedNextClass}
+                      {topic.avgPredictedScore != null && (
+                        <> · predicted {topic.avgPredictedScore}%</>
+                      )}
                     </p>
                   </div>
-                  <span
-                    className={cn(
-                      'font-mono-data text-sm font-semibold',
-                      topic.avgMastery < 60 ? 'text-rose' : 'text-accent',
+                  <div className="text-right shrink-0">
+                    <span
+                      className={cn(
+                        'font-mono-data text-sm font-semibold',
+                        topic.avgMastery < 60 ? 'text-rose' : 'text-accent',
+                      )}
+                    >
+                      {topic.avgMastery}%
+                    </span>
+                    {topic.avgPredictedScore != null && topic.avgPredictedScore !== topic.avgMastery && (
+                      <p className="text-[10px] text-muted-foreground font-mono">
+                        → {topic.avgPredictedScore}%
+                      </p>
                     )}
-                  >
-                    {topic.avgMastery}%
-                  </span>
+                  </div>
                 </div>
               ))
             )}

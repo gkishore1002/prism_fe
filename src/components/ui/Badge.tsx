@@ -9,10 +9,10 @@ const variantStyles = {
   default: 'bg-secondary text-muted-foreground',
   brand: 'bg-blue-100 text-blue-700',
   action: 'bg-yellow-100 text-yellow-700',
-  ai: 'bg-indigo-100 text-indigo-700',
-  success: 'bg-emerald-100 text-emerald-700',
-  warning: 'bg-yellow-100 text-yellow-700',
-  danger: 'bg-rose-100 text-rose-700',
+  ai: 'bg-[#E8E0FF] text-[#6554D8]',
+  success: 'bg-[#E8F8F1] text-[#0C8F5C]',
+  warning: 'bg-[#FFEFD0] text-[#C06F00]',
+  danger: 'bg-[#FCEEEF] text-[#CC3D42]',
   neutral: 'bg-secondary text-muted-foreground',
 }
 

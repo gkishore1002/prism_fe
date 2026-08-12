@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { InlineLoader } from '@/components/ui/PrismLoader'
-import { AppSelect } from '@/components/ui/AppSelect'
+import { AppDropdown } from '@/components/ui/AppDropdown'
 import {
   MarksSpreadsheet,
   createMarksColumn,
@@ -692,7 +692,7 @@ export function TutorMarksPage() {
         <AppCard className="flex flex-col">
           <div className="flex flex-wrap items-end gap-3 mb-4">
             <div className="w-full sm:w-48 shrink-0">
-              <AppSelect
+              <AppDropdown
                 label="Batch"
                 value={uploadBatchId}
                 onChange={setUploadBatchId}
@@ -889,7 +889,7 @@ export function TutorMarksPage() {
                 className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background resize-y"
               />
             </div>
-            <AppSelect label="Batch" value={batchId} onChange={setBatchId} options={batchOptions} />
+            <AppDropdown label="Batch" value={batchId} onChange={setBatchId} options={batchOptions} />
             {selectedBatch && (
               <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-1">
                 <span>

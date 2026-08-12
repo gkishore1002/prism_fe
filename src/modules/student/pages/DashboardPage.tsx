@@ -53,7 +53,7 @@ export function StudentDashboardPage() {
           value={`${studentHealth.overall}`}
           description="Overall learning health score."
           tone="accent"
-          href="/student/reports"
+          href="/student/assessments"
         />
         <InsightCard
           icon={Flame}
@@ -71,10 +71,10 @@ export function StudentDashboardPage() {
         />
         <InsightCard
           icon={Sparkles}
-          title="AI study coach"
-          description="Get a personalized study nudge for today."
-          href="/student/reports"
-          action="Open coach"
+          title="Your results"
+          description="See scores from assessments you have attended."
+          href="/student/assessments"
+          action="View results"
           tone="default"
         />
       </div>
@@ -106,10 +106,10 @@ export function StudentDashboardPage() {
               </p>
               {nextStep && (
                 <Link
-                  to="/student/reports"
+                  to="/student/assessments"
                   className="mt-3 inline-flex items-center gap-1 text-sm text-accent font-medium"
                 >
-                  Continue plan <ArrowRight className="w-3.5 h-3.5" />
+                  View assessments <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               )}
             </div>

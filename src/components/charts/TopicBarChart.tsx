@@ -17,11 +17,12 @@ interface TopicBarChartProps {
 }
 
 const statusColors: Record<string, string> = {
-  excellent: '#10b981',
-  good: '#22c55e',
-  fair: '#f59e0b',
-  weak: '#f97316',
-  critical: '#ef4444',
+  excellent: '#0fa96e',
+  good: '#0065f3',
+  fair: '#ff950a',
+  average: '#ff950a',
+  weak: '#ff950a',
+  critical: '#e5484d',
 }
 
 export function TopicBarChart({ data, height = 220, className }: TopicBarChartProps) {
@@ -56,7 +57,7 @@ export function TopicBarChart({ data, height = 220, className }: TopicBarChartPr
           />
           <Bar dataKey="mastery" radius={[0, 4, 4, 0]} barSize={16}>
             {data.map((entry, i) => (
-              <Cell key={i} fill={statusColors[entry.status] ?? '#6366f1'} />
+              <Cell key={i} fill={statusColors[entry.status] ?? '#0065f3'} />
             ))}
           </Bar>
         </BarChart>

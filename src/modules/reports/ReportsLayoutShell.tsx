@@ -1,7 +1,9 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle, BarChart3, BookOpen, LineChart, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { PageHeader } from '@/components/layout/AppShell'
+import { pageUnfold } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
 interface ReportsLayoutShellProps {
@@ -19,6 +21,7 @@ export function ReportsLayoutShell({
   analyticsTo,
   atRiskTo,
 }: ReportsLayoutShellProps) {
+  const { pathname } = useLocation()
   const tabs: { to: string; label: string; icon: LucideIcon }[] = [
     { to: insightsTo, label: 'Class insights', icon: BarChart3 },
     { to: studentsTo, label: 'Student reports', icon: Users },
@@ -33,10 +36,17 @@ export function ReportsLayoutShell({
     tabs.push({ to: atRiskTo, label: 'At-risk', icon: AlertTriangle })
   }
 
+  void pathname
+
   return (
-    <>
+    <motion.div
+      variants={pageUnfold}
+      initial="hidden"
+      animate="visible"
+      style={{ transformOrigin: 'top center' }}
+    >
       <PageHeader
-        eyebrow="Learning Genome"
+        eyebrow="Prism Spectrum"
         title="Reports"
         sub="Built from in-app assessment results plus marks you enter manually or upload on the Marks page."
       />
@@ -48,10 +58,10 @@ export function ReportsLayoutShell({
             to={to}
             className={({ isActive }) =>
               cn(
-                'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[12px] text-sm font-medium transition-all duration-[280ms] ios-press',
+                'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-sm font-medium transition-colors',
                 isActive
                   ? 'bg-accent text-accent-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
+                  : 'text-muted-foreground hover:bg-[#F0EBE3] hover:text-foreground',
               )
             }
           >
@@ -61,7 +71,18 @@ export function ReportsLayoutShell({
         ))}
       </nav>
 
-      <Outlet />
-    </>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={pathname}
+          variants={pageUnfold}
+          initial="hidden"
+          animate="visible"
+          exit={{ opacity: 0, y: -6, transition: { duration: 0.18 } }}
+          style={{ transformOrigin: 'top center' }}
+        >
+          <Outlet />
+        </motion.div>
+      </AnimatePresence>
+    </motion.div>
   )
 }

@@ -1,7 +1,9 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AppNotification, UserRole } from '@/types'
 import { useAuth } from '@/hooks/useAuth'
 import * as notificationsApi from '@/lib/api/notificationsApi'
+
+const POLL_INTERVAL_MS = 60_000
 
 interface NotificationsContextValue {
   notifications: AppNotification[]
@@ -25,7 +27,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const loadPromiseRef = useRef<Promise<void> | null>(null)
 
   const refresh = useCallback(async () => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || !role) return
     setLoading(true)
     setError(null)
     try {
@@ -39,7 +41,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, role])
 
   const ensureLoaded = useCallback(async () => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || !role) return
     if (items.length > 0) return
     if (!loadPromiseRef.current) {
       loadPromiseRef.current = refresh().finally(() => {
@@ -47,7 +49,32 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       })
     }
     await loadPromiseRef.current
-  }, [isAuthenticated, items.length, refresh])
+  }, [isAuthenticated, role, items.length, refresh])
+
+  useEffect(() => {
+    if (!isAuthenticated || !role) {
+      setItems([])
+      return
+    }
+    void refresh()
+  }, [isAuthenticated, role, refresh])
+
+  useEffect(() => {
+    if (!isAuthenticated || !role) return
+    const timer = window.setInterval(() => {
+      void refresh()
+    }, POLL_INTERVAL_MS)
+    return () => window.clearInterval(timer)
+  }, [isAuthenticated, role, refresh])
+
+  useEffect(() => {
+    if (!isAuthenticated || !role) return
+    const onFocus = () => {
+      void refresh()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [isAuthenticated, role, refresh])
 
   const unreadCount = (r: UserRole) => items.filter((n) => n.role === r && !n.read).length
 

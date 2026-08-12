@@ -119,8 +119,10 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
       const assessment = assessments.find((a) => a.id === assessmentId)
       return Boolean(
         assessment &&
-          assessment.status === 'live' &&
-          !assessment.studentSubmitted &&
+          (assessment.canAttend ??
+            (assessment.status === 'live' &&
+              !assessment.studentSubmitted &&
+              !assessment.timingOver)) &&
           assessment.assignedStudentIds.includes(query.studentId) &&
           assessmentMatchesScope(assessment, query),
       )

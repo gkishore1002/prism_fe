@@ -1,6 +1,12 @@
 import type { HealthStatus } from '@/types'
 
 export const APP_NAME = 'Prism'
+export const APP_TAGLINE = 'AI-Powered Academic Intelligence'
+export const APP_WORKFLOW = ['Learn', 'Assess', 'Analyze', 'Improve'] as const
+export const APP_ORG = 'Prism Software'
+
+export const BRAND_LOGO_FULL = '/brand/prism-logo-full.png'
+export const BRAND_MARK_DARK = '/brand/prism-mark-dark.png'
 
 export const HEALTH_CONFIG: Record<
   HealthStatus,

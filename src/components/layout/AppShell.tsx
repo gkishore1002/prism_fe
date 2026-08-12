@@ -23,27 +23,31 @@ import {
   X,
   Calendar,
   LayoutDashboard,
-  Search,
-  PanelLeftClose,
-  PanelLeft,
-  ChevronRight,
+  Settings,
+  Shield,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { moduleRegistry, type ModuleId } from '@/lib/modules'
 import { useAuth } from '@/hooks/useAuth'
+import { isPlatformContext } from '@/modules/auth/lib/orgContext'
+import { useCenters } from '@/hooks/useCenters'
 import { useAnalytics } from '@/hooks/useAnalytics'
 import { useNotifications } from '@/hooks/useNotifications'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
+import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
+import { BranchSwitcher } from '@/components/layout/BranchSwitcher'
+import { OrgSwitcher } from '@/components/layout/OrgSwitcher'
 import { StudentPendingAssessmentReminder } from '@/components/student/StudentPendingAssessmentReminder'
 import { PrismLogo } from '@/components/brand/PrismLogo'
 import { getSidebarProfile } from '@/lib/roleProfile'
+import { adminNavForPortal } from '@/modules/admin/lib/nav'
+import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
 import { studentProfileSubtitle } from '@/modules/student/lib/studentProfile'
-import { AmbientParticles } from '@/components/design/AmbientParticles'
-import { CommandPalette } from '@/components/design/CommandPalette'
 import { AiCopilotFab } from '@/components/design/AiCopilotFab'
+import { drawerOverlay, fadeUp, slideFromLeft, springSoft } from '@/lib/motion'
 import { cn } from '@/lib/cn'
-import type { NavItem } from '@/types'
+import type { NavItem, UserRole } from '@/types'
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -65,39 +69,14 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Target,
   FileText,
   Calendar,
+  Settings,
+  Shield,
 }
 
 function detectModule(pathname: string): ModuleId {
   if (pathname.startsWith('/tutor')) return 'tutor'
   if (pathname.startsWith('/admin')) return 'admin'
   return 'student'
-}
-
-function resolvePageBreadcrumb(moduleId: ModuleId, pathname: string): string {
-  const home = `/${moduleId}`
-  const nav = moduleRegistry[moduleId].nav
-  const segments = pathname.split('/').filter(Boolean)
-
-  if (pathname === home) {
-    return nav.find((item) => item.href === home)?.label ?? 'Dashboard'
-  }
-
-  const section = segments[1]
-  const sectionNav = nav.find(
-    (item) => item.href === `${home}/${section}` || pathname.startsWith(item.href + '/'),
-  )
-  const sectionLabel = sectionNav?.label ?? section?.replace(/-/g, ' ') ?? 'Page'
-
-  if (segments.length >= 3) {
-    if (section === 'assessments' && segments[3] === 'take') return `${sectionLabel} · Exam`
-    if (section === 'assessments' && segments[3] === 'paper') return `${sectionLabel} · Paper`
-    if (section === 'assessments' && segments[3] === 'attendance') return `${sectionLabel} · Attendance`
-    if (section === 'question-bank' && segments[2] === 'papers') return `${sectionLabel} · Paper`
-    if (section === 'students' && segments[2] === 'report') return `${sectionLabel} · Report`
-    if (section === 'reports' && segments[2]) return `${sectionLabel} · ${segments[2]}`
-  }
-
-  return sectionLabel
 }
 
 interface AppShellProps {
@@ -107,13 +86,14 @@ interface AppShellProps {
 export function AppShell({ module }: AppShellProps) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { logout, user } = useAuth()
+  const { logout, user, role, adminPortal } = useAuth()
+  const { isPlatformSuperUser, canManageTenant } = useCenters()
+  const { branchScoped, portalLabel } = useAdminPortalContext()
   const { studentProfile, overview, load } = useAnalytics()
   const [shellLoading, setShellLoading] = useState(false)
   const { ensureLoaded: ensureNotificationsLoaded } = useNotifications()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
-  const [cmdOpen, setCmdOpen] = useState(false)
   const moduleId = module ?? detectModule(pathname)
 
   useEffect(() => {
@@ -122,54 +102,58 @@ export function AppShell({ module }: AppShellProps) {
       void load('shellStudent').finally(() => setShellLoading(false))
       void ensureNotificationsLoaded()
     } else if (moduleId === 'admin') {
-      setShellLoading(true)
-      void load('shellInstitution').finally(() => setShellLoading(false))
+      if (role !== 'super_user') {
+        setShellLoading(true)
+        void load('shellInstitution').finally(() => setShellLoading(false))
+      }
       void ensureNotificationsLoaded()
     } else if (moduleId === 'tutor') {
       void ensureNotificationsLoaded()
     }
-  }, [moduleId, load, ensureNotificationsLoaded])
-
-  useEffect(() => {
-    function onOpen() {
-      setCmdOpen(true)
-    }
-    document.addEventListener('prism:open-command', onOpen)
-    return () => document.removeEventListener('prism:open-command', onOpen)
-  }, [])
+  }, [moduleId, load, ensureNotificationsLoaded, role, pathname])
 
   const config = moduleRegistry[moduleId]
+  const platformMode = role === 'super_user'
+  const platformOverview = role === 'super_user' && isPlatformContext() && !pathname.includes('/platform/organizations/')
   const sidebarSubtitle =
     moduleId === 'student' && studentProfile
       ? studentProfileSubtitle(studentProfile)
       : moduleId === 'student' && shellLoading
         ? 'Loading profile…'
-        : moduleId === 'admin' && overview?.institution.name
+        : moduleId === 'admin' && platformMode
+          ? platformOverview
+            ? 'Platform console'
+            : 'Organization registry'
+          : moduleId === 'admin' && overview?.institution.name
           ? overview.institution.name
           : undefined
-  const profile = getSidebarProfile(moduleId, user, { subtitle: sidebarSubtitle })
-  const nav = config.nav
-  const homePath = `/${moduleId}`
-  const pageBreadcrumb = resolvePageBreadcrumb(moduleId, pathname)
+  const profile = getSidebarProfile(moduleId, user, {
+    subtitle: sidebarSubtitle,
+    isPlatformSuperUserInContext: isPlatformSuperUser || platformMode,
+    adminPortal,
+    canManageTenant,
+  })
+  const nav =
+    moduleId === 'admin' && role === 'super_user'
+      ? [
+          { label: 'Organizations', href: '/admin/platform', icon: 'Building2' },
+          { label: 'Add organization', href: '/admin/platform/onboard', icon: 'Upload' },
+          { label: 'Platform admins', href: '/admin/platform/admins', icon: 'Shield' },
+        ]
+      : moduleId === 'admin'
+        ? adminNavForPortal(config.nav, branchScoped)
+        : config.nav
+  const homePath = moduleId === 'admin' && role === 'super_user' ? '/admin/platform' : `/${moduleId}`
 
-  const sidebarInner = (
+  const sidebarNav = (
     <>
-      <div className={cn('shrink-0 border-b border-border', collapsed ? 'px-3 py-4' : 'px-4 py-4')}>
-        <PrismLogo
-          size="sm"
-          showWordmark={!collapsed}
-          showTagline={false}
-          href={homePath}
-        />
-      </div>
-
       <nav
         className="flex-1 min-h-0 px-2 py-3 space-y-0.5 overflow-y-auto scrollbar-thin"
         aria-label="Primary"
       >
         {!collapsed && (
           <p className="px-3 mb-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-            Workspace
+            {moduleId === 'admin' && role !== 'super_user' ? portalLabel : 'Workspace'}
           </p>
         )}
         {nav.map((item) => (
@@ -182,27 +166,10 @@ export function AppShell({ module }: AppShellProps) {
             onNavigate={() => setSidebarOpen(false)}
           />
         ))}
-        {!collapsed && (
-          <>
-            <p className="px-3 mt-5 mb-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-              Intelligence
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setSidebarOpen(false)
-                setCmdOpen(true)
-              }}
-              className="ios-nav-pill ios-nav-pill-inactive w-full"
-            >
-              <Sparkles className="w-[18px] h-[18px] shrink-0 text-accent" />
-              <span className="flex-1 text-left">AI Assistant</span>
-            </button>
-          </>
-        )}
       </nav>
 
       <div className="shrink-0 px-2 py-3 border-t border-border space-y-2">
+        <RoleSwitcher collapsed={collapsed} />
         {!collapsed && (
           <div className="flex items-center gap-3 px-2 py-2 rounded-2xl">
             <div className="w-9 h-9 rounded-full bg-accent/20 text-accent grid place-items-center font-semibold text-sm shrink-0">
@@ -224,7 +191,7 @@ export function AppShell({ module }: AppShellProps) {
             navigate('/login', { replace: true })
           }}
           className={cn(
-            'w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-slate-100 hover:text-foreground transition-colors',
+            'w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors',
             collapsed && 'justify-center',
           )}
           aria-label="Sign out"
@@ -237,20 +204,26 @@ export function AppShell({ module }: AppShellProps) {
   )
 
   return (
-    <div className="relative h-dvh overflow-hidden text-foreground flex app-page-bg safe-top">
-      <AmbientParticles />
+    <div className="relative h-dvh overflow-hidden text-foreground flex flex-col bg-background topo-texture safe-top">
+      {/* Unified top row: sidebar brand + navbar */}
+      <div className="shrink-0 h-14 flex items-stretch border-b border-border bg-card z-ln-sticky">
+        <div
+          className={cn(
+            'hidden lg:flex items-center shrink-0 border-r border-border bg-sidebar px-2 transition-[width] duration-200 ease-out',
+            collapsed ? 'w-[72px] justify-center' : 'w-[260px] justify-end',
+          )}
+        >
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            className="btn btn-ghost size-9 text-muted-foreground shrink-0"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <Menu className="w-[18px] h-[18px]" />
+          </button>
+        </div>
 
-      <aside
-        className={cn(
-          'hidden lg:flex shrink-0 h-full glass-sidebar flex-col overflow-hidden relative z-[1] transition-[width] duration-300 ease-out',
-          collapsed ? 'w-[72px]' : 'w-[260px]',
-        )}
-      >
-        {sidebarInner}
-      </aside>
-
-      <div className="relative z-[1] flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">
-        <header className="shrink-0 h-14 flex items-center px-3 sm:px-5 gap-2 sm:gap-3 glass-nav z-ln-sticky">
+        <header className="flex-1 min-w-0 flex items-center px-3 sm:px-5 gap-2 sm:gap-3 bg-card">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
@@ -259,94 +232,84 @@ export function AppShell({ module }: AppShellProps) {
           >
             <Menu className="w-4 h-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => setCollapsed((v) => !v)}
-            className="hidden lg:inline-flex btn btn-ghost p-2 text-muted-foreground"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-          </button>
 
-          <nav
-            className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground min-w-0"
-            aria-label="Breadcrumb"
-          >
-            <span className="truncate">{config.portalLabel}</span>
-            <ChevronRight className="w-3 h-3 opacity-50 shrink-0" />
-            <span className="text-foreground capitalize truncate">{pageBreadcrumb}</span>
-          </nav>
+          <PrismLogo
+            size="sm"
+            showWordmark
+            showTagline={false}
+            href={homePath}
+            className="min-w-0"
+          />
 
-          <div className="min-w-0 flex-1 md:hidden">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground truncate">
-              {config.portalLabel}
-            </div>
-            <div className="text-sm font-medium text-foreground truncate capitalize">
-              {pageBreadcrumb}
-            </div>
-          </div>
-
-          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-            <button
-              type="button"
-              onClick={() => setCmdOpen(true)}
-              className="hidden sm:inline-flex items-center gap-2 h-9 px-3 rounded-xl border border-border bg-secondary text-muted-foreground text-xs hover:text-foreground hover:border-indigo-200 hover:bg-indigo-50 transition-colors"
-              aria-label="Open search"
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span>Search</span>
-              <kbd className="ml-2 text-[10px] border border-border rounded-md px-1.5 py-0.5">⌘K</kbd>
-            </button>
+          <div className="ml-auto flex items-center gap-1.5">
+            {(moduleId === 'admin' || moduleId === 'tutor') && (
+              <>
+                {role === 'super_user' && <OrgSwitcher />}
+                {moduleId === 'admin' && role !== 'super_user' && !branchScoped && <BranchSwitcher />}
+                {moduleId === 'tutor' && <BranchSwitcher />}
+              </>
+            )}
             <NotificationBell moduleId={moduleId} />
           </div>
         </header>
+      </div>
+
+      <div className="relative flex flex-1 min-h-0 overflow-hidden">
+        <aside
+          className={cn(
+            'hidden lg:flex shrink-0 h-full flex-col overflow-hidden border-r border-border bg-sidebar transition-[width] duration-200 ease-out',
+            collapsed ? 'w-[72px]' : 'w-[260px]',
+          )}
+        >
+          {sidebarNav}
+        </aside>
 
         <AnimatePresence>
           {sidebarOpen && (
             <motion.div
               className="lg:hidden fixed inset-0 z-ln-drawer flex"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              variants={drawerOverlay}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
             >
               <button
                 type="button"
-                className="absolute inset-0 glass-overlay"
+                className="absolute inset-0 bg-ink/40"
                 onClick={() => setSidebarOpen(false)}
                 aria-label="Close menu"
               />
               <motion.aside
-                className="relative w-[min(100%,300px)] h-full glass-sheet rounded-none flex flex-col overflow-hidden"
-                initial={{ x: -24, opacity: 0.8 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: -24, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                className="relative w-[min(100%,300px)] h-full bg-sidebar border-r border-border flex flex-col overflow-hidden shadow-lg"
+                variants={slideFromLeft}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
               >
-                <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border shrink-0">
+                <div className="flex items-center justify-between gap-2 h-14 px-4 border-b border-border shrink-0">
                   <PrismLogo size="sm" showWordmark href={homePath} />
                   <button
                     type="button"
                     onClick={() => setSidebarOpen(false)}
-                    className="p-1.5 rounded-md hover:bg-slate-100 text-muted-foreground shrink-0"
+                    className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground shrink-0"
                     aria-label="Close menu"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{sidebarInner}</div>
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{sidebarNav}</div>
               </motion.aside>
             </motion.div>
           )}
         </AnimatePresence>
 
-        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto scrollbar-thin page-enter safe-bottom">
+        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto scrollbar-thin safe-bottom">
           <PageBackBar moduleId={moduleId} />
           <Outlet />
         </main>
       </div>
 
-      <CommandPalette moduleId={moduleId} open={cmdOpen} onClose={() => setCmdOpen(false)} />
-      <AiCopilotFab />
+      {role !== 'super_user' && <AiCopilotFab />}
       {moduleId === 'student' && <StudentPendingAssessmentReminder />}
     </div>
   )
@@ -355,7 +318,8 @@ export function AppShell({ module }: AppShellProps) {
 function PageBackBar({ moduleId }: { moduleId: ModuleId }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const back = resolveBackNavigation(moduleId, pathname)
+  const { role } = useAuth()
+  const back = resolveBackNavigation(moduleId, pathname, role)
 
   if (!back) return null
 
@@ -365,7 +329,7 @@ function PageBackBar({ moduleId }: { moduleId: ModuleId }) {
       onClick={() => navigate(back.href)}
       className="hidden md:inline-flex items-center gap-2.5 text-sm text-muted-foreground hover:text-foreground mb-6 -mt-1 transition-colors group print:hidden"
     >
-      <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-border bg-card group-hover:border-indigo-200 group-hover:bg-indigo-50 transition-colors">
+      <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-border bg-card group-hover:border-accent/30 group-hover:bg-secondary transition-colors">
         <ArrowLeft className="w-4 h-4" />
       </span>
       <span>{back.label}</span>
@@ -376,6 +340,7 @@ function PageBackBar({ moduleId }: { moduleId: ModuleId }) {
 function resolveBackNavigation(
   moduleId: ModuleId,
   pathname: string,
+  role: UserRole | null,
 ): { href: string; label: string } | null {
   const home = `/${moduleId}`
   if (pathname === home) return null
@@ -384,6 +349,15 @@ function resolveBackNavigation(
   if (segments[0] !== moduleId || segments.length < 2) return null
 
   const section = segments[1]
+
+  if (section === 'platform') {
+    if (segments[2] === 'organizations' && segments[3]) {
+      return { href: `${home}/platform`, label: 'Organizations' }
+    }
+    return null
+  }
+
+  if (role === 'super_user') return null
 
   if (segments.length >= 3) {
     if (section === 'reports') {
@@ -403,6 +377,20 @@ function resolveBackNavigation(
   return { href: home, label: 'Back to dashboard' }
 }
 
+function isNavItemActive(item: NavItem, pathname: string, moduleId: ModuleId): boolean {
+  if (pathname === item.href) return true
+
+  // Platform console root — only highlight for org list + org detail, not sibling tabs.
+  if (item.href === '/admin/platform') {
+    return pathname.startsWith('/admin/platform/organizations/')
+  }
+
+  const base = `/${moduleId}`
+  if (item.href === base) return false
+
+  return pathname.startsWith(`${item.href}/`)
+}
+
 function NavLinkItem({
   item,
   moduleId,
@@ -417,9 +405,7 @@ function NavLinkItem({
   onNavigate?: () => void
 }) {
   const Icon = iconMap[item.icon]
-  const base = `/${moduleId}`
-  const active =
-    pathname === item.href || (item.href !== base && pathname.startsWith(item.href))
+  const active = isNavItemActive(item, pathname, moduleId)
 
   return (
     <Link
@@ -457,30 +443,39 @@ export function PageHeader({
   actions?: ReactNode
 }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6 pb-6 mb-6 border-b border-border">
+    <motion.div
+      className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6 pb-6 mb-6 border-b border-border"
+      variants={fadeUp}
+      initial="hidden"
+      animate="visible"
+    >
       <div className="min-w-0">
         {eyebrow && (
-          <div className="text-[11px] uppercase tracking-[0.18em] text-accent font-semibold mb-2">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-accent font-sans font-semibold mb-2">
             {eyebrow}
           </div>
         )}
-        <h1 className="font-display text-[26px] sm:text-[32px] font-semibold text-foreground tracking-tight leading-[1.15]">
+        <h1 className="font-display text-[28px] sm:text-[34px] font-semibold text-ink tracking-tight leading-[1.15]">
           {title}
         </h1>
         {sub && (
-          <p className="text-muted-foreground mt-2.5 max-w-2xl text-[15px] leading-relaxed">{sub}</p>
+          <p className="text-muted-foreground mt-2.5 max-w-2xl text-[15px] leading-relaxed font-sans">{sub}</p>
         )}
       </div>
       {actions && <div className="page-actions shrink-0">{actions}</div>}
-    </div>
+    </motion.div>
   )
 }
 
 export function AppCard({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('glass-card p-4 sm:p-5', className)}>
+    <motion.div
+      className={cn('glass-card p-4 sm:p-5', className)}
+      whileHover={{ y: -2 }}
+      transition={springSoft}
+    >
       {children}
-    </div>
+    </motion.div>
   )
 }
 
@@ -507,7 +502,7 @@ export function AppStat({
           : 'text-foreground'
 
   return (
-    <AppCard className="hover:border-indigo-200 transition-colors">
+    <AppCard className="hover:border-accent/30 transition-colors">
       <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-medium">
         {label}
       </div>

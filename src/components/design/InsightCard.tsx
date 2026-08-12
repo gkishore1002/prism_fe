@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowUpRight, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { springSoft } from '@/lib/motion'
 
 export function InsightCard({
   icon: Icon,
@@ -14,6 +15,7 @@ export function InsightCard({
   tone = 'default',
   action,
   className,
+  index = 0,
 }: {
   icon: LucideIcon
   title: string
@@ -24,23 +26,24 @@ export function InsightCard({
   tone?: 'default' | 'accent' | 'success' | 'warning' | 'danger'
   action?: string
   className?: string
+  index?: number
 }) {
   const toneMap = {
-    default: 'text-slate-500 bg-slate-100',
-    accent: 'text-indigo-600 bg-indigo-50',
-    success: 'text-emerald-600 bg-emerald-50',
-    warning: 'text-amber-600 bg-amber-50',
-    danger: 'text-rose-600 bg-rose-50',
+    default: 'text-muted-foreground bg-secondary',
+    accent: 'text-[#0065F3] bg-[#D9EAFF]',
+    success: 'text-[#0C8F5C] bg-[#E8F8F1]',
+    warning: 'text-[#C06F00] bg-[#FFEFD0]',
+    danger: 'text-[#CC3D42] bg-[#FCEEEF]',
   }
 
   const body = (
     <motion.div
-      whileHover={{ y: -2 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-      className={cn(
-        'glass-card p-5 h-full flex flex-col gap-3 card-hover',
-        className,
-      )}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...springSoft, delay: index * 0.05 }}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.99 }}
+      className={cn('glass-card p-5 h-full flex flex-col gap-3', className)}
     >
       <div className="flex items-start justify-between gap-3">
         <span className={cn('flex h-10 w-10 items-center justify-center rounded-2xl', toneMap[tone])}>
@@ -70,7 +73,7 @@ export function InsightCard({
 
   if (href) {
     return (
-      <Link to={href} className="block h-full focus-visible:rounded-[20px]">
+      <Link to={href} className="block h-full focus-visible:rounded-[16px]">
         {body}
       </Link>
     )
@@ -98,8 +101,13 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="glass-card px-6 py-14 text-center">
-      <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-muted-foreground">
+    <motion.div
+      className="glass-card px-6 py-14 text-center"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
         <Icon className="w-5 h-5" />
       </span>
       <h3 className="font-display text-lg text-foreground">{title}</h3>
@@ -107,6 +115,6 @@ export function EmptyState({
         {description}
       </p>
       {action && <div className="mt-5 flex justify-center">{action}</div>}
-    </div>
+    </motion.div>
   )
 }

@@ -8,9 +8,10 @@ export function formatCenterLabel(center: { name: string; city?: string | null }
 }
 
 export function centerLabelById(
-  id: string,
+  id: string | null | undefined,
   centers: { id: string; name: string; city?: string | null }[],
 ): string {
+  if (!id) return '—'
   const center = centers.find((c) => c.id === id)
   if (!center) return id
   return formatCenterLabel(center)
