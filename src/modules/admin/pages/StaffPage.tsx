@@ -57,7 +57,7 @@ function mergeTutorAnalytics(staff: StaffMember[], analytics: TeacherRow[]) {
     })
 }
 
-export function AdminStaffPage() {
+export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   useAnalyticsPage('adminTeachers')
   const { user, refreshAuth } = useAuth()
   const { organizationScoped } = useAdminPortalContext()
@@ -231,16 +231,18 @@ export function AdminStaffPage() {
 
   return (
     <>
-      <PageHeader
-        title="Staff"
-        sub={
-          isPlatformSuperUser
-            ? 'Manage organization owners, branch admins, and tutors in one place.'
-            : organizationScoped
-              ? 'Manage organization owners, branch admins, and tutors. Assign roles and branch access across the organization.'
-              : 'Add tutors and branch admins within your assigned branches. Switch to Organization Admin to manage organization owners.'
-        }
-      />
+      {!embedded && (
+        <PageHeader
+          title="Staff"
+          sub={
+            isPlatformSuperUser
+              ? 'Manage organization owners, branch admins, and tutors in one place.'
+              : organizationScoped
+                ? 'Manage organization owners, branch admins, and tutors. Assign roles and branch access across the organization.'
+                : 'Add tutors and branch admins within your assigned branches. Switch to Organization Admin to manage organization owners.'
+          }
+        />
+      )}
 
       {isPlatformSuperUser && (
         <AppCard className="mb-4 border-indigo/30 bg-indigo/5">

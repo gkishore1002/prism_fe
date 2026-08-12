@@ -3,8 +3,8 @@ import { StudentGenomeReportPage } from '@/modules/reports/StudentGenomeReportPa
 export function AdminStudentReportPage() {
   return (
     <StudentGenomeReportPage
-      reportsBackHref="/admin/reports/students"
-      reportsBackLabel="All student reports"
+      reportsBackHref="/admin/manage/students"
+      reportsBackLabel="Back to students"
     />
   )
 }

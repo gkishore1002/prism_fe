@@ -26,7 +26,7 @@ import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
 import { createCenter } from '@/lib/api/institutionsApi'
 import { exportCentersCsv } from '@/lib/api/exportsApi'
 
-export function AdminCentersPage() {
+export function AdminCentersPage({ embedded = false }: { embedded?: boolean }) {
   useAnalyticsPage('adminCenters')
   const { loading, centerAnalytics, refresh } = useAnalytics()
   const { loading: centersLoading, refresh: refreshCenters, canManageTenant, ensureLoaded } = useCenters()
@@ -78,51 +78,75 @@ export function AdminCentersPage() {
   }
 
   if (!organizationScoped || !canManageTenant) {
-    return <Navigate to="/admin" replace />
+    return <Navigate to={embedded ? '/admin/manage/students' : '/admin'} replace />
   }
 
   if (loading) {
     return <PageLoader />
   }
 
+  const branchActions = (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        disabled={exporting}
+        onClick={() => void handleExportCenters()}
+        className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary/50"
+      >
+        <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'Export CSV'}
+      </button>
+      {canManageTenant && (
+        <button
+          type="button"
+          onClick={() => setShowForm((v) => !v)}
+          className="inline-flex items-center gap-2 bg-accent text-accent-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90"
+        >
+          <Plus className="w-4 h-4" /> Add center
+        </button>
+      )}
+    </div>
+  )
+
   if (centerAnalytics.length === 0) {
     return (
       <>
-        <PageHeader
-          title="Branches"
-          sub="Centers are physical branches under your institution — not separate products."
-        />
+        {!embedded && (
+          <PageHeader
+            title="Branches"
+            sub="Centers are physical branches under your institution — not separate products."
+          />
+        )}
         <AppCard>
           {canManageTenant ? (
-          <form onSubmit={(e) => void handleCreateCenter(e)} className="grid sm:grid-cols-3 gap-4 items-end">
-            <label className="block sm:col-span-1">
-              <span className="text-xs text-muted-foreground">Center name</span>
-              <input
-                value={centerName}
-                onChange={(e) => setCenterName(e.target.value)}
-                required
-                placeholder="e.g. Andheri (HQ)"
-                className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
-              />
-            </label>
-            <label className="block sm:col-span-1">
-              <span className="text-xs text-muted-foreground">City</span>
-              <input
-                value={centerCity}
-                onChange={(e) => setCenterCity(e.target.value)}
-                required
-                placeholder="e.g. Mumbai"
-                className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={creating}
-              className="bg-ink text-paper px-4 py-2 rounded-md text-sm font-medium disabled:opacity-60"
-            >
-              {creating ? 'Creating…' : 'Create first center'}
-            </button>
-          </form>
+            <form onSubmit={(e) => void handleCreateCenter(e)} className="grid sm:grid-cols-3 gap-4 items-end">
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-muted-foreground">Center name</span>
+                <input
+                  value={centerName}
+                  onChange={(e) => setCenterName(e.target.value)}
+                  required
+                  placeholder="e.g. Andheri (HQ)"
+                  className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-muted-foreground">City</span>
+                <input
+                  value={centerCity}
+                  onChange={(e) => setCenterCity(e.target.value)}
+                  required
+                  placeholder="e.g. Mumbai"
+                  className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={creating}
+                className="bg-ink text-paper px-4 py-2 rounded-md text-sm font-medium disabled:opacity-60"
+              >
+                {creating ? 'Creating…' : 'Create first center'}
+              </button>
+            </form>
           ) : (
             <p className="text-sm text-muted-foreground">
               No branches yet. Contact your organization owner to create the first center.
@@ -150,41 +174,16 @@ export function AdminCentersPage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={`Network · ${centerAnalytics.length} centers`}
-        title="Branches"
-        sub="Compare branch performance across your institution. Open a center for students, CSC compliance, and settings."
-        actions={
-          canManageTenant ? (
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={exporting}
-              onClick={() => void handleExportCenters()}
-              className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary/50"
-            >
-              <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'Export CSV'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm((v) => !v)}
-              className="inline-flex items-center gap-2 bg-accent text-accent-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90"
-            >
-              <Plus className="w-4 h-4" /> Add center
-            </button>
-          </div>
-          ) : (
-            <button
-              type="button"
-              disabled={exporting}
-              onClick={() => void handleExportCenters()}
-              className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary/50"
-            >
-              <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'Export CSV'}
-            </button>
-          )
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          eyebrow={`Network · ${centerAnalytics.length} centers`}
+          title="Branches"
+          sub="Compare branch performance across your institution. Open a center for students, CSC compliance, and settings."
+          actions={branchActions}
+        />
+      ) : (
+        <div className="flex flex-wrap justify-end gap-2 mb-4">{branchActions}</div>
+      )}
 
       {showForm && canManageTenant && (
         <AppCard className="mb-6">
@@ -275,7 +274,7 @@ export function AdminCentersPage() {
                   <span className="font-mono-data text-xs opacity-70">{c.students}</span>
                 </button>
                 <Link
-                  to={`/admin/centers/${c.id}`}
+                  to={`/admin/manage/centers/${c.id}`}
                   className="p-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
                   title="View center details"
                 >
@@ -290,7 +289,7 @@ export function AdminCentersPage() {
           <div className="flex items-baseline justify-between mb-3">
             <div className="font-display text-2xl">{formatCenterLabel(center)}</div>
             <Link
-              to={`/admin/centers/${center.id}`}
+              to={`/admin/manage/centers/${center.id}`}
               className="text-xs text-accent hover:underline"
             >
               Open center details →

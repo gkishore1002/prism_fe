@@ -359,6 +359,14 @@ function resolveBackNavigation(
 
   if (role === 'super_user') return null
 
+  // Manage hub (students / staff / branches) → dashboard; center detail → branches list
+  if (section === 'manage') {
+    if (segments[2] === 'centers' && segments[3]) {
+      return { href: `${home}/manage/centers`, label: 'Back to branches' }
+    }
+    return { href: home, label: 'Back to dashboard' }
+  }
+
   if (segments.length >= 3) {
     if (section === 'reports') {
       return { href: `${home}/reports`, label: 'Back to reports' }
@@ -369,8 +377,9 @@ function resolveBackNavigation(
     if (section === 'assessments' && segments[2] !== undefined) {
       return { href: `${home}/assessments`, label: 'Back to assessments' }
     }
-    if (section === 'students' && segments[2] === 'report') {
-      return { href: `${home}/reports/students`, label: 'Back to student reports' }
+    // Student report deep-links opened from Manage → Students
+    if (section === 'students') {
+      return { href: `${home}/manage/students`, label: 'Back to students' }
     }
   }
 

@@ -61,8 +61,8 @@ If setup is already done, `/setup` is not available — use `/login` or reset th
 | Screen | Path | Login pattern |
 |--------|------|----------------|
 | Organization owner | `/setup` or platform onboard | Phone → `{phone}@gmail.com` |
-| Staff (admins & tutors) | `/admin/staff` | Organization owner only for admin roles |
-| Student | `/admin/students` | Same |
+| Staff (admins & tutors) | `/admin/manage/staff` | Organization owner only for admin roles |
+| Student | `/admin/manage/students` | Same |
 
 Each form shows a preview of the login email and password to give the user.
 

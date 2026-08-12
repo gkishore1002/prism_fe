@@ -4,9 +4,6 @@ import { PageLoader } from '@/components/ui/PrismLoader'
 import {
   ArrowRight,
   Users,
-  BookMarked,
-  MapPin,
-  Layers,
   Network,
   BarChart3,
   Database,
@@ -47,7 +44,6 @@ export function AdminDashboardPage() {
     isAllBranches,
     canSelectAllBranches,
     centers,
-    canManageTenant,
     ensureLoaded: ensureBranchesLoaded,
   } = useCenters()
   const { branchScoped, portalLabel } = useAdminPortalContext()
@@ -423,23 +419,19 @@ export function AdminDashboardPage() {
           <div className="mt-3 space-y-1">
             {(branchScopedAdminPortal
               ? [
-                  { to: '/admin/students', icon: Users, label: 'Student management' },
+                  { to: '/admin/manage/students', icon: Users, label: 'Student management' },
+                  { to: '/admin/manage/staff', icon: Users, label: 'Staff & tutor impact' },
                   { to: '/admin/reports', icon: BarChart3, label: 'Learning Genome reports' },
-                  { to: '/admin/boards', icon: Layers, label: 'Board-wise reports' },
                   { to: '/admin/curriculum', icon: Network, label: 'Curriculum setup' },
                   { to: '/admin/question-bank', icon: Database, label: 'Question bank' },
                   { to: '/admin/assessments', icon: ClipboardList, label: 'Assessments' },
-                  { to: '/admin/staff', icon: Users, label: 'Staff & tutor impact' },
                 ]
               : [
-                  { to: '/admin/centers', icon: MapPin, label: 'Branch management' },
-                  { to: '/admin/boards', icon: Layers, label: 'Board-wise reports' },
+                  { to: '/admin/manage', icon: Users, label: 'Manage students, staff & branches' },
                   { to: '/admin/reports', icon: BarChart3, label: 'Learning Genome reports' },
                   { to: '/admin/curriculum', icon: Network, label: 'Curriculum setup' },
-                  { to: '/admin/students', icon: Users, label: 'Student management' },
                   { to: '/admin/question-bank', icon: Database, label: 'Question bank' },
                   { to: '/admin/assessments', icon: ClipboardList, label: 'Assessments' },
-                  { to: '/admin/staff', icon: Users, label: 'Staff & tutor impact' },
                   { to: '/admin/settings', icon: ShieldCheck, label: 'Organization settings' },
                 ]
             ).map(({ to, icon: Icon, label }) => (

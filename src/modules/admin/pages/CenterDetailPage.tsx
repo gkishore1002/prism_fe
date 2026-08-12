@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { ArrowLeft, MapPin, Pencil, Users, Download } from 'lucide-react'
+import { MapPin, Pencil, Users, Download } from 'lucide-react'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { Pagination } from '@/components/ui/Pagination'
@@ -153,9 +153,6 @@ export function AdminCenterDetailPage() {
   if (!center) {
     return (
       <>
-        <Link to="/admin/centers" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4">
-          <ArrowLeft className="w-4 h-4" /> Back to centers
-        </Link>
         <AppCard>
           <p className="text-sm text-rose">{error ?? 'Center not found'}</p>
         </AppCard>
@@ -170,10 +167,6 @@ export function AdminCenterDetailPage() {
 
   return (
     <>
-      <Link to="/admin/centers" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4">
-        <ArrowLeft className="w-4 h-4" /> All centers
-      </Link>
-
       <PageHeader
         eyebrow="Branch"
         title={formatCenterLabel(center)}
@@ -339,7 +332,7 @@ export function AdminCenterDetailPage() {
                 {students.map((s) => (
                   <tr key={s.id} className="border-t border-border hover:bg-secondary/30">
                     <td className="px-5 py-3">
-                      <Link to={`/admin/students`} className="font-medium text-foreground hover:text-accent">
+                      <Link to={`/admin/manage/students`} className="font-medium text-foreground hover:text-accent">
                         {s.name}
                       </Link>
                       <p className="text-[11px] text-muted-foreground font-mono-data">{s.id}</p>

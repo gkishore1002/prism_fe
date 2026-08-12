@@ -107,16 +107,12 @@ Every question must be tagged with Board, Grade, Subject, Chapter, and Topic. Th
 | Module | Route | Business purpose |
 |--------|-------|------------------|
 | Institution | `/admin` | Institute overview and KPIs |
-| Centers | `/admin/centers` | Branch / center management |
-| Students | `/admin/students` | Roster and student-wise reports |
+| Manage | `/admin/manage` | Students, staff, and branches (live DB data) |
 | Test Attendance | `/admin/assessments` | Who was invited, attended, or absent |
 | Tutor Content | `/admin/question-bank` | Read-only view of tutor question papers |
-| Boards | `/admin/boards` | Board configuration |
 | Subject Reports | `/admin/reports` | Institute-wide subject analytics |
-| Curriculum Setup | `/admin/setup` | Academic hierarchy (Board → Topic) |
-| Teachers | `/admin/teachers` | Tutor roster |
-| Syllabus | `/admin/syllabus` | Syllabus mapping |
-| AI Intelligence | `/admin/intelligence` | Institute-level AI insights |
+| Curriculum Setup | `/admin/curriculum` | Academic hierarchy (Board → Topic) |
+| AI Intelligence | `/admin/reports` | Institute-level insights (via Reports) |
 
 ### 5.2 Owner business process
 
