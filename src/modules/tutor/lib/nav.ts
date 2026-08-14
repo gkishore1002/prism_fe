@@ -12,6 +12,6 @@ export const tutorNav: NavItem[] = [
 
 export const tutorMeta = {
   portalLabel: 'Tutor Portal',
-  defaultTitle: 'Tutor Copilot',
+  defaultTitle: 'Dashboard',
   defaultSubtitle: 'Know exactly what to teach next',
 }

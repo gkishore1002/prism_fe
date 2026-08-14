@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import {
@@ -31,7 +31,6 @@ import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
 import { useCenters } from '@/hooks/useCenters'
-import { analyticsApi, type InstitutionOperationalStats, type InstitutionOverview } from '@/lib/api/analyticsApi'
 import { formatCenterLabel } from '@/lib/centerLabel'
 import { adminMeta } from '@/modules/admin/lib/nav'
 
@@ -47,13 +46,10 @@ export function AdminDashboardPage() {
     ensureLoaded: ensureBranchesLoaded,
   } = useCenters()
   const { branchScoped, portalLabel } = useAdminPortalContext()
-  const [scopedOverview, setScopedOverview] = useState<InstitutionOverview | null>(null)
-  const [scopedOps, setScopedOps] = useState<InstitutionOperationalStats | null>(null)
-  const [scopedLoading, setScopedLoading] = useState(true)
   const {
     loading,
-    overview,
-    operationalStats,
+    overview: inst,
+    operationalStats: ops,
     teachers,
     hardestTopics,
     monthlyTrend,
@@ -66,36 +62,6 @@ export function AdminDashboardPage() {
     void ensureBranchesLoaded()
   }, [ensureBranchesLoaded])
 
-  useEffect(() => {
-    let cancelled = false
-    setScopedLoading(true)
-    const centerParam = isAllBranches ? undefined : activeCenterId
-    Promise.all([
-      analyticsApi.institutionOverview(centerParam),
-      analyticsApi.institutionOperationalStats(centerParam),
-    ])
-      .then(([ov, ops]) => {
-        if (!cancelled) {
-          setScopedOverview(ov)
-          setScopedOps(ops)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setScopedOverview(null)
-          setScopedOps(null)
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setScopedLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [activeCenterId, isAllBranches])
-
-  const inst = scopedOverview ?? overview
-  const ops = scopedOps ?? operationalStats
   const activeCenter = centers.find((c) => c.id === activeCenterId)
   const branchScopedAdminPortal = branchScoped
   const studentScopeHint = branchScopedAdminPortal
@@ -108,7 +74,7 @@ export function AdminDashboardPage() {
         ? formatCenterLabel(activeCenter)
         : 'Current branch view'
 
-  if (loading || scopedLoading) {
+  if (loading) {
     return <PageLoader />
   }
 
@@ -144,18 +110,22 @@ export function AdminDashboardPage() {
           hint={`${studentActive} active · ${studentInactive} inactive · ${studentScopeHint}`}
         />
         <AppStat
-          label="Avg. improvement"
-          value={`+${inst.avgImprovement}%`}
+          label="Avg. score growth"
+          value={`${inst.avgImprovement >= 0 ? '+' : ''}${inst.avgImprovement}%`}
           tone="leaf"
-          hint="Year-to-date"
+          hint="Recent vs prior assessments"
         />
         <AppStat
-          label="Engagement score"
+          label="Avg. readiness"
           value={inst.parentNps}
           tone="accent"
-          hint="Derived from readiness"
+          hint="From marks and assessments"
         />
-        <AppStat label="Retention index" value={`${inst.retention}%`} hint="From improving cohort" />
+        <AppStat
+          label="Students improving"
+          value={`${inst.retention}%`}
+          hint="Upward score trend"
+        />
       </div>
 
       {ops && (
@@ -297,7 +267,7 @@ export function AdminDashboardPage() {
                   <XAxis dataKey="month" fontSize={11} />
                   <YAxis domain={[0, 100]} fontSize={11} />
                   <Tooltip />
-                  <Line type="monotone" dataKey="score" stroke="#3575c4" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="score" name="Avg score" stroke="#3575c4" strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -395,15 +365,17 @@ export function AdminDashboardPage() {
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="font-mono-data text-lg text-leaf">+{t.growth}%</div>
+                    <div className="font-mono-data text-lg text-leaf">
+                      {t.growth > 0 ? '+' : ''}{t.growth}%
+                    </div>
                     <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                      growth
+                      score growth
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="font-mono-data text-lg">{t.improved}%</div>
                     <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                      improved
+                      improving
                     </div>
                   </div>
                 </div>

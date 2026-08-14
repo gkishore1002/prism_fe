@@ -26,7 +26,23 @@ export const R = {
   // Brand / hero
   brandIntelligence: { en: 'Intelligence', ta: 'நுண்ணறிவு' },
   reportKindEngine: { en: 'AI Academic Profiling Engine', ta: 'AI கல்வி சுயவிவர இயந்திரம்' },
+  reportKindOverall: { en: 'Overall performance report', ta: 'ஒட்டுமொத்த செயல்திறன் அறிக்கை' },
   reportKindAssessment: { en: 'Assessment report', ta: 'தேர்வு அறிக்கை' },
+  tabOverview: { en: 'Overview', ta: 'மேலோட்டம்' },
+  tabAcademicReport: { en: 'Academic report', ta: 'கல்வி அறிக்கை' },
+  titleOverallSection: { en: 'Overall report', ta: 'ஒட்டுமொத்த அறிக்கை' },
+  descOverallSection: {
+    en: 'Learning Genome overall report — cross-assessment profile and trends.',
+    ta: 'ஒட்டுமொத்த Learning Genome — அனைத்து தேர்வுகளின் சுயவிவரம்.',
+  },
+  titleAcademicSection: { en: 'Academic reports', ta: 'கல்வி அறிக்கைகள்' },
+  descAcademicSection: {
+    en: 'Assessment-wise reports — one per test. View opens that assessment only.',
+    ta: 'தேர்வு வாரியான அறிக்கைகள் — ஒ each test. View opens that assessment only.',
+  },
+  viewReport: { en: 'View', ta: 'காண்க' },
+  openFullReport: { en: 'Open full report', ta: 'முழு அறிக்கை' },
+  reportForStudent: { en: 'Report', ta: 'அறிக்கை' },
   reportUnavailable: { en: 'Report unavailable', ta: 'அறிக்கை கிடைக்கவில்லை' },
   reportNotFound: { en: 'Report not found', ta: 'அறிக்கை கிடைக்கவில்லை' },
   studentNotFound: { en: 'Student not found', ta: 'மாணவர் கிடைக்கவில்லை' },

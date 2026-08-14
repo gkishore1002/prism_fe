@@ -1,33 +1,15 @@
-import { useParams } from 'react-router-dom'
-import { OverallPerformanceReportPage } from '@/modules/reports/OverallPerformanceReportPage'
+import { Navigate, useParams } from 'react-router-dom'
 
 export function StudentOverallReportPage() {
-  return (
-    <OverallPerformanceReportPage
-      backHref="/student/reports"
-      backLabel="All reports"
-    />
-  )
+  return <Navigate to="/student/reports?tab=overview" replace />
 }
 
 export function TutorStudentOverallReportPage() {
   const { studentId } = useParams<{ studentId: string }>()
-  return (
-    <OverallPerformanceReportPage
-      studentId={studentId}
-      backHref={`/tutor/students/${studentId}/reports`}
-      backLabel="All reports"
-    />
-  )
+  return <Navigate to={`/tutor/students/${studentId}/reports?tab=overview`} replace />
 }
 
 export function AdminStudentOverallReportPage() {
   const { studentId } = useParams<{ studentId: string }>()
-  return (
-    <OverallPerformanceReportPage
-      studentId={studentId}
-      backHref={`/admin/students/${studentId}/reports`}
-      backLabel="All reports"
-    />
-  )
+  return <Navigate to={`/admin/students/${studentId}/reports?tab=overview`} replace />
 }

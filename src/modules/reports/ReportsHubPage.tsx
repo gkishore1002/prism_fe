@@ -17,7 +17,6 @@ import {
   LgReportLayout,
   LgSection,
 } from '@/modules/reports/learningGenome/LearningGenomeShell'
-import { StudentAssessmentInsightsBody } from '@/modules/reports/learningGenome/StudentAssessmentInsightsBody'
 
 interface ReportsHubPageProps {
   studentId?: string
@@ -42,9 +41,6 @@ function ReportsHubContent({
   const { L, language } = useReportLabels()
 
   const displayName = overall?.studentName ?? title
-  const latest = [...assessmentReports].sort(
-    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
-  )[0]
 
   const dates = assessmentReports
     .map((a) => a.submittedAt)
@@ -77,9 +73,7 @@ function ReportsHubContent({
         }
         detailLines={[
           `${L.assessmentWindow}: ${windowLabel}`,
-          latest
-            ? `${L.thisAssessment}: ${latest.assessmentTitle} · ${L.conducted} ${formatReportDate(latest.submittedAt, language)}`
-            : L.awaitingAssessments,
+          `${L.assessments}: ${assessmentReports.length}`,
         ]}
         stats={
           overall
@@ -88,16 +82,12 @@ function ReportsHubContent({
                 { value: translateHealthStatus(overall.status, language), label: L.consistency },
                 { value: overall.improving ? L.improving : L.stable, label: L.learningTrend },
                 { value: `${overall.readiness}%`, label: L.predictedNext },
-                { value: `${overall.health}`, label: L.confidenceScore },
-                { value: `+${overall.improvement}%`, label: L.growthPotential },
               ]
             : [
                 { value: assessmentReports.length, label: L.assessments },
                 { value: '—', label: L.overallScore },
                 { value: '—', label: L.learningTrend },
                 { value: '—', label: L.predictedNext },
-                { value: '—', label: L.confidenceScore },
-                { value: '—', label: L.growthPotential },
               ]
         }
         statsPlacement="below"
@@ -105,7 +95,25 @@ function ReportsHubContent({
       />
 
       {overall && (
-        <StudentAssessmentInsightsBody overall={overall} assessments={assessmentReports} />
+        <LgSection
+          id="overall"
+          eyebrow={L.eyebrowExecutive}
+          title={L.reportKindOverall}
+          description={L.descOnePerTest}
+        >
+          <Link to={`${reportsPathPrefix}/overall`} className="lg-report-card block max-w-md">
+            <div className="bar" />
+            <div className="n">
+              {overall.avgAccuracy}
+              <span className="text-lg text-[var(--lg-gold)]">%</span>
+            </div>
+            <div className="lbl">{L.overallProfile}</div>
+            <div className="desc">
+              {overall.board} · {overall.grade} · {windowLabel}
+            </div>
+            <p className="desc mt-1">{L.openFullOverall}</p>
+          </Link>
+        </LgSection>
       )}
 
       {!overall && assessmentReports.length === 0 && (
@@ -151,13 +159,6 @@ function ReportsHubContent({
             ))}
           </div>
         )}
-        {overall && (
-          <div className="mt-4">
-            <Link to={`${reportsPathPrefix}/overall`} className="lg-back-link print:hidden">
-              {L.openFullOverall}
-            </Link>
-          </div>
-        )}
       </LgSection>
 
       <LgFooter
@@ -182,19 +183,13 @@ export function ReportsHubPage({
     let cancelled = false
     setLoading(true)
     void Promise.all([
-      analyticsApi.overallReport(studentId),
-      analyticsApi.assessmentReports(studentId),
+      analyticsApi.overallReport(studentId).catch(() => null),
+      analyticsApi.assessmentReports(studentId).catch(() => [] as AssessmentReport[]),
     ])
       .then(([overallData, assessmentData]) => {
         if (cancelled) return
         setOverall(overallData)
         setAssessmentReports(assessmentData)
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setOverall(null)
-          setAssessmentReports([])
-        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -213,13 +208,10 @@ export function ReportsHubPage({
   return (
     <LgReportLayout
       bilingual
-      printTitle={`${displayName} — Learning Genome Report`}
+      printTitle={`${displayName} — Reports`}
       showExport
       navLinks={(L) => [
-        { href: '#assessment-wise', label: L.navAssessment },
-        { href: '#trend-map', label: L.navTrend },
-        { href: '#history', label: L.navHistory },
-        { href: '#all-assessments', label: L.navAllTests },
+        ...(overall ? [{ href: '#overall', label: L.overallProfile }] : []),
         { href: '#assessments', label: L.navCards },
       ]}
     >

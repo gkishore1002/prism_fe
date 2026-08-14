@@ -8,6 +8,7 @@ import {
   type RoleOptionsResponse,
 } from '@/modules/auth/lib/authApi'
 import { cn } from '@/lib/cn'
+import { useConfirmModal } from '@/components/ui/AppModal'
 
 function isActiveOption(
   option: RoleOption,
@@ -20,6 +21,7 @@ function isActiveOption(
 
 export function RoleSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   const { role, switchPortal, portalRefreshKey } = useAuth()
+  const { confirm } = useConfirmModal()
   const [options, setOptions] = useState<RoleOptionsResponse | null>(null)
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
@@ -58,6 +60,12 @@ export function RoleSwitcher({ collapsed = false }: { collapsed?: boolean }) {
       setOpen(false)
       return
     }
+    const ok = await confirm({
+      title: 'Switch portal',
+      message: `Switch to "${option.label}"? You will be redirected to that portal.`,
+      confirmLabel: 'Switch',
+    })
+    if (!ok) return
     setSwitching(true)
     setError(null)
     try {

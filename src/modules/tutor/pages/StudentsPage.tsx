@@ -28,10 +28,10 @@ export function TutorStudentsPage() {
         sub="Add and manage students anchored to board, grade, batch, branch, and academic year."
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-        <AppStat label="My Students" value={stats?.total ?? 0} />
-        <AppStat label="Active" value={stats?.active ?? 0} tone="leaf" />
-        <AppStat label="Batches" value={batches.length} hint="Manage in Curriculum Setup" />
+      <div className="flex flex-wrap items-start gap-2 mb-5">
+        <AppStat compact label="My Students" value={stats?.total ?? 0} />
+        <AppStat compact label="Active" value={stats?.active ?? 0} tone="leaf" />
+        <AppStat compact label="Batches" value={batches.length} />
       </div>
 
       <AppCard className="mb-6 !p-4">

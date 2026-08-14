@@ -62,6 +62,7 @@ export interface CenterAnalytics extends InstitutionCenter {
   retention: number
   nps: number
   growth: number
+  topicMastery?: number
 }
 
 export interface BoardReportRow {
@@ -122,23 +123,43 @@ export interface StudentMasterRow {
   daysUntilCscDisable?: number | null
 }
 
+function withCenterQuery(path: string, centerId?: string): string {
+  if (!centerId) return path
+  const sep = path.includes('?') ? '&' : '?'
+  return `${path}${sep}center_id=${encodeURIComponent(centerId)}`
+}
+
 export const analyticsApi = {
   institutionOverview: (centerId?: string) =>
-    apiFetch<InstitutionOverview>(
-      `/analytics/institution/overview${centerId ? `?center_id=${encodeURIComponent(centerId)}` : ''}`,
-    ),
+    apiFetch<InstitutionOverview>(withCenterQuery('/analytics/institution/overview', centerId)),
   institutionOperationalStats: (centerId?: string) =>
     apiFetch<InstitutionOperationalStats>(
-      `/analytics/institution/operational-stats${centerId ? `?center_id=${encodeURIComponent(centerId)}` : ''}`,
+      withCenterQuery('/analytics/institution/operational-stats', centerId),
     ),
-  institutionCenters: () => apiFetch<CenterAnalytics[]>('/analytics/institution/centers'),
-  institutionBoards: () => apiFetch<BoardReportRow[]>('/analytics/institution/boards'),
-  institutionTeachers: () => apiFetch<TeacherRow[]>('/analytics/institution/teachers'),
-  hardestTopics: () => apiFetch<{ topic: string; correct: number }[]>('/analytics/institution/hardest-topics'),
-  syllabusCompletion: () => apiFetch<Record<string, number | string>[]>('/analytics/institution/syllabus'),
-  monthlyTrend: () => apiFetch<{ month: string; score: number }[]>('/analytics/institution/monthly-trend'),
-  subjectHealth: () => apiFetch<{ subject: string; health: number }[]>('/analytics/institution/subject-health'),
-  studentMaster: () => apiFetch<StudentMasterRow[]>('/analytics/students/master'),
+  institutionCenters: (centerId?: string) =>
+    apiFetch<CenterAnalytics[]>(withCenterQuery('/analytics/institution/centers', centerId)),
+  institutionBoards: (centerId?: string) =>
+    apiFetch<BoardReportRow[]>(withCenterQuery('/analytics/institution/boards', centerId)),
+  institutionTeachers: (centerId?: string) =>
+    apiFetch<TeacherRow[]>(withCenterQuery('/analytics/institution/teachers', centerId)),
+  hardestTopics: (centerId?: string) =>
+    apiFetch<{ topic: string; correct: number }[]>(
+      withCenterQuery('/analytics/institution/hardest-topics', centerId),
+    ),
+  syllabusCompletion: (centerId?: string) =>
+    apiFetch<Record<string, number | string>[]>(
+      withCenterQuery('/analytics/institution/syllabus', centerId),
+    ),
+  monthlyTrend: (centerId?: string) =>
+    apiFetch<{ month: string; score: number }[]>(
+      withCenterQuery('/analytics/institution/monthly-trend', centerId),
+    ),
+  subjectHealth: (centerId?: string) =>
+    apiFetch<{ subject: string; health: number }[]>(
+      withCenterQuery('/analytics/institution/subject-health', centerId),
+    ),
+  studentMaster: (centerId?: string) =>
+    apiFetch<StudentMasterRow[]>(withCenterQuery('/analytics/students/master', centerId)),
   tutorNames: () => apiFetch<Record<string, string>>('/analytics/users/tutor-names'),
 
   studentProfile: (studentId?: string) =>
@@ -197,10 +218,11 @@ export const analyticsApi = {
     const qs = params.toString()
     return apiFetch<BatchTopicWeakness[]>(`/analytics/tutor/topic-weakness${qs ? `?${qs}` : ''}`)
   },
-  tutorAtRisk: (batchId?: string, batchName?: string) => {
+  tutorAtRisk: (batchId?: string, batchName?: string, centerId?: string) => {
     const params = new URLSearchParams()
     if (batchId) params.set('batch_id', batchId)
     else if (batchName) params.set('batch_name', batchName)
+    if (centerId) params.set('center_id', centerId)
     const qs = params.toString()
     return apiFetch<AtRiskStudent[]>(`/analytics/tutor/at-risk${qs ? `?${qs}` : ''}`)
   },
@@ -213,7 +235,8 @@ export const analyticsApi = {
       `/analytics/tutor/batch-heatmap${qs ? `?${qs}` : ''}`,
     )
   },
-  classInsights: () => apiFetch<ClassInsight[]>('/analytics/tutor/class-insights'),
+  classInsights: (centerId?: string) =>
+    apiFetch<ClassInsight[]>(withCenterQuery('/analytics/tutor/class-insights', centerId)),
   tutorCopilot: (batchName?: string) =>
     apiFetch<TutorCopilotAnalytics>(`/analytics/tutor/copilot${batchName ? `?batch_name=${encodeURIComponent(batchName)}` : ''}`),
   subjectStudents: (subject: string) =>

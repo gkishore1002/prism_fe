@@ -40,11 +40,13 @@ function OverallReportContent({
   assessmentReports,
   backHref,
   backLabel,
+  embedded = false,
 }: {
   report: OverallPerformanceReport
   assessmentReports: AssessmentReport[]
   backHref: string
   backLabel: string
+  embedded?: boolean
 }) {
   const { L, language, forecastHeaders } = useReportLabels()
 
@@ -81,8 +83,9 @@ function OverallReportContent({
 
   return (
     <>
+      {!embedded && (
       <LgHero
-        reportKind={L.reportKindEngine}
+        reportKind={L.reportKindOverall}
         title={report.studentName}
         quickFacts={formatHeroQuickFacts(
           { board: report.board, grade: report.grade, batch: report.batch, status: report.status },
@@ -107,8 +110,13 @@ function OverallReportContent({
         backHref={backHref}
         backLabel={backLabel}
       />
+      )}
 
-      <StudentAssessmentInsightsBody overall={report} assessments={assessmentReports} />
+      <StudentAssessmentInsightsBody
+        overall={report}
+        assessments={assessmentReports}
+        variant="overall"
+      />
 
       <LgSection
         id="summary"
@@ -185,10 +193,12 @@ function OverallReportContent({
         </LgSection>
       )}
 
-      <LgFooter windowLabel={windowLabel} cohortNote={report.batch} />
+      {!embedded && <LgFooter windowLabel={windowLabel} cohortNote={report.batch} />}
     </>
   )
 }
+
+export { OverallReportContent }
 
 export function OverallPerformanceReportPage({
   studentId,
@@ -246,15 +256,14 @@ export function OverallPerformanceReportPage({
   return (
     <LgReportLayout
       bilingual
-      printTitle={`${report.studentName} — Learning Genome Report`}
+      printTitle={`${report.studentName} — Overall performance report`}
       backHref={backHref}
       backLabel={backLabel}
       navLinks={(L) => [
-        { href: '#assessment-wise', label: L.navAssessment },
         { href: '#trend-map', label: L.navTrend },
         { href: '#history', label: L.navHistory },
-        { href: '#all-assessments', label: L.navAllTests },
         { href: '#summary', label: L.navSummary },
+        { href: '#insights', label: L.navAssessment },
         { href: '#forecast', label: L.navForecast },
       ]}
     >

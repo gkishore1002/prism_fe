@@ -13,8 +13,8 @@ import { router } from './router'
 export function App() {
   return (
     <AuthProvider>
-      <AnalyticsProvider>
-        <CentersProvider>
+      <CentersProvider>
+        <AnalyticsProvider>
           <CurriculumProvider>
             <QuestionPaperProvider>
               <AssessmentProvider>
@@ -28,8 +28,8 @@ export function App() {
               </AssessmentProvider>
             </QuestionPaperProvider>
           </CurriculumProvider>
-        </CentersProvider>
-      </AnalyticsProvider>
+        </AnalyticsProvider>
+      </CentersProvider>
     </AuthProvider>
   )
 }

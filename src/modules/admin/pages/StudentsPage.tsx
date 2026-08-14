@@ -32,10 +32,10 @@ export function AdminStudentsPage({ embedded = false }: { embedded?: boolean }) 
         />
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <AppStat label="Total Students" value={stats?.total ?? 0} />
-        <AppStat label="Active" value={stats?.active ?? 0} tone="leaf" />
-        <AppStat label="Branches" value={centers.length} hint="Across institute" />
+      <div className="flex flex-wrap items-start gap-2 mb-5">
+        <AppStat compact label="Total Students" value={stats?.total ?? 0} />
+        <AppStat compact label="Active" value={stats?.active ?? 0} tone="leaf" />
+        <AppStat compact label="Branches" value={centers.length} />
       </div>
 
       <StudentManagementPanel scope="admin" />

@@ -43,7 +43,7 @@ export function centerInsightBullets(
   const sorted = [...centers].sort((a, b) => a.avg - b.avg)
   return sorted.slice(0, 3).map(
     (center) =>
-      `${center.name}: ${center.students} students · ${center.avg}% health · growth ${center.growth > 0 ? '+' : ''}${center.growth}%.`,
+      `${center.name}: ${center.students} students · ${center.avg}% avg score · score growth ${center.growth > 0 ? '+' : ''}${center.growth} pts.`,
   )
 }
 

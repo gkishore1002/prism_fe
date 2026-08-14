@@ -1,14 +1,13 @@
 import { useParams } from 'react-router-dom'
-import { ReportsHubPage } from '@/modules/reports/ReportsHubPage'
+import { StudentPerformanceReportPage } from '@/modules/reports/StudentPerformanceReportPage'
 
 export function TutorStudentReportsHubPage() {
   const { studentId } = useParams<{ studentId: string }>()
   return (
-    <ReportsHubPage
+    <StudentPerformanceReportPage
       studentId={studentId}
       reportsPathPrefix={`/tutor/students/${studentId}/reports`}
-      title="Student reports"
-      subtitle="Assessment-wise results and overall performance for this student."
+      reportsListHref="/tutor/reports/students"
     />
   )
 }
@@ -16,11 +15,10 @@ export function TutorStudentReportsHubPage() {
 export function AdminStudentReportsHubPage() {
   const { studentId } = useParams<{ studentId: string }>()
   return (
-    <ReportsHubPage
+    <StudentPerformanceReportPage
       studentId={studentId}
       reportsPathPrefix={`/admin/students/${studentId}/reports`}
-      title="Student reports"
-      subtitle="Assessment-wise results and overall performance for this student."
+      reportsListHref="/admin/reports/students"
     />
   )
 }

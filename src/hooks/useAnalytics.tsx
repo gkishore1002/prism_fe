@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { useCenters } from '@/hooks/useCenters'
 import {
   analyticsApi,
   type AtRiskStudent,
@@ -102,6 +103,8 @@ const AnalyticsContext = createContext<AnalyticsContextValue | null>(null)
 
 export function AnalyticsProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth()
+  const { activeCenterId, isAllBranches } = useCenters()
+  const branchCenterId = isAllBranches ? undefined : activeCenterId
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const loadedRef = useRef(new Set<AnalyticsLoadKey>())
@@ -147,7 +150,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
         break
       }
       case 'shellInstitution': {
-        const data = await analyticsApi.institutionOverview()
+        const data = await analyticsApi.institutionOverview(branchCenterId)
         setOverview(data)
         break
       }
@@ -258,15 +261,16 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
         break
       }
       case 'adminDashboard': {
+        const centerId = branchCenterId
         const [inst, ops, teacherRows, topics, trend, subjects, insights, risk] = await Promise.all([
-          analyticsApi.institutionOverview(),
-          analyticsApi.institutionOperationalStats(),
-          analyticsApi.institutionTeachers(),
-          analyticsApi.hardestTopics(),
-          analyticsApi.monthlyTrend(),
-          analyticsApi.subjectHealth(),
-          analyticsApi.classInsights(),
-          analyticsApi.tutorAtRisk(),
+          analyticsApi.institutionOverview(centerId),
+          analyticsApi.institutionOperationalStats(centerId),
+          analyticsApi.institutionTeachers(centerId),
+          analyticsApi.hardestTopics(centerId),
+          analyticsApi.monthlyTrend(centerId),
+          analyticsApi.subjectHealth(centerId),
+          analyticsApi.classInsights(centerId),
+          analyticsApi.tutorAtRisk(undefined, undefined, centerId),
         ])
         setOverview(inst)
         setOperationalStats(ops)
@@ -279,48 +283,51 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
         break
       }
       case 'adminStudents': {
-        setStudentMaster(await analyticsApi.studentMaster())
+        setStudentMaster(await analyticsApi.studentMaster(branchCenterId))
         break
       }
       case 'adminCenters': {
+        const centerId = branchCenterId
         const [inst, centers] = await Promise.all([
-          analyticsApi.institutionOverview(),
-          analyticsApi.institutionCenters(),
+          analyticsApi.institutionOverview(centerId),
+          analyticsApi.institutionCenters(centerId),
         ])
         setOverview(inst)
         setCenterAnalytics(centers)
         break
       }
       case 'adminBoards': {
-        setBoardReport(await analyticsApi.institutionBoards())
+        setBoardReport(await analyticsApi.institutionBoards(branchCenterId))
         break
       }
       case 'adminTeachers': {
-        setTeachers(await analyticsApi.institutionTeachers())
+        setTeachers(await analyticsApi.institutionTeachers(branchCenterId))
         break
       }
       case 'adminSyllabus': {
-        setSyllabusCompletion(await analyticsApi.syllabusCompletion())
+        setSyllabusCompletion(await analyticsApi.syllabusCompletion(branchCenterId))
         break
       }
       case 'adminAnalytics': {
+        const centerId = branchCenterId
         const [trend, subjects] = await Promise.all([
-          analyticsApi.monthlyTrend(),
-          analyticsApi.subjectHealth(),
+          analyticsApi.monthlyTrend(centerId),
+          analyticsApi.subjectHealth(centerId),
         ])
         setMonthlyTrend(trend)
         setSubjectHealth(subjects)
         break
       }
       case 'adminInstitution': {
-        setOverview(await analyticsApi.institutionOverview())
+        setOverview(await analyticsApi.institutionOverview(branchCenterId))
         break
       }
       case 'tutorDashboard': {
+        const centerId = branchCenterId
         const [weakness, insights, risk, copilotData] = await Promise.all([
           analyticsApi.tutorTopicWeakness(),
-          analyticsApi.classInsights(),
-          analyticsApi.tutorAtRisk(),
+          analyticsApi.classInsights(centerId),
+          analyticsApi.tutorAtRisk(undefined, undefined, centerId),
           analyticsApi.tutorCopilot(),
         ])
         setTopicWeakness(weakness)
@@ -334,7 +341,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
         break
       }
       case 'tutorAtRisk': {
-        setAtRisk(await analyticsApi.tutorAtRisk())
+        setAtRisk(await analyticsApi.tutorAtRisk(undefined, undefined, branchCenterId))
         break
       }
       case 'tutorNames': {
@@ -344,7 +351,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       default:
         break
     }
-  }, [])
+  }, [branchCenterId])
 
   const load = useCallback(
     async (keys: AnalyticsLoadKey | AnalyticsLoadKey[], force = false) => {
@@ -471,13 +478,15 @@ export function useAnalytics() {
 /** Call once on mount for the current page's analytics needs. */
 export function useAnalyticsPage(key: AnalyticsLoadKey | AnalyticsLoadKey[]) {
   const { load, loading, error } = useAnalytics()
+  const { activeCenterId, isAllBranches } = useCenters()
+  const branchCenterId = isAllBranches ? undefined : activeCenterId
   const keys = useMemo(() => (Array.isArray(key) ? key : [key]), [key])
   const keysKey = keys.join(',')
 
   useEffect(() => {
-    void load(keys)
+    void load(keys, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [load, keysKey])
+  }, [load, keysKey, branchCenterId])
 
   return { loading, error }
 }

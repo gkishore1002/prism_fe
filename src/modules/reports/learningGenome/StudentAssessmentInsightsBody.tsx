@@ -47,13 +47,15 @@ function subjectTableRows(report: AssessmentReport): ReactNode[][] {
   ])
 }
 
-/** Full assessment insights: per-test tables, history, trend + affinity graphs. */
+/** Assessment insights — overall variant omits per-test detail (see single assessment report). */
 export function StudentAssessmentInsightsBody({
   overall,
   assessments,
+  variant = 'full',
 }: {
   overall: OverallPerformanceReport
   assessments: AssessmentReport[]
+  variant?: 'overall' | 'full'
 }) {
   const { L, language, subjectHeaders, historyHeaders } = useReportLabels()
 
@@ -91,7 +93,7 @@ export function StudentAssessmentInsightsBody({
 
   return (
     <>
-      {latest && (
+      {variant === 'full' && latest && (
         <LgSection
           id="assessment-wise"
           eyebrow={L.eyebrowAssessmentWise}
@@ -235,7 +237,7 @@ export function StudentAssessmentInsightsBody({
         </LgSection>
       )}
 
-      {ordered.length > 0 && (
+      {variant === 'full' && ordered.length > 0 && (
         <LgSection
           id="all-assessments"
           eyebrow={L.eyebrowAllAssessments}

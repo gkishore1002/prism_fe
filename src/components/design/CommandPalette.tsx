@@ -25,14 +25,13 @@ export function CommandPalette({ moduleId, open, onClose }: CommandPaletteProps)
       group: 'Navigate',
     }))
     const extras = [
-      { id: 'ai', label: 'Ask Prism AI', href: `/${moduleId}`, group: 'AI' },
       {
         id: 'reports',
         label: 'Open reports',
         href: `/${moduleId}/reports`,
         group: 'Quick',
       },
-    ].filter((e) => moduleRegistry[moduleId].nav.some((n) => n.href === e.href) || e.id === 'ai')
+    ].filter((e) => moduleRegistry[moduleId].nav.some((n) => n.href === e.href))
     const all = [...nav, ...extras]
     const q = query.trim().toLowerCase()
     if (!q) return all

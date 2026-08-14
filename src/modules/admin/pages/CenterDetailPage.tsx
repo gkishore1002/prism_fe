@@ -263,15 +263,15 @@ export function AdminCenterDetailPage() {
           <h3 className="font-display font-semibold text-foreground mb-3">Branch performance</h3>
           <div className="grid sm:grid-cols-3 gap-4 text-sm">
             <div>
-              <p className="text-xs text-muted-foreground">Retention</p>
+              <p className="text-xs text-muted-foreground">Active students</p>
               <p className="font-medium">{analytics.retention}%</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Parent NPS</p>
-              <p className="font-medium">{analytics.nps}</p>
+              <p className="text-xs text-muted-foreground">Avg. readiness</p>
+              <p className="font-medium">{analytics.nps}%</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Growth</p>
+              <p className="text-xs text-muted-foreground">Score growth</p>
               <p className="font-medium">{analytics.growth > 0 ? '+' : ''}{analytics.growth}%</p>
             </div>
           </div>

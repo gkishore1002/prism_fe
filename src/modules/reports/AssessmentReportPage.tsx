@@ -22,14 +22,16 @@ interface AssessmentReportPageProps {
   backLabel: string
 }
 
-function AssessmentReportBody({
+export function AssessmentReportBody({
   report,
   backHref,
   backLabel,
+  embedded = false,
 }: {
   report: AssessmentReport
   backHref: string
   backLabel: string
+  embedded?: boolean
 }) {
   const { L, language, subjectHeaders } = useReportLabels()
 
@@ -50,8 +52,9 @@ function AssessmentReportBody({
 
   return (
     <>
+      {!embedded && (
       <LgHero
-        reportKind={L.reportKindEngine}
+        reportKind={L.reportKindAssessment}
         title={report.assessmentTitle}
         quickFacts={`${report.subject} · ${L.submitted} ${formatReportDate(report.submittedAt, language)}`}
         detailLines={[
@@ -74,6 +77,7 @@ function AssessmentReportBody({
         backHref={backHref}
         backLabel={backLabel}
       />
+      )}
 
       <LgSection
         id="narrative"
@@ -152,7 +156,7 @@ function AssessmentReportBody({
         </div>
       </LgSection>
 
-      <LgFooter />
+      {!embedded && <LgFooter />}
     </>
   )
 }

@@ -56,8 +56,10 @@ export function AdminBoardsPage() {
                 <div className="font-mono-data text-xl">{b.avg}%</div>
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Growth</div>
-                <div className="font-mono-data text-xl text-leaf">+{b.improvement}%</div>
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Score growth</div>
+                <div className="font-mono-data text-xl text-leaf">
+                  {b.improvement > 0 ? '+' : ''}{b.improvement}%
+                </div>
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-widest text-muted-foreground">At-risk</div>
@@ -71,7 +73,7 @@ export function AdminBoardsPage() {
       <div className="grid md:grid-cols-4 gap-4 mb-6">
         <AppStat label="Students" value={row.students.toLocaleString()} />
         <AppStat label="Mean score" value={row.avg} unit="%" tone="accent" />
-        <AppStat label="Syllabus done" value={row.syllabus} unit="%" tone="leaf" />
+        <AppStat label="Topic mastery" value={row.syllabus} unit="%" tone="leaf" />
         <AppStat label="At-risk" value={row.atRisk} tone="rose" />
       </div>
 

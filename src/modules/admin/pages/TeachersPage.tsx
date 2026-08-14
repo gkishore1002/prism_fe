@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Plus, Pencil, Mail, Users } from 'lucide-react'
+import { Plus, Pencil, Mail, Users, User, TrendingUp, BookOpen, Award } from 'lucide-react'
+import { ActionMenu, ActionMenuItem } from '@/components/ui/ActionMenu'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { AppModal } from '@/components/ui/AppModal'
@@ -47,6 +48,7 @@ export function AdminTeachersPage() {
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [viewingProfile, setViewingProfile] = useState<(TutorAccount & { subject: string; students: number; improved: number; growth: number; readiness: number }) | null>(null)
 
   async function loadAccounts() {
     setAccountsLoading(true)
@@ -143,7 +145,7 @@ export function AdminTeachersPage() {
         <AppStat label="Tutors" value={rows.length} hint="Active tutor accounts" />
         <AppStat label="Students taught" value={totalStudents} tone="leaf" />
         <AppStat
-          label="Avg growth"
+          label="Avg score growth"
           value={avgGrowth ?? '—'}
           unit={avgGrowth != null ? '%' : undefined}
           tone="accent"
@@ -208,14 +210,16 @@ export function AdminTeachersPage() {
                       </span>
                     </td>
                     <td className="py-3.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(tutor)}
-                        className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
-                      >
-                        <Pencil className="w-3 h-3" />
-                        Edit
-                      </button>
+                      <ActionMenu label={`Actions for ${tutor.name}`}>
+                        <ActionMenuItem onSelect={() => setViewingProfile(tutor)}>
+                          <User className="w-3.5 h-3.5 text-muted-foreground" />
+                          View profile
+                        </ActionMenuItem>
+                        <ActionMenuItem onSelect={() => openEdit(tutor)}>
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                          Edit
+                        </ActionMenuItem>
+                      </ActionMenu>
                     </td>
                   </tr>
                 ))}
@@ -247,8 +251,8 @@ export function AdminTeachersPage() {
                   <th className="text-left px-5 py-3">Subject · Board</th>
                   <th className="text-right px-5 py-3">Students</th>
                   <th className="text-right px-5 py-3">Improved %</th>
-                  <th className="text-right px-5 py-3">Avg growth</th>
-                  <th className="text-right px-5 py-3">Readiness lift</th>
+                  <th className="text-right px-5 py-3">Score growth</th>
+                  <th className="text-right px-5 py-3">Avg readiness</th>
                 </tr>
               </thead>
               <tbody>
@@ -258,8 +262,10 @@ export function AdminTeachersPage() {
                     <td className="px-5 py-4 text-muted-foreground">{t.subject}</td>
                     <td className="px-5 py-4 text-right font-mono-data">{t.students}</td>
                     <td className="px-5 py-4 text-right font-mono-data">{t.improved}%</td>
-                    <td className="px-5 py-4 text-right font-mono-data text-leaf">+{t.growth}%</td>
-                    <td className="px-5 py-4 text-right font-mono-data text-accent">+{t.readiness}%</td>
+                    <td className="px-5 py-4 text-right font-mono-data text-leaf">
+                      {t.growth > 0 ? '+' : ''}{t.growth}%
+                    </td>
+                    <td className="px-5 py-4 text-right font-mono-data text-accent">{t.readiness}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -267,6 +273,96 @@ export function AdminTeachersPage() {
           </ResponsiveTable>
         )}
       </AppCard>
+
+      {/* Teacher profile modal */}
+      <AppModal
+        open={Boolean(viewingProfile)}
+        onClose={() => setViewingProfile(null)}
+        title={viewingProfile?.name ?? ''}
+        description={viewingProfile?.email}
+        size="md"
+        footer={
+          <div className="flex gap-2 justify-end w-full">
+            <button
+              type="button"
+              onClick={() => {
+                if (viewingProfile) openEdit(viewingProfile)
+                setViewingProfile(null)
+              }}
+              className="text-sm px-4 py-2 rounded-md border border-border hover:bg-secondary/60 transition-colors inline-flex items-center gap-2"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit tutor
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewingProfile(null)}
+              className="text-sm px-4 py-2 rounded-md bg-accent text-accent-foreground hover:opacity-90"
+            >
+              Close
+            </button>
+          </div>
+        }
+      >
+        {viewingProfile && (
+          <div className="space-y-5">
+            {/* Avatar + basic info */}
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-accent/15 flex items-center justify-center shrink-0">
+                <span className="text-xl font-display text-accent">
+                  {viewingProfile.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="font-display text-lg text-foreground truncate">{viewingProfile.name}</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                  <Mail className="w-3.5 h-3.5 shrink-0" />
+                  {viewingProfile.email}
+                </p>
+                {viewingProfile.subject && viewingProfile.subject !== '—' && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                    <BookOpen className="w-3 h-3 shrink-0" />
+                    {viewingProfile.subject}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Impact stats grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Students</p>
+                <p className="text-2xl font-display text-foreground mt-1 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-accent" />
+                  {viewingProfile.students}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Improved</p>
+                <p className="text-2xl font-display text-foreground mt-1 flex items-center gap-2">
+                  <Award className="w-4 h-4 text-leaf" />
+                  {viewingProfile.improved}%
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Score growth</p>
+                <p className={`text-2xl font-display mt-1 flex items-center gap-2 ${
+                  viewingProfile.growth >= 0 ? 'text-leaf' : 'text-rose'
+                }`}>
+                  <TrendingUp className="w-4 h-4" />
+                  {viewingProfile.growth > 0 ? '+' : ''}{viewingProfile.growth}%
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Avg readiness</p>
+                <p className="text-2xl font-display text-accent mt-1">
+                  {viewingProfile.readiness}%
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </AppModal>
 
       <AppModal
         open={showForm}

@@ -211,21 +211,13 @@ export function StudentReportsList({ reportPathPrefix }: StudentReportsListProps
                         </td>
                       )}
                       <td className="px-5 py-4 text-right">
-                        <div className="flex flex-col items-end gap-1">
-                          <Link
-                            to={`${reportPathPrefix}/${s.id}/reports`}
-                            className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            View reports
-                          </Link>
-                          <Link
-                            to={`${reportPathPrefix}/${s.id}/report`}
-                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
-                          >
-                            Learning genome
-                          </Link>
-                        </div>
+                        <Link
+                          to={`${reportPathPrefix}/${s.id}/reports`}
+                          className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          View reports
+                        </Link>
                       </td>
                     </tr>
                   ))}

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Mail, Pencil, Upload, Users } from 'lucide-react'
+import { Mail, Plus, Upload, Users, Search, Edit3, User, TrendingUp, BookOpen, Award, ShieldCheck } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
-import { AppModal } from '@/components/ui/AppModal'
+import { AppModal, useConfirmModal } from '@/components/ui/AppModal'
 import { ResponsiveTable } from '@/components/ui/ResponsiveTable'
+import { ActionMenu, ActionMenuItem } from '@/components/ui/ActionMenu'
+import { Pagination } from '@/components/ui/Pagination'
 import { btnClass } from '@/components/ui/Button'
 import { PhoneCredentialFields } from '@/components/auth/PhoneCredentialFields'
 import { useCenters } from '@/hooks/useCenters'
@@ -63,10 +65,13 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const { organizationScoped } = useAdminPortalContext()
   const { centers, isPlatformSuperUser, ensureLoaded, refresh: refreshCenters } = useCenters()
   const { teachers, loading: analyticsLoading, refresh } = useAnalytics()
+  const { confirm } = useConfirmModal()
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -75,7 +80,6 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const [isBranchAdmin, setIsBranchAdmin] = useState(false)
   const [isTutor, setIsTutor] = useState(true)
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
-  const [editingId, setEditingId] = useState<string | null>(null)
 
   const [editOpen, setEditOpen] = useState(false)
   const [editMember, setEditMember] = useState<StaffMember | null>(null)
@@ -87,6 +91,8 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const [editBranches, setEditBranches] = useState<string[]>([])
   const [editError, setEditError] = useState<string | null>(null)
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [viewingProfile, setViewingProfile] = useState<StaffMember | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -105,6 +111,21 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
     void ensureLoaded()
     void load()
   }, [ensureLoaded, load])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [searchInput])
+
+  const filteredStaff = useMemo(() => {
+    if (!debouncedSearch) return staff
+    const query = debouncedSearch.toLowerCase()
+    return staff.filter(
+      (s) =>
+        s.name.toLowerCase().includes(query) ||
+        s.email.toLowerCase().includes(query),
+    )
+  }, [staff, debouncedSearch])
 
   const tutorRows = useMemo(() => mergeTutorAnalytics(staff, teachers), [staff, teachers])
   const totalStudents = useMemo(() => tutorRows.reduce((sum, row) => sum + row.students, 0), [tutorRows])
@@ -147,6 +168,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
         centerIds: showBranchPicker ? selectedBranches : undefined,
       })
       resetCreateForm()
+      setShowAddForm(false)
       await Promise.all([load(), refresh('adminTeachers')])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add staff')
@@ -210,23 +232,6 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
     await saveEdit()
   }
 
-  async function saveInlineBranches(member: StaffMember, centerIds: string[]) {
-    setSaving(true)
-    setError(null)
-    try {
-      await setStaffBranches(member.id, centerIds)
-      setEditingId(null)
-      if (member.id === user.id) {
-        await Promise.all([refreshAuth(), refreshCenters()])
-      }
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update branch access')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   if (loading) return <PageLoader />
 
   return (
@@ -269,176 +274,196 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       <AppCard className="mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h3 className="font-display font-semibold">Add staff</h3>
-          <button
-            type="button"
-            onClick={() => setBulkUploadOpen(true)}
-            className={`${btnClass.secondary} text-sm px-4 py-2 inline-flex items-center gap-2`}
-          >
-            <Upload className="w-4 h-4" />
-            Bulk upload
-          </button>
-        </div>
-        <form onSubmit={(e) => void handleCreate(e)} className="grid sm:grid-cols-2 gap-4">
-          <label className="block">
-            <span className="text-xs text-muted-foreground">Name</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-2 flex-1 max-w-md bg-secondary/40 border border-border rounded-md px-3 py-2">
+            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
             <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className={inputClass}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by name or email..."
+              className="text-sm outline-none bg-transparent w-full"
             />
-          </label>
-          <PhoneCredentialFields
-            phone={phone}
-            onPhoneChange={setPhone}
-            password={password}
-            onPasswordChange={setPassword}
-            idPrefix="staff-create"
-          />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setBulkUploadOpen(true)}
+              className={`${btnClass.secondary} text-sm px-4 py-2 inline-flex items-center gap-2`}
+            >
+              <Upload className="w-4 h-4" />
+              Bulk upload
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAddForm((open) => !open)}
+              className={`${btnClass.primary} text-sm px-4 py-2 inline-flex items-center gap-2`}
+            >
+              <Plus className="w-4 h-4" />
+              Add staff
+            </button>
+          </div>
+        </div>
 
-          <fieldset className="sm:col-span-2">
-            <legend className="text-xs text-muted-foreground mb-2">Roles</legend>
-            <div className="flex flex-wrap gap-4">
-              {canPromoteOrgOwner && (
+        {showAddForm && (
+          <form onSubmit={(e) => void handleCreate(e)} className="grid sm:grid-cols-2 gap-4 mb-6 pb-6 border-b border-border">
+            <label className="block">
+              <span className="text-xs text-muted-foreground">Name</span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </label>
+            <PhoneCredentialFields
+              phone={phone}
+              onPhoneChange={setPhone}
+              password={password}
+              onPasswordChange={setPassword}
+              idPrefix="staff-create"
+            />
+
+            <fieldset className="sm:col-span-2">
+              <legend className="text-xs text-muted-foreground mb-2">Roles</legend>
+              <div className="flex flex-wrap gap-4">
+                {canPromoteOrgOwner && (
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={isOwner}
+                      onChange={(e) => setIsOwner(e.target.checked)}
+                    />
+                    Organization owner
+                  </label>
+                )}
                 <label className="inline-flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    checked={isOwner}
-                    onChange={(e) => setIsOwner(e.target.checked)}
+                    checked={isBranchAdmin || isOwner}
+                    onChange={(e) => setIsBranchAdmin(e.target.checked)}
                   />
-                  Organization owner
+                  Branch admin
                 </label>
-              )}
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={isBranchAdmin || isOwner}
-                  onChange={(e) => setIsBranchAdmin(e.target.checked)}
-                />
-                Branch admin
-              </label>
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={isTutor} onChange={(e) => setIsTutor(e.target.checked)} />
-                Tutor
-              </label>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Organization owner and branch admin can both be enabled — owners get all branches; branch assignments
-              apply when signing in as Branch Admin. Same login also supports tutor portal.
-            </p>
-          </fieldset>
-
-          {showBranchPicker && (
-            <fieldset className="sm:col-span-2">
-              <legend className="text-xs text-muted-foreground mb-2">Branch access</legend>
-              <p className="text-xs text-muted-foreground mb-2">
-                Scopes admin and tutor work. Organization owners ignore this when using the Organization Admin portal.
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={isTutor} onChange={(e) => setIsTutor(e.target.checked)} />
+                  Tutor
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Organization owner and branch admin can both be enabled — owners get all branches; branch assignments
+                apply when signing in as Branch Admin. Same login also supports tutor portal.
               </p>
-              <div className="flex flex-wrap gap-2">
-                {centers.map((c) => (
-                  <label
-                    key={c.id}
-                    className="inline-flex items-center gap-2 text-sm border border-border rounded-md px-3 py-1.5"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedBranches.includes(c.id)}
-                      onChange={(e) =>
-                        setSelectedBranches((prev) =>
-                          e.target.checked ? [...prev, c.id] : prev.filter((id) => id !== c.id),
-                        )
-                      }
-                    />
-                    {formatCenterLabel(c)}
-                  </label>
-                ))}
-              </div>
             </fieldset>
-          )}
 
-          {isValidPhone(phone) && (
-            <p className="sm:col-span-2 text-xs text-muted-foreground">
-              Login: <span className="font-medium text-foreground">{phoneToLoginEmail(phone)}</span> · Password:{' '}
-              <span className="font-medium text-foreground">{resolvePassword(phone, password)}</span>
-            </p>
-          )}
-
-          <div className="sm:col-span-2">
-            <button
-              type="submit"
-              disabled={saving || !isValidPhone(phone)}
-              className={`${btnClass.primary} text-sm px-4 py-2`}
-            >
-              {saving ? 'Saving…' : 'Add staff'}
-            </button>
-          </div>
-        </form>
-      </AppCard>
-
-      <AppCard className="mb-6">
-        <h3 className="font-display font-semibold mb-4">Team roster</h3>
-        {staff.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No staff yet.</p>
-        ) : (
-          <div className="space-y-4">
-            {staff.map((member) => (
-              <div key={member.id} className="rounded-xl border border-border p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{member.name}</p>
-                    <p className="text-sm text-muted-foreground inline-flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5 shrink-0" />
-                      {member.email}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">{staffRoleSummary(member)}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(member)}
-                      className={`${btnClass.secondary} text-xs px-3 py-1.5 inline-flex items-center gap-1`}
+            {showBranchPicker && (
+              <fieldset className="sm:col-span-2">
+                <legend className="text-xs text-muted-foreground mb-2">Branch access</legend>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Scopes admin and tutor work. Organization owners ignore this when using the Organization Admin portal.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {centers.map((c) => (
+                    <label
+                      key={c.id}
+                      className="inline-flex items-center gap-2 text-sm border border-border rounded-md px-3 py-1.5"
                     >
-                      <Pencil className="w-3 h-3" />
-                      Edit
-                    </button>
-                    {canAssignBranches && !member.isOwner && (
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(editingId === member.id ? null : member.id)}
-                        className={`${btnClass.secondary} text-xs px-3 py-1.5`}
-                      >
-                        {editingId === member.id ? 'Close branches' : 'Edit branches'}
-                      </button>
-                    )}
-                  </div>
+                      <input
+                        type="checkbox"
+                        checked={selectedBranches.includes(c.id)}
+                        onChange={(e) =>
+                          setSelectedBranches((prev) =>
+                            e.target.checked ? [...prev, c.id] : prev.filter((id) => id !== c.id),
+                          )
+                        }
+                      />
+                      {formatCenterLabel(c)}
+                    </label>
+                  ))}
                 </div>
+              </fieldset>
+            )}
 
-                {!member.isOwner && editingId !== member.id && (
-                  <p className="text-sm mt-3 text-muted-foreground">
-                    Branches:{' '}
-                    {member.centerIds.length
-                      ? member.centerIds
-                          .map((id) => formatCenterLabel(centers.find((c) => c.id === id) ?? { name: id, city: '' }))
-                          .join(', ')
-                      : member.roles.includes('tutor') && !member.roles.includes('admin')
-                        ? 'All branches (tutor)'
-                        : 'None assigned'}
-                  </p>
-                )}
+            {isValidPhone(phone) && (
+              <p className="sm:col-span-2 text-xs text-muted-foreground">
+                Login: <span className="font-medium text-foreground">{phoneToLoginEmail(phone)}</span> · Password:{' '}
+                <span className="font-medium text-foreground">{resolvePassword(phone, password)}</span>
+              </p>
+            )}
 
-                {canAssignBranches && !member.isOwner && editingId === member.id && (
-                  <BranchEditor
-                    centers={centers}
-                    initial={member.centerIds}
-                    saving={saving}
-                    onSave={(ids) => void saveInlineBranches(member, ids)}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
+            <div className="sm:col-span-2 flex gap-2">
+              <button
+                type="submit"
+                disabled={saving || !isValidPhone(phone)}
+                className={`${btnClass.primary} text-sm px-4 py-2`}
+              >
+                {saving ? 'Saving…' : 'Save staff'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  resetCreateForm()
+                  setShowAddForm(false)
+                }}
+                className={`${btnClass.secondary} text-sm px-4 py-2`}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
+        {filteredStaff.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">{debouncedSearch ? 'No staff found.' : 'No staff yet.'}</p>
+        ) : (
+          <ResponsiveTable minWidth={520}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                  <th className="pb-3 font-medium">Staff</th>
+                  <th className="pb-3 font-medium">Role</th>
+                  <th className="pb-3 font-medium">Branches</th>
+                  <th className="pb-3 font-medium text-right w-16">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredStaff.map((member) => (
+                  <tr key={member.id} className="hover:bg-secondary/30">
+                    <td className="py-3">
+                      <p className="font-medium text-foreground">{member.name}</p>
+                      <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                        <Mail className="w-3 h-3 shrink-0" />
+                        {member.email}
+                      </p>
+                    </td>
+                    <td className="py-3 text-muted-foreground text-xs">{staffRoleSummary(member)}</td>
+                    <td className="py-3 text-muted-foreground text-xs">
+                      {member.isOwner
+                        ? 'All (owner)'
+                        : member.centerIds.length
+                          ? member.centerIds
+                              .map((id) => formatCenterLabel(centers.find((c) => c.id === id) ?? { name: id, city: '' }))
+                              .join(', ')
+                          : member.roles.includes('tutor') && !member.roles.includes('admin')
+                            ? 'All (tutor)'
+                            : '—'}
+                    </td>
+                    <td className="py-3">
+                      <ActionMenu label={`Actions for ${member.name}`}>
+                        <ActionMenuItem onSelect={() => setViewingProfile(member)}>
+                          <User className="w-3.5 h-3.5 text-muted-foreground" />
+                          View profile
+                        </ActionMenuItem>
+                        <ActionMenuItem onSelect={() => openEdit(member)}>
+                          <Edit3 className="w-3.5 h-3.5 text-muted-foreground" />
+                          Edit
+                        </ActionMenuItem>
+                      </ActionMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ResponsiveTable>
         )}
       </AppCard>
 
@@ -474,7 +499,9 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
                         </span>
                       </td>
                       <td className="px-5 py-4 text-right font-mono-data">{row.improved}%</td>
-                      <td className="px-5 py-4 text-right font-mono-data text-leaf">+{row.growth}%</td>
+                      <td className="px-5 py-4 text-right font-mono-data text-leaf">
+                        {row.growth > 0 ? '+' : ''}{row.growth}%
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -483,6 +510,119 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
           )}
         </AppCard>
       )}
+
+      {/* Staff profile modal */}
+      <AppModal
+        open={Boolean(viewingProfile)}
+        onClose={() => setViewingProfile(null)}
+        title={viewingProfile?.name ?? ''}
+        description={viewingProfile ? staffRoleSummary(viewingProfile) : undefined}
+        size="md"
+        footer={
+          <div className="flex gap-2 justify-end w-full">
+            <button
+              type="button"
+              onClick={() => {
+                if (viewingProfile) openEdit(viewingProfile)
+                setViewingProfile(null)
+              }}
+              className="text-sm px-4 py-2 rounded-md border border-border hover:bg-secondary/60 transition-colors inline-flex items-center gap-2"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewingProfile(null)}
+              className="text-sm px-4 py-2 rounded-md bg-accent text-accent-foreground hover:opacity-90"
+            >
+              Close
+            </button>
+          </div>
+        }
+      >
+        {viewingProfile && (() => {
+          const tutorStats = tutorRows.find((r) => r.id === viewingProfile.id)
+          return (
+            <div className="space-y-5">
+              {/* Avatar + basic info */}
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-accent/15 flex items-center justify-center shrink-0">
+                  <span className="text-xl font-display text-accent">
+                    {viewingProfile.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-display text-lg text-foreground truncate">{viewingProfile.name}</p>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                    <Mail className="w-3.5 h-3.5 shrink-0" />
+                    {viewingProfile.email}
+                  </p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                    <ShieldCheck className="w-3 h-3 shrink-0" />
+                    {staffRoleSummary(viewingProfile)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Branches */}
+              {!viewingProfile.isOwner && viewingProfile.centerIds.length > 0 && (
+                <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Branch access</p>
+                  <div className="flex flex-wrap gap-2">
+                    {viewingProfile.centerIds.map((id) => {
+                      const center = centers.find((c) => c.id === id)
+                      return (
+                        <span key={id} className="text-xs border border-border rounded-md px-2 py-1 text-foreground">
+                          {center ? formatCenterLabel(center) : id}
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Tutor analytics if available */}
+              {tutorStats && (
+                <>
+                  <p className="text-[11px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <BookOpen className="w-3 h-3" /> Tutor impact
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Students</p>
+                      <p className="text-2xl font-display text-foreground mt-1 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-accent" />
+                        {tutorStats.students}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Improved</p>
+                      <p className="text-2xl font-display text-foreground mt-1 flex items-center gap-2">
+                        <Award className="w-4 h-4 text-leaf" />
+                        {tutorStats.improved}%
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Score growth</p>
+                      <p className={`text-2xl font-display mt-1 flex items-center gap-2 ${tutorStats.growth >= 0 ? 'text-leaf' : 'text-rose'}`}>
+                        <TrendingUp className="w-4 h-4" />
+                        {tutorStats.growth > 0 ? '+' : ''}{tutorStats.growth}%
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Avg readiness</p>
+                      <p className="text-2xl font-display text-accent mt-1">
+                        {tutorStats.readiness}%
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })()}
+      </AppModal>
 
       <AppModal
         open={editOpen}
@@ -702,45 +842,5 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
         onComplete={() => void Promise.all([load(), refresh('adminTeachers')])}
       />
     </>
-  )
-}
-
-function BranchEditor({
-  centers,
-  initial,
-  saving,
-  onSave,
-}: {
-  centers: { id: string; name: string; city: string }[]
-  initial: string[]
-  saving: boolean
-  onSave: (ids: string[]) => void
-}) {
-  const [selected, setSelected] = useState(initial)
-  return (
-    <div className="mt-3 space-y-3">
-      <div className="flex flex-wrap gap-2">
-        {centers.map((c) => (
-          <label key={c.id} className="inline-flex items-center gap-2 text-sm border border-border rounded-md px-3 py-1.5">
-            <input
-              type="checkbox"
-              checked={selected.includes(c.id)}
-              onChange={(e) =>
-                setSelected((prev) => (e.target.checked ? [...prev, c.id] : prev.filter((id) => id !== c.id)))
-              }
-            />
-            {formatCenterLabel(c)}
-          </label>
-        ))}
-      </div>
-      <button
-        type="button"
-        disabled={saving}
-        onClick={() => onSave(selected)}
-        className={`${btnClass.primary} text-xs px-3 py-1.5`}
-      >
-        Save branch access
-      </button>
-    </div>
   )
 }

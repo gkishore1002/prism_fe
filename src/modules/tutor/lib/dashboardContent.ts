@@ -28,7 +28,7 @@ export const defaultTutorDashboardHeroContent: TutorDashboardHeroContent = {
 }
 
 export const defaultTutorDashboardPageContent = {
-  title: 'Tutor Copilot',
+  title: 'Dashboard',
   subtitle: 'Your command center — batch health, assessments, and what to teach next.',
 }
 

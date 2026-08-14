@@ -44,7 +44,6 @@ import { getSidebarProfile } from '@/lib/roleProfile'
 import { adminNavForPortal } from '@/modules/admin/lib/nav'
 import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
 import { studentProfileSubtitle } from '@/modules/student/lib/studentProfile'
-import { AiCopilotFab } from '@/components/design/AiCopilotFab'
 import { drawerOverlay, fadeUp, slideFromLeft, springSoft } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 import type { NavItem, UserRole } from '@/types'
@@ -309,7 +308,6 @@ export function AppShell({ module }: AppShellProps) {
         </main>
       </div>
 
-      {role !== 'super_user' && <AiCopilotFab />}
       {moduleId === 'student' && <StudentPendingAssessmentReminder />}
     </div>
   )
@@ -494,12 +492,14 @@ export function AppStat({
   unit,
   hint,
   tone = 'default',
+  compact = false,
 }: {
   label: string
   value: string | number
   unit?: string
   hint?: string
   tone?: 'default' | 'accent' | 'leaf' | 'rose'
+  compact?: boolean
 }) {
   const toneColor =
     tone === 'accent'
@@ -509,6 +509,28 @@ export function AppStat({
         : tone === 'rose'
           ? 'text-rose'
           : 'text-foreground'
+
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          'inline-flex min-w-[4.75rem] flex-col rounded-md border border-border/80 bg-background/80 px-2.5 py-1.5',
+          'hover:border-accent/25 transition-colors',
+        )}
+      >
+        <div className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground font-medium leading-none truncate">
+          {label}
+        </div>
+        <div className={cn('mt-1 font-display text-base leading-none font-semibold tabular-nums', toneColor)}>
+          {value}
+          {unit && <span className="text-[10px] text-muted-foreground ml-0.5 font-sans font-normal">{unit}</span>}
+        </div>
+        {hint && (
+          <div className="text-[9px] text-muted-foreground/80 mt-0.5 leading-none truncate">{hint}</div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <AppCard className="hover:border-accent/30 transition-colors">

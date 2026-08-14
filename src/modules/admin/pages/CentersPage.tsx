@@ -166,10 +166,10 @@ export function AdminCentersPage({ embedded = false }: { embedded?: boolean }) {
   }))
   const radarData = [
     { metric: 'Avg score', value: center.avg },
-    { metric: 'Retention', value: center.retention },
-    { metric: 'NPS', value: center.nps + 40 },
-    { metric: 'Growth', value: center.growth * 5 },
-    { metric: 'Syllabus', value: 70 + (center.avg - 65) },
+    { metric: 'Active students', value: center.retention },
+    { metric: 'Readiness', value: center.nps },
+    { metric: 'Score growth', value: Math.min(100, Math.max(0, 50 + center.growth)) },
+    { metric: 'Topic mastery', value: center.topicMastery ?? 0 },
   ]
 
   return (
@@ -247,8 +247,8 @@ export function AdminCentersPage({ embedded = false }: { embedded?: boolean }) {
               <YAxis fontSize={11} />
               <Tooltip />
               <Bar dataKey="avg" fill="var(--color-ink)" name="Avg score" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="retention" fill="var(--color-leaf)" name="Retention" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="nps" fill="var(--color-accent)" name="NPS" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="retention" fill="var(--color-leaf)" name="Active %" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="nps" fill="var(--color-accent)" name="Readiness" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
