@@ -1,5 +1,6 @@
-import { ChevronDown, Repeat } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Check, ChevronDown, Repeat } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '@/hooks/useAuth'
 import {
   fetchRoleOptions,
@@ -26,7 +27,9 @@ export function RoleSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({})
 
   const load = useCallback(async () => {
     if (role === 'super_user') return
@@ -42,13 +45,55 @@ export function RoleSwitcher({ collapsed = false }: { collapsed?: boolean }) {
     void load()
   }, [load, role, portalRefreshKey])
 
+  const updatePanelPosition = useCallback(() => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const gap = 6
+    setPanelStyle({
+      position: 'fixed',
+      zIndex: 70,
+      minWidth: Math.max(rect.width, 176),
+      left: collapsed ? rect.right + gap : rect.left,
+      bottom: window.innerHeight - rect.top + gap,
+    })
+  }, [collapsed])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    updatePanelPosition()
+  }, [open, updatePanelPosition])
+
   useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    if (!open) return
+    const onMove = () => updatePanelPosition()
+    window.addEventListener('resize', onMove)
+    window.addEventListener('scroll', onMove, true)
+    return () => {
+      window.removeEventListener('resize', onMove)
+      window.removeEventListener('scroll', onMove, true)
     }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [])
+  }, [open, updatePanelPosition])
+
+  useEffect(() => {
+    if (!open) return
+    function onPointerDown(e: MouseEvent) {
+      const target = e.target as Node
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open])
 
   if (!options || options.roles.length <= 1) return null
 
@@ -78,54 +123,67 @@ export function RoleSwitcher({ collapsed = false }: { collapsed?: boolean }) {
     }
   }
 
+  const menu =
+    open &&
+    createPortal(
+      <div
+        ref={panelRef}
+        role="menu"
+        style={panelStyle}
+        className="rounded-lg border border-border bg-card py-1 shadow-lg"
+      >
+        {options.roles.map((option) => {
+          const activeOption = isActiveOption(option, options)
+          return (
+            <button
+              key={roleOptionKey(option)}
+              type="button"
+              role="menuitem"
+              disabled={switching}
+              onClick={() => void handleSelect(option)}
+              className={cn(
+                'flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[13px] disabled:opacity-60',
+                activeOption
+                  ? 'bg-accent/10 text-accent font-medium'
+                  : 'text-foreground hover:bg-secondary/70',
+              )}
+            >
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+              {activeOption && <Check className="w-3.5 h-3.5 shrink-0" />}
+            </button>
+          )
+        })}
+        {error && <p className="px-2.5 py-1.5 text-xs text-rose">{error}</p>}
+      </div>,
+      document.body,
+    )
+
   return (
-    <div ref={rootRef} className="relative px-2">
+    <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
         disabled={switching}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'w-full flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-left text-sm hover:bg-secondary/50 transition-colors disabled:opacity-60',
+          'w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-navy-200 hover:bg-navy-700/60 hover:text-white transition-colors disabled:opacity-60',
           collapsed && 'justify-center px-2',
         )}
-        aria-label="Switch portal"
+        aria-label="Switch role"
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
-        <Repeat className="w-4 h-4 shrink-0 text-accent" />
+        <Repeat className="w-4 h-4 shrink-0" />
         {!collapsed && (
           <>
-            <span className="min-w-0 flex-1 truncate font-medium">{active.label}</span>
-            <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-left">{active.label}</span>
+            <ChevronDown
+              className={cn('w-3.5 h-3.5 shrink-0 opacity-70 transition-transform', open && 'rotate-180')}
+            />
           </>
         )}
       </button>
-      {open && (
-        <div
-          className={cn(
-            'absolute z-50 rounded-md border border-border bg-background py-1 shadow-lg',
-            collapsed ? 'left-full ml-2 bottom-0 min-w-[220px]' : 'left-2 right-2 bottom-full mb-1',
-          )}
-        >
-          <p className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
-            Switch portal
-          </p>
-          {options.roles.map((option) => (
-            <button
-              key={roleOptionKey(option)}
-              type="button"
-              disabled={switching}
-              onClick={() => void handleSelect(option)}
-              className={cn(
-                'block w-full px-3 py-2 text-left hover:bg-secondary/50 disabled:opacity-60',
-                isActiveOption(option, options) && 'bg-accent/10 text-accent',
-              )}
-            >
-              <span className="block text-sm font-medium">{option.label}</span>
-              <span className="block text-[11px] text-muted-foreground">{option.description}</span>
-            </button>
-          ))}
-          {error && <p className="px-3 py-2 text-xs text-rose">{error}</p>}
-        </div>
-      )}
+      {menu}
     </div>
   )
 }

@@ -86,7 +86,7 @@ export function TutorDashboardHero({
   const [editing, setEditing] = useState(false)
 
   return (
-    <section className="relative mb-8 overflow-hidden rounded-xl bg-gradient-to-br from-[#0c2238] via-[#163a66] to-[#1e4a82] text-paper shadow-lg">
+    <section className="relative mb-8 overflow-hidden rounded-xl bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] text-paper shadow-lg">
       <div className="absolute inset-0 paper-grid opacity-[0.08]" aria-hidden />
       <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-accent/25 blur-3xl" />
       <div className="absolute -bottom-20 left-1/4 h-40 w-40 rounded-full bg-blue-400/10 blur-3xl" />

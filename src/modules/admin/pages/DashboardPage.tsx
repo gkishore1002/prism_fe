@@ -34,7 +34,7 @@ import { useCenters } from '@/hooks/useCenters'
 import { formatCenterLabel } from '@/lib/centerLabel'
 import { adminMeta } from '@/modules/admin/lib/nav'
 
-const COLORS = ['#0065F3', '#FF950A', '#0FA96E', '#E5484D', '#7C6CF0']
+const COLORS = ['#1C2739', '#F7B731', '#0CBF6E', '#FF6B6B', '#8B5CF6']
 
 export function AdminDashboardPage() {
   useAnalyticsPage('adminDashboard')
@@ -244,7 +244,7 @@ export function AdminDashboardPage() {
                   <XAxis type="number" domain={[0, 100]} fontSize={11} />
                   <YAxis type="category" dataKey="topic" fontSize={11} width={180} />
                   <Tooltip />
-                  <Bar dataKey="correct" fill="#c45c5c" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="correct" fill="#FF6B6B" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -267,7 +267,7 @@ export function AdminDashboardPage() {
                   <XAxis dataKey="month" fontSize={11} />
                   <YAxis domain={[0, 100]} fontSize={11} />
                   <Tooltip />
-                  <Line type="monotone" dataKey="score" name="Avg score" stroke="#3575c4" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="score" name="Avg score" stroke="#1C2739" strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

@@ -17,16 +17,16 @@ const MOUSE_INFLUENCE = 200
 
 const PALETTES = {
   light: {
-    blue: { core: '#0065F3', glow: 'rgba(0, 101, 243, 0.22)', line: 'rgba(0, 101, 243, 0.14)' },
-    amber: { core: '#FF950A', glow: 'rgba(255, 149, 10, 0.18)', line: 'rgba(255, 149, 10, 0.12)' },
-    hub: { inner: 'rgba(0, 101, 243, 0.12)', mid: 'rgba(255, 149, 10, 0.06)', cursor: 'rgba(0, 101, 243, 0.85)' },
-    cross: 'rgba(124, 108, 240, 0.12)',
+    blue: { core: '#1C2739', glow: 'rgba(28, 39, 57, 0.22)', line: 'rgba(107, 137, 171, 0.14)' },
+    amber: { core: '#F7B731', glow: 'rgba(247, 183, 49, 0.18)', line: 'rgba(247, 183, 49, 0.12)' },
+    hub: { inner: 'rgba(28, 39, 57, 0.12)', mid: 'rgba(247, 183, 49, 0.06)', cursor: 'rgba(28, 39, 57, 0.85)' },
+    cross: 'rgba(139, 92, 246, 0.12)',
   },
   dark: {
-    blue: { core: '#7AADE6', glow: 'rgba(82, 144, 218, 0.5)', line: 'rgba(53, 117, 196, 0.4)' },
-    amber: { core: '#F5C830', glow: 'rgba(232, 184, 32, 0.45)', line: 'rgba(212, 160, 8, 0.35)' },
-    hub: { inner: 'rgba(245, 215, 110, 0.22)', mid: 'rgba(107, 159, 212, 0.08)', cursor: 'rgba(255, 244, 214, 0.9)' },
-    cross: 'rgba(147, 184, 232, 0.2)',
+    blue: { core: '#6B89AB', glow: 'rgba(107, 137, 171, 0.5)', line: 'rgba(77, 107, 143, 0.4)' },
+    amber: { core: '#FACE6A', glow: 'rgba(250, 206, 106, 0.45)', line: 'rgba(247, 183, 49, 0.35)' },
+    hub: { inner: 'rgba(250, 206, 106, 0.22)', mid: 'rgba(107, 137, 171, 0.08)', cursor: 'rgba(250, 250, 247, 0.9)' },
+    cross: 'rgba(167, 139, 250, 0.2)',
   },
 } as const
 

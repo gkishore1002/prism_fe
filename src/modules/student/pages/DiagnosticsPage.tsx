@@ -18,11 +18,11 @@ import {
 } from 'recharts'
 
 const barColors: Record<string, string> = {
-  weak: '#e5484d',
-  ok: '#ff950a',
-  strong: '#0fa96e',
-  fair: '#ff950a',
-  good: '#0065f3',
+  weak: '#FF6B6B',
+  ok: '#F7B731',
+  strong: '#0CBF6E',
+  fair: '#F7B731',
+  good: '#1C2739',
 }
 
 export function StudentDiagnosticsPage() {
@@ -66,13 +66,13 @@ export function StudentDiagnosticsPage() {
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={mathTopics} layout="vertical" margin={{ left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#d8e2ef" horizontal={false} />
-                  <XAxis type="number" domain={[0, 100]} stroke="#6e8499" fontSize={11} />
-                  <YAxis type="category" dataKey="topic" stroke="#6e8499" fontSize={11} width={120} />
-                  <Tooltip contentStyle={{ background: 'white', border: '1px solid #d8e2ef', borderRadius: 8 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#EEEDEA" horizontal={false} />
+                  <XAxis type="number" domain={[0, 100]} stroke="#94A3B8" fontSize={11} />
+                  <YAxis type="category" dataKey="topic" stroke="#94A3B8" fontSize={11} width={120} />
+                  <Tooltip contentStyle={{ background: 'white', border: '1px solid #EEEDEA', borderRadius: 10 }} />
                   <Bar dataKey="score" radius={[0, 4, 4, 0]}>
                     {mathTopics.map((t) => (
-                      <Cell key={t.topic} fill={barColors[t.status] ?? '#e8b820'} />
+                      <Cell key={t.topic} fill={barColors[t.status] ?? '#F7B731'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -92,10 +92,10 @@ export function StudentDiagnosticsPage() {
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={readinessBySubject}>
-                  <PolarGrid stroke="#d8e2ef" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#6e8499', fontSize: 12 }} />
+                  <PolarGrid stroke="#EEEDEA" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748B', fontSize: 12 }} />
                   <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                  <Radar dataKey="readiness" stroke="#3575c4" fill="#3575c4" fillOpacity={0.25} />
+                  <Radar dataKey="readiness" stroke="#1C2739" fill="#6B89AB" fillOpacity={0.25} />
                 </RadarChart>
               </ResponsiveContainer>
             </div>

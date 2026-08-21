@@ -35,8 +35,8 @@ export function AdminAnalyticsPage() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={monthlyTrend} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f5e8c8" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6e8499' }} />
-                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6e8499' }} />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94A3B8' }} />
+                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94A3B8' }} />
                 <Tooltip
                   contentStyle={{
                     background: '#ffffff',
@@ -45,7 +45,7 @@ export function AdminAnalyticsPage() {
                     fontSize: '12px',
                   }}
                 />
-                <Line type="monotone" dataKey="score" stroke="#3575c4" strokeWidth={2} dot={{ r: 4 }} name="Score %" />
+                <Line type="monotone" dataKey="score" stroke="#1C2739" strokeWidth={2} dot={{ r: 4 }} name="Score %" />
               </LineChart>
             </ResponsiveContainer>
           </div>

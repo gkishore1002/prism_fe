@@ -71,8 +71,10 @@ export async function fetchCurriculum(): Promise<CurriculumBoard[]> {
   return mapCurriculumBoards(data)
 }
 
-export async function fetchStudents(): Promise<StudentSummary[]> {
-  const data = await apiFetch<ApiStudentSummary[]>('/students')
+export async function fetchStudents(center?: string): Promise<StudentSummary[]> {
+  const data = await apiFetch<ApiStudentSummary[]>(
+    `/students${center ? `?center=${encodeURIComponent(center)}` : ''}`,
+  )
   return data.map(mapStudent)
 }
 
@@ -81,8 +83,10 @@ export async function fetchBatches(): Promise<TutorBatch[]> {
   return data.map(mapBatch)
 }
 
-export async function fetchStudentsForBatch(batchId: string): Promise<StudentSummary[]> {
-  const data = await apiFetch<ApiStudentSummary[]>(`/batches/${batchId}/students`)
+export async function fetchStudentsForBatch(batchId: string, center?: string): Promise<StudentSummary[]> {
+  const data = await apiFetch<ApiStudentSummary[]>(
+    `/batches/${batchId}/students${center ? `?center=${encodeURIComponent(center)}` : ''}`,
+  )
   return data.map(mapStudent)
 }
 

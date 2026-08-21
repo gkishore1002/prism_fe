@@ -5,9 +5,17 @@ export const APP_TAGLINE = 'AI-Powered Academic Intelligence'
 export const APP_WORKFLOW = ['Learn', 'Assess', 'Analyze', 'Improve'] as const
 export const APP_ORG = 'Prism Software'
 
+export const BRAND_MARK = '/brand/prism-mark.png'
 export const BRAND_LOGO_FULL = '/brand/prism-logo-full.png'
-export const BRAND_MARK_DARK = '/brand/prism-mark-dark.png'
+export const BRAND_MARK_DARK = '/brand/prism-mark.png'
 
+/**
+ * Health status → Swotify semantic colour families:
+ *   excellent / good → Emerald  (positive outcome)
+ *   fair             → Gold     (in-progress / watch)
+ *   weak             → Gold     (caution)
+ *   critical         → Coral    (risk detected)
+ */
 export const HEALTH_CONFIG: Record<
   HealthStatus,
   { label: string; color: string; bg: string; dot: string }
@@ -15,32 +23,32 @@ export const HEALTH_CONFIG: Record<
   excellent: {
     label: 'Excellent',
     color: 'text-emerald-700',
-    bg: 'bg-emerald-100',
-    dot: 'bg-emerald-500',
+    bg:    'bg-emerald-100',
+    dot:   'bg-emerald-500',
   },
   good: {
     label: 'Good',
     color: 'text-emerald-700',
-    bg: 'bg-emerald-100',
-    dot: 'bg-emerald-500',
+    bg:    'bg-emerald-100',
+    dot:   'bg-emerald-500',
   },
   fair: {
     label: 'Fair',
-    color: 'text-yellow-700',
-    bg: 'bg-yellow-100',
-    dot: 'bg-yellow-500',
+    color: 'text-gold-700',
+    bg:    'bg-gold-100',
+    dot:   'bg-gold-500',
   },
   weak: {
     label: 'Weak',
-    color: 'text-yellow-700',
-    bg: 'bg-yellow-100',
-    dot: 'bg-yellow-400',
+    color: 'text-gold-700',
+    bg:    'bg-gold-100',
+    dot:   'bg-gold-600',
   },
   critical: {
     label: 'Critical',
-    color: 'text-rose-700',
-    bg: 'bg-rose-100',
-    dot: 'bg-rose-500',
+    color: 'text-coral-700',
+    bg:    'bg-coral-100',
+    dot:   'bg-coral-500',
   },
 }
 

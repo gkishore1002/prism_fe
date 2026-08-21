@@ -1321,14 +1321,14 @@
 }
 
 .lg-nav-btn-primary {
-  background: #0065f3;
-  border-color: #0065f3;
+  background: #1C2739;
+  border-color: #1C2739;
   color: #fff;
 }
 
 .lg-nav-btn-primary:hover {
-  background: #005bdb;
-  border-color: #005bdb;
+  background: #2A3B52;
+  border-color: #2A3B52;
 }
 
 .lg-nav-btn-primary:disabled {

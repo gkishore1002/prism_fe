@@ -21,6 +21,7 @@ import {
   type MarksGrid,
 } from '@/modules/tutor/components/MarksSpreadsheet'
 import { useCurriculum } from '@/hooks/useCurriculum'
+import { useCenters } from '@/hooks/useCenters'
 import { fetchStudentsForBatch } from '@/lib/api/curriculumApi'
 import {
   getCurriculumSubjectsForBatch,
@@ -71,6 +72,8 @@ type MarksTab = (typeof TABS)[number]['id']
 export function TutorMarksPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { batches, curriculum, ensureLoaded } = useCurriculum()
+  const { activeCenterId, isAllBranches } = useCenters()
+  const branchCenterId = isAllBranches ? undefined : activeCenterId
 
   useEffect(() => {
     void ensureLoaded()
@@ -159,7 +162,7 @@ export function TutorMarksPage() {
 
     let cancelled = false
     setLoadingStudents(true)
-    void fetchStudentsForBatch(batchId)
+    void fetchStudentsForBatch(batchId, branchCenterId)
       .then((list) => {
         if (cancelled) return
         setBatchStudents(list.map((s) => ({ id: s.id, name: s.name })))
@@ -179,7 +182,7 @@ export function TutorMarksPage() {
     return () => {
       cancelled = true
     }
-  }, [batchId, curriculum, selectedBatch])
+  }, [batchId, curriculum, selectedBatch, branchCenterId])
 
   const clearUploadPreview = useCallback(() => {
     setUploadPreviewLoaded(false)
@@ -199,7 +202,7 @@ export function TutorMarksPage() {
     let cancelled = false
     setLoadingUploadStudents(true)
     clearUploadPreview()
-    void fetchStudentsForBatch(uploadBatchId)
+    void fetchStudentsForBatch(uploadBatchId, branchCenterId)
       .then((list) => {
         if (cancelled) return
         setUploadStudents(list.map((s) => ({ id: s.id, name: s.name })))
@@ -218,7 +221,7 @@ export function TutorMarksPage() {
     return () => {
       cancelled = true
     }
-  }, [uploadBatchId, curriculum, uploadBatch, clearUploadPreview])
+  }, [uploadBatchId, curriculum, uploadBatch, clearUploadPreview, branchCenterId])
 
   const marksLog = useMemo(
     () =>

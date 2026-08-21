@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { useCenters } from '@/hooks/useCenters'
 import * as assessmentsApi from '@/lib/api/assessmentsApi'
 import type { AssessmentAttendanceRecord, TutorAssessmentSchedule } from '@/types'
 import { assessmentMatchesScope, type AcademicScope } from '@/lib/academicScope'
@@ -39,11 +40,15 @@ const AssessmentContext = createContext<AssessmentContextValue | null>(null)
 
 export function AssessmentProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, role, user } = useAuth()
+  const { activeCenterId, isAllBranches } = useCenters()
+  const branchCenterId = isAllBranches ? undefined : activeCenterId
   const [assessments, setAssessments] = useState<TutorAssessmentSchedule[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const loadPromiseRef = useRef<Promise<void> | null>(null)
   const attendanceCacheRef = useRef<Map<string, AssessmentAttendanceRecord[]>>(new Map())
+
+  const loadedBranchRef = useRef<string | 'all' | null>(null)
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated) return
@@ -53,30 +58,40 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
       const data =
         role === 'student'
           ? await assessmentsApi.fetchAssessmentsForStudent({ studentId: user.id })
-          : await assessmentsApi.fetchAssessments()
+          : await assessmentsApi.fetchAssessments(branchCenterId)
       setAssessments(data)
       attendanceCacheRef.current.clear()
+      loadedBranchRef.current = role === 'student' ? 'all' : (branchCenterId ?? 'all')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load assessments')
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated, role, user.id])
+  }, [isAuthenticated, role, user.id, branchCenterId])
 
   const ensureLoaded = useCallback(async () => {
     if (!isAuthenticated) return
-    if (assessments.length > 0) return
+    const key = role === 'student' ? 'all' : (branchCenterId ?? 'all')
+    if (assessments.length > 0 && loadedBranchRef.current === key) return
     if (!loadPromiseRef.current) {
       loadPromiseRef.current = refresh().finally(() => {
         loadPromiseRef.current = null
       })
     }
     await loadPromiseRef.current
-  }, [isAuthenticated, assessments.length, refresh])
+  }, [isAuthenticated, role, assessments.length, branchCenterId, refresh])
 
   useEffect(() => {
-    if (!isAuthenticated) setAssessments([])
-  }, [isAuthenticated])
+    if (!isAuthenticated) {
+      setAssessments([])
+      loadedBranchRef.current = null
+      return
+    }
+    if (role === 'student') return
+    const key = branchCenterId ?? 'all'
+    if (loadedBranchRef.current === key) return
+    void refresh()
+  }, [isAuthenticated, role, branchCenterId, refresh])
 
   const addAssessment = useCallback(async (assessment: TutorAssessmentSchedule) => {
     const created = await assessmentsApi.createAssessment(assessment)

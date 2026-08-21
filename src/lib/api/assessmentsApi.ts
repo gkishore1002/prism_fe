@@ -22,8 +22,10 @@ function unwrapAssessments(data: ApiAssessment[] | PaginatedAssessments): ApiAss
   return data.items ?? []
 }
 
-export async function fetchAssessments(): Promise<TutorAssessmentSchedule[]> {
-  const data = await apiFetch<ApiAssessment[] | PaginatedAssessments>('/assessments')
+export async function fetchAssessments(centerId?: string): Promise<TutorAssessmentSchedule[]> {
+  const data = await apiFetch<ApiAssessment[] | PaginatedAssessments>(
+    `/assessments${centerId ? `?center_id=${encodeURIComponent(centerId)}` : ''}`,
+  )
   return unwrapAssessments(data).map(mapAssessment)
 }
 

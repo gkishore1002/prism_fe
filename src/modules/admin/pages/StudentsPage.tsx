@@ -8,15 +8,17 @@ import { fetchStudentsMasterStats, type StudentMasterStats } from '@/lib/api/stu
 
 export function AdminStudentsPage({ embedded = false }: { embedded?: boolean }) {
   useAnalyticsPage('adminStudents')
-  const { centers } = useCenters()
+  const { centers, activeCenterId, isAllBranches } = useCenters()
   const [stats, setStats] = useState<StudentMasterStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const branchCenterId = isAllBranches ? undefined : activeCenterId
 
   useEffect(() => {
-    void fetchStudentsMasterStats()
+    setLoading(true)
+    void fetchStudentsMasterStats(branchCenterId)
       .then(setStats)
       .finally(() => setLoading(false))
-  }, [])
+  }, [branchCenterId])
 
   if (loading) {
     return <PageLoader />
@@ -35,7 +37,7 @@ export function AdminStudentsPage({ embedded = false }: { embedded?: boolean }) 
       <div className="flex flex-wrap items-start gap-2 mb-5">
         <AppStat compact label="Total Students" value={stats?.total ?? 0} />
         <AppStat compact label="Active" value={stats?.active ?? 0} tone="leaf" />
-        <AppStat compact label="Branches" value={centers.length} />
+        <AppStat compact label="Branches" value={isAllBranches ? centers.length : 1} />
       </div>
 
       <StudentManagementPanel scope="admin" />

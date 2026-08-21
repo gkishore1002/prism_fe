@@ -17,12 +17,12 @@ interface TopicBarChartProps {
 }
 
 const statusColors: Record<string, string> = {
-  excellent: '#0fa96e',
-  good: '#0065f3',
-  fair: '#ff950a',
-  average: '#ff950a',
-  weak: '#ff950a',
-  critical: '#e5484d',
+  excellent: '#0CBF6E',
+  good: '#1C2739',
+  fair: '#F7B731',
+  average: '#F7B731',
+  weak: '#F7B731',
+  critical: '#FF6B6B',
 }
 
 export function TopicBarChart({ data, height = 220, className }: TopicBarChartProps) {
@@ -30,13 +30,13 @@ export function TopicBarChart({ data, height = 220, className }: TopicBarChartPr
     <div className={cn('w-full', className)} style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" horizontal={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#EEEDEA" horizontal={false} />
           <XAxis
             type="number"
             domain={[0, 100]}
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: '#a1a1aa' }}
+            tick={{ fontSize: 11, fill: '#94A3B8' }}
           />
           <YAxis
             type="category"
@@ -44,20 +44,20 @@ export function TopicBarChart({ data, height = 220, className }: TopicBarChartPr
             width={110}
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: '#52525b' }}
+            tick={{ fontSize: 11, fill: '#64748B' }}
           />
           <Tooltip
             contentStyle={{
               background: 'white',
-              border: '1px solid #e4e4e7',
-              borderRadius: '8px',
+              border: '1px solid #EEEDEA',
+              borderRadius: '10px',
               fontSize: '12px',
             }}
             formatter={(value) => [`${value}%`, 'Mastery']}
           />
           <Bar dataKey="mastery" radius={[0, 4, 4, 0]} barSize={16}>
             {data.map((entry, i) => (
-              <Cell key={i} fill={statusColors[entry.status] ?? '#0065f3'} />
+              <Cell key={i} fill={statusColors[entry.status] ?? '#1C2739'} />
             ))}
           </Bar>
         </BarChart>

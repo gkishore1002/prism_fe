@@ -34,7 +34,7 @@ function mergeTeachers(accounts: TutorAccount[], analytics: TeacherRow[]) {
 
 export function AdminTeachersPage() {
   useAnalyticsPage('adminTeachers')
-  const { centers, canManageTenant } = useCenters()
+  const { centers, canManageTenant, activeCenterId, isAllBranches } = useCenters()
   const { teachers, loading, refresh } = useAnalytics()
   const [accounts, setAccounts] = useState<TutorAccount[]>([])
   const [accountsLoading, setAccountsLoading] = useState(true)
@@ -53,7 +53,7 @@ export function AdminTeachersPage() {
   async function loadAccounts() {
     setAccountsLoading(true)
     try {
-      setAccounts(await fetchTutors())
+      setAccounts(await fetchTutors(isAllBranches ? undefined : activeCenterId))
     } catch {
       setAccounts([])
     } finally {
@@ -63,7 +63,7 @@ export function AdminTeachersPage() {
 
   useEffect(() => {
     void loadAccounts()
-  }, [])
+  }, [activeCenterId, isAllBranches])
 
   const rows = useMemo(() => mergeTeachers(accounts, teachers), [accounts, teachers])
 

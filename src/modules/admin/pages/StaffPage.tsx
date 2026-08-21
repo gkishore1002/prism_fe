@@ -63,7 +63,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   useAnalyticsPage('adminTeachers')
   const { user, refreshAuth } = useAuth()
   const { organizationScoped } = useAdminPortalContext()
-  const { centers, isPlatformSuperUser, ensureLoaded, refresh: refreshCenters } = useCenters()
+  const { centers, isPlatformSuperUser, ensureLoaded, refresh: refreshCenters, activeCenterId, isAllBranches } = useCenters()
   const { teachers, loading: analyticsLoading, refresh } = useAnalytics()
   const { confirm } = useConfirmModal()
   const [staff, setStaff] = useState<StaffMember[]>([])
@@ -94,18 +94,20 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [viewingProfile, setViewingProfile] = useState<StaffMember | null>(null)
 
+  const branchCenterId = isAllBranches ? undefined : activeCenterId
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      setStaff(await fetchStaff())
+      setStaff(await fetchStaff(branchCenterId))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load staff')
       setStaff([])
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [branchCenterId])
 
   useEffect(() => {
     void ensureLoaded()

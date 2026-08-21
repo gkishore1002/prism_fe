@@ -10,8 +10,10 @@ export interface StaffMember {
   roles: string[]
 }
 
-export async function fetchStaff(): Promise<StaffMember[]> {
-  return apiFetch<StaffMember[]>('/staff')
+export async function fetchStaff(centerId?: string): Promise<StaffMember[]> {
+  return apiFetch<StaffMember[]>(
+    `/staff${centerId ? `?center_id=${encodeURIComponent(centerId)}` : ''}`,
+  )
 }
 
 export async function createStaff(body: {

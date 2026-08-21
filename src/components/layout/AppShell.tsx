@@ -151,7 +151,7 @@ export function AppShell({ module }: AppShellProps) {
         aria-label="Primary"
       >
         {!collapsed && (
-          <p className="px-3 mb-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
+          <p className="px-3 mb-2 nav-section-label">
             {moduleId === 'admin' && role !== 'super_user' ? portalLabel : 'Workspace'}
           </p>
         )}
@@ -171,15 +171,15 @@ export function AppShell({ module }: AppShellProps) {
         <RoleSwitcher collapsed={collapsed} />
         {!collapsed && (
           <div className="flex items-center gap-3 px-2 py-2 rounded-2xl">
-            <div className="w-9 h-9 rounded-full bg-accent/20 text-accent grid place-items-center font-semibold text-sm shrink-0">
+            <div className="w-9 h-9 rounded-full sidebar-avatar grid place-items-center font-semibold text-sm shrink-0">
               {profile.initials}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-widest text-accent font-medium">
+              <div className="text-[10px] uppercase tracking-widest text-gold-500 font-medium">
                 {profile.roleLabel}
               </div>
-              <div className="text-sm font-medium truncate text-foreground">{profile.name}</div>
-              <div className="text-[11px] text-muted-foreground truncate">{profile.subtitle}</div>
+              <div className="text-sm font-medium truncate text-white">{profile.name}</div>
+              <div className="text-[11px] text-navy-200 truncate">{profile.subtitle}</div>
             </div>
           </div>
         )}
@@ -190,7 +190,7 @@ export function AppShell({ module }: AppShellProps) {
             navigate('/login', { replace: true })
           }}
           className={cn(
-            'w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors',
+            'w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-navy-200 hover:bg-navy-700/60 hover:text-white transition-colors',
             collapsed && 'justify-center',
           )}
           aria-label="Sign out"
@@ -208,14 +208,14 @@ export function AppShell({ module }: AppShellProps) {
       <div className="shrink-0 h-14 flex items-stretch border-b border-border bg-card z-ln-sticky">
         <div
           className={cn(
-            'hidden lg:flex items-center shrink-0 border-r border-border bg-sidebar px-2 transition-[width] duration-200 ease-out',
+            'hidden lg:flex items-center shrink-0 border-r border-[rgba(255,255,255,0.08)] bg-navy-900 px-2 transition-[width] duration-200 ease-out',
             collapsed ? 'w-[72px] justify-center' : 'w-[260px] justify-end',
           )}
         >
           <button
             type="button"
             onClick={() => setCollapsed((v) => !v)}
-            className="btn btn-ghost size-9 text-muted-foreground shrink-0"
+            className="btn btn-ghost size-9 text-navy-200 hover:text-white hover:bg-navy-700/60 shrink-0"
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             <Menu className="w-[18px] h-[18px]" />
@@ -244,8 +244,9 @@ export function AppShell({ module }: AppShellProps) {
             {(moduleId === 'admin' || moduleId === 'tutor') && (
               <>
                 {role === 'super_user' && <OrgSwitcher />}
-                {moduleId === 'admin' && role !== 'super_user' && !branchScoped && <BranchSwitcher />}
-                {moduleId === 'tutor' && <BranchSwitcher />}
+                {((moduleId === 'admin' && role !== 'super_user') || moduleId === 'tutor') && (
+                  <BranchSwitcher />
+                )}
               </>
             )}
             <NotificationBell moduleId={moduleId} />
@@ -256,7 +257,7 @@ export function AppShell({ module }: AppShellProps) {
       <div className="relative flex flex-1 min-h-0 overflow-hidden">
         <aside
           className={cn(
-            'hidden lg:flex shrink-0 h-full flex-col overflow-hidden border-r border-border bg-sidebar transition-[width] duration-200 ease-out',
+            'hidden lg:flex shrink-0 h-full flex-col overflow-hidden csc-sidebar transition-[width] duration-200 ease-out',
             collapsed ? 'w-[72px]' : 'w-[260px]',
           )}
         >
@@ -279,13 +280,13 @@ export function AppShell({ module }: AppShellProps) {
                 aria-label="Close menu"
               />
               <motion.aside
-                className="relative w-[min(100%,300px)] h-full bg-sidebar border-r border-border flex flex-col overflow-hidden shadow-lg"
+                className="relative w-[min(100%,300px)] h-full csc-sidebar flex flex-col overflow-hidden shadow-lg"
                 variants={slideFromLeft}
                 initial="hidden"
                 animate="visible"
                 exit="exit"
               >
-                <div className="flex items-center justify-between gap-2 h-14 px-4 border-b border-border shrink-0">
+                <div className="flex items-center justify-between gap-2 h-14 px-4 border-b border-[rgba(255,255,255,0.08)] shrink-0">
                   <PrismLogo size="sm" showWordmark href={homePath} />
                   <button
                     type="button"
@@ -426,11 +427,11 @@ function NavLinkItem({
       )}
     >
       {Icon && (
-        <Icon className={cn('w-[18px] h-[18px] shrink-0', active && 'text-accent')} />
+        <Icon className={cn('w-[18px] h-[18px] shrink-0', active && 'text-gold-500')} />
       )}
       {!collapsed && <span className="flex-1">{item.label}</span>}
       {!collapsed && item.badge != null && (
-        <span className="font-mono-data text-[10px] bg-accent/15 text-accent px-2 py-0.5 rounded-full">
+        <span className="font-mono-data text-[10px] bg-gold-500/20 text-gold-600 px-2 py-0.5 rounded-full">
           {item.badge}
         </span>
       )}
@@ -458,7 +459,7 @@ export function PageHeader({
     >
       <div className="min-w-0">
         {eyebrow && (
-          <div className="text-[11px] uppercase tracking-[0.2em] text-accent font-sans font-semibold mb-2">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-navy-500 font-sans font-semibold mb-2">
             {eyebrow}
           </div>
         )}

@@ -11,6 +11,7 @@ import { fetchStudentsPaginated } from '@/lib/api/studentsApi'
 import { isApiEnabled } from '@/lib/apiClient'
 import { isCscUrgent } from '@/lib/cscPolicy'
 import { useInstitutionPolicies } from '@/hooks/useInstitutionPolicies'
+import { useCenters } from '@/hooks/useCenters'
 import { DEFAULT_PAGE_LIMIT } from '@/lib/pagination'
 import type { ReportCollectionLog, StudentSummary } from '@/types'
 
@@ -80,6 +81,8 @@ function GuardianCollectionCell({
 
 export function StudentReportsList({ reportPathPrefix }: StudentReportsListProps) {
   const { policies } = useInstitutionPolicies()
+  const { activeCenterId, isAllBranches } = useCenters()
+  const branchCenterId = isAllBranches ? undefined : activeCenterId
   const warningDays = policies?.csc.warningThresholdDays ?? 14
   const inactivityDays = policies?.csc.inactivityThresholdDays ?? 90
   const [searchInput, setSearchInput] = useState('')
@@ -100,7 +103,7 @@ export function StudentReportsList({ reportPathPrefix }: StudentReportsListProps
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch])
+  }, [debouncedSearch, branchCenterId])
 
   const loadStudents = useCallback(async () => {
     setLoading(true)
@@ -110,6 +113,7 @@ export function StudentReportsList({ reportPathPrefix }: StudentReportsListProps
         page,
         limit,
         search: debouncedSearch || undefined,
+        center: branchCenterId,
       })
       setStudents(data.items)
       setTotal(data.total)
@@ -125,7 +129,7 @@ export function StudentReportsList({ reportPathPrefix }: StudentReportsListProps
     } finally {
       setLoading(false)
     }
-  }, [page, limit, debouncedSearch])
+  }, [page, limit, debouncedSearch, branchCenterId])
 
   useEffect(() => {
     void loadStudents()

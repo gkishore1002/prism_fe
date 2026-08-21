@@ -6,8 +6,10 @@ export interface TutorAccount {
   email: string
 }
 
-export async function fetchTutors(): Promise<TutorAccount[]> {
-  return apiFetch<TutorAccount[]>('/tutors')
+export async function fetchTutors(centerId?: string): Promise<TutorAccount[]> {
+  return apiFetch<TutorAccount[]>(
+    `/tutors${centerId ? `?center_id=${encodeURIComponent(centerId)}` : ''}`,
+  )
 }
 
 export async function createTutor(payload: {

@@ -325,10 +325,10 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       case 'tutorDashboard': {
         const centerId = branchCenterId
         const [weakness, insights, risk, copilotData] = await Promise.all([
-          analyticsApi.tutorTopicWeakness(),
+          analyticsApi.tutorTopicWeakness(undefined, undefined, centerId),
           analyticsApi.classInsights(centerId),
           analyticsApi.tutorAtRisk(undefined, undefined, centerId),
-          analyticsApi.tutorCopilot(),
+          analyticsApi.tutorCopilot(undefined, centerId),
         ])
         setTopicWeakness(weakness)
         setClassInsights(insights)
@@ -337,7 +337,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
         break
       }
       case 'tutorBatches': {
-        setBatchHeatmap(await analyticsApi.tutorBatchHeatmap())
+        setBatchHeatmap(await analyticsApi.tutorBatchHeatmap(undefined, undefined, branchCenterId))
         break
       }
       case 'tutorAtRisk': {

@@ -212,11 +212,11 @@ export function StudentTodayPage() {
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={improvementTrend}>
-                  <CartesianGrid stroke="#d8e2ef" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="month" stroke="#6e8499" fontSize={11} />
-                  <YAxis stroke="#6e8499" fontSize={11} domain={[0, 100]} />
-                  <Tooltip contentStyle={{ background: 'white', border: '1px solid #d8e2ef', borderRadius: 8 }} />
-                  <Line type="monotone" dataKey="score" stroke="#e8b820" strokeWidth={2.5} dot={{ r: 4, fill: '#e8b820' }} />
+                  <CartesianGrid stroke="#EEEDEA" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" stroke="#94A3B8" fontSize={11} />
+                  <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 100]} />
+                  <Tooltip contentStyle={{ background: 'white', border: '1px solid #EEEDEA', borderRadius: 10 }} />
+                  <Line type="monotone" dataKey="score" stroke="#F7B731" strokeWidth={2.5} dot={{ r: 4, fill: '#F7B731' }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

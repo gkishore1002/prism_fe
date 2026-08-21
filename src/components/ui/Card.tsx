@@ -1,31 +1,82 @@
 import { cn } from '@/lib/cn'
 import type { HTMLAttributes } from 'react'
 
-type Accent = 'blue' | 'yellow' | 'emerald' | 'rose' | 'indigo' | 'none'
+/**
+ * Metric card category (Swotify left-border accent pattern):
+ * Cards stay white; a 4px left pseudo-element carries the category color.
+ * - volume   → sapphire  (totals, neutral counts)
+ * - healthy  → emerald   (pass rate, improvements)
+ * - risk     → coral     (at-risk students, alerts)
+ * - caution  → gold      (mid-range watch, pending interventions)
+ * - activity → violet    (AI engagement, uploads, logins)
+ * - action   → sapphire-600 (pending reviews, actions needed)
+ */
+type MetricCategory = 'volume' | 'healthy' | 'risk' | 'caution' | 'activity' | 'action'
+
+type Accent =
+  | 'sapphire' | 'navy' | 'blue'
+  | 'gold' | 'yellow'
+  | 'emerald'
+  | 'rose' | 'coral'
+  | 'indigo'
+  | 'violet'
+  | 'none'
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   hover?: boolean
   padding?: 'none' | 'sm' | 'md' | 'lg'
   accent?: Accent
+  /** Metric category tint — renders a 4px left-border accent */
+  metric?: MetricCategory
 }
 
 const paddingMap = {
   none: '',
-  sm: 'p-4',
-  md: 'p-5',
-  lg: 'p-6',
+  sm:   'p-4',
+  md:   'p-5',
+  lg:   'p-6',
 }
 
 const accentMap: Record<Accent, string> = {
-  blue: 'accent-blue',
-  yellow: 'accent-yellow',
-  emerald: 'accent-emerald',
-  rose: 'accent-rose',
-  indigo: 'accent-indigo',
-  none: '',
+  sapphire: 'accent-sapphire',
+  navy:     'accent-navy',
+  blue:     'accent-blue',
+  gold:     'accent-gold',
+  yellow:   'accent-yellow',
+  emerald:  'accent-emerald',
+  rose:     'accent-rose',
+  coral:    'accent-coral',
+  indigo:   'accent-indigo',
+  violet:   'accent-activity',
+  none:     '',
 }
 
-export function Card({ className, hover, padding = 'md', accent = 'none', children, ...props }: CardProps) {
+const metricMap: Record<MetricCategory, string> = {
+  volume:   'metric-card metric-volume',
+  healthy:  'metric-card metric-healthy',
+  risk:     'metric-card metric-risk',
+  caution:  'metric-card metric-caution',
+  activity: 'metric-card metric-activity',
+  action:   'metric-card metric-action',
+}
+
+export function Card({
+  className,
+  hover,
+  padding = 'md',
+  accent = 'none',
+  metric,
+  children,
+  ...props
+}: CardProps) {
+  if (metric) {
+    return (
+      <div className={cn(metricMap[metric], className)} {...props}>
+        {children}
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn(
@@ -44,7 +95,11 @@ export function Card({ className, hover, padding = 'md', accent = 'none', childr
 
 export function CardHeader({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('flex items-center justify-between mb-4 pb-4 border-b border-border', className)} {...props}>
+    <div
+      className={cn('flex items-center justify-between border-b border-border', className)}
+      style={{ padding: '18px 20px 14px' }}
+      {...props}
+    >
       {children}
     </div>
   )
@@ -60,8 +115,26 @@ export function CardTitle({ className, children, ...props }: HTMLAttributes<HTML
 
 export function CardDescription({ className, children, ...props }: HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={cn('text-[12px] text-muted-foreground mt-0.5 font-sans', className)} {...props}>
+    <p className={cn('text-[13px] text-muted-foreground mt-0.5 font-sans', className)} {...props}>
       {children}
     </p>
+  )
+}
+
+/** Metric label — Sora 11px, uppercase, muted, letter-spaced */
+export function MetricLabel({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn('metric-label', className)} {...props}>
+      {children}
+    </div>
+  )
+}
+
+/** Metric value — IBM Plex Mono 28px 600 */
+export function MetricValue({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn('metric-value font-mono-data tabular-nums', className)} {...props}>
+      {children}
+    </div>
   )
 }

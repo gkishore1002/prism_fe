@@ -90,7 +90,7 @@ export function StudentFullReportView({ periodLabel }: StudentFullReportViewProp
     name: t.topic.length > 14 ? `${t.topic.slice(0, 12)}…` : t.topic,
     mastery: t.currentMastery ?? t.mastery,
     predicted: t.predictedScore ?? t.mastery,
-    fill: (t.predictedScore ?? t.mastery) >= 75 ? '#059669' : (t.predictedScore ?? t.mastery) >= 55 ? '#e8b820' : '#e11d48',
+    fill: (t.predictedScore ?? t.mastery) >= 75 ? '#0CBF6E' : (t.predictedScore ?? t.mastery) >= 55 ? '#F7B731' : '#FF6B6B',
   }))
 
   const generatedOn = new Date().toLocaleDateString('en-IN', {
@@ -335,14 +335,14 @@ export function StudentFullReportView({ periodLabel }: StudentFullReportViewProp
                       <div className="h-36">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={topicChartData} layout="vertical" margin={{ left: 0, right: 4, top: 0, bottom: 0 }}>
-                            <XAxis type="number" domain={[0, 100]} fontSize={8} tick={{ fill: '#6e8499' }} />
-                            <YAxis type="category" dataKey="name" width={72} fontSize={8} tick={{ fill: '#466080' }} />
+                            <XAxis type="number" domain={[0, 100]} fontSize={8} tick={{ fill: '#94A3B8' }} />
+                            <YAxis type="category" dataKey="name" width={72} fontSize={8} tick={{ fill: '#64748B' }} />
                             <Bar dataKey="mastery" barSize={8} name="Mastery">
                               {topicChartData.map((entry) => (
                                 <Cell key={entry.name} fill={entry.fill} />
                               ))}
                             </Bar>
-                            <Bar dataKey="predicted" barSize={8} fill="#0065F3" name="Predicted" />
+                            <Bar dataKey="predicted" barSize={8} fill="#1C2739" name="Predicted" />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -374,15 +374,15 @@ export function StudentFullReportView({ periodLabel }: StudentFullReportViewProp
                   <div className="h-36">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={improvementTrend}>
-                        <CartesianGrid stroke="#e8e4dc" strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="month" fontSize={8} tick={{ fill: '#6e8499' }} />
-                        <YAxis domain={[0, 100]} fontSize={8} tick={{ fill: '#6e8499' }} width={28} />
+                        <CartesianGrid stroke="#EEEDEA" strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="month" fontSize={8} tick={{ fill: '#94A3B8' }} />
+                        <YAxis domain={[0, 100]} fontSize={8} tick={{ fill: '#94A3B8' }} width={28} />
                         <Line
                           type="monotone"
                           dataKey="score"
-                          stroke="#163a66"
+                          stroke="#1C2739"
                           strokeWidth={2}
-                          dot={{ r: 2, fill: '#e8b820', stroke: '#163a66' }}
+                          dot={{ r: 2, fill: '#F7B731', stroke: '#1C2739' }}
                         />
                       </LineChart>
                     </ResponsiveContainer>

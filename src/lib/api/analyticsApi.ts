@@ -211,10 +211,11 @@ export const analyticsApi = {
     }
   },
 
-  tutorTopicWeakness: (batchId?: string, batchName?: string) => {
+  tutorTopicWeakness: (batchId?: string, batchName?: string, centerId?: string) => {
     const params = new URLSearchParams()
     if (batchId) params.set('batch_id', batchId)
     else if (batchName) params.set('batch_name', batchName)
+    if (centerId) params.set('center_id', centerId)
     const qs = params.toString()
     return apiFetch<BatchTopicWeakness[]>(`/analytics/tutor/topic-weakness${qs ? `?${qs}` : ''}`)
   },
@@ -226,10 +227,11 @@ export const analyticsApi = {
     const qs = params.toString()
     return apiFetch<AtRiskStudent[]>(`/analytics/tutor/at-risk${qs ? `?${qs}` : ''}`)
   },
-  tutorBatchHeatmap: (batchId?: string, batchName?: string) => {
+  tutorBatchHeatmap: (batchId?: string, batchName?: string, centerId?: string) => {
     const params = new URLSearchParams()
     if (batchId) params.set('batch_id', batchId)
     else if (batchName) params.set('batch_name', batchName)
+    if (centerId) params.set('center_id', centerId)
     const qs = params.toString()
     return apiFetch<{ topic: string; mastery: number }[]>(
       `/analytics/tutor/batch-heatmap${qs ? `?${qs}` : ''}`,
@@ -237,8 +239,13 @@ export const analyticsApi = {
   },
   classInsights: (centerId?: string) =>
     apiFetch<ClassInsight[]>(withCenterQuery('/analytics/tutor/class-insights', centerId)),
-  tutorCopilot: (batchName?: string) =>
-    apiFetch<TutorCopilotAnalytics>(`/analytics/tutor/copilot${batchName ? `?batch_name=${encodeURIComponent(batchName)}` : ''}`),
+  tutorCopilot: (batchName?: string, centerId?: string) => {
+    const params = new URLSearchParams()
+    if (batchName) params.set('batch_name', batchName)
+    if (centerId) params.set('center_id', centerId)
+    const qs = params.toString()
+    return apiFetch<TutorCopilotAnalytics>(`/analytics/tutor/copilot${qs ? `?${qs}` : ''}`)
+  },
   subjectStudents: (subject: string) =>
     apiFetch<
       {

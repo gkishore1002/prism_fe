@@ -3,18 +3,22 @@ import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { StudentManagementPanel } from '@/components/academic/StudentManagementPanel'
 import { useCurriculum } from '@/hooks/useCurriculum'
+import { useCenters } from '@/hooks/useCenters'
 import { fetchStudentsMasterStats, type StudentMasterStats } from '@/lib/api/studentsApi'
 
 export function TutorStudentsPage() {
   const { batches } = useCurriculum()
+  const { activeCenterId, isAllBranches } = useCenters()
   const [stats, setStats] = useState<StudentMasterStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const branchCenterId = isAllBranches ? undefined : activeCenterId
 
   useEffect(() => {
-    void fetchStudentsMasterStats()
+    setLoading(true)
+    void fetchStudentsMasterStats(branchCenterId)
       .then(setStats)
       .finally(() => setLoading(false))
-  }, [])
+  }, [branchCenterId])
 
   if (loading) {
     return <PageLoader />

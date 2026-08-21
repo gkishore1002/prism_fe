@@ -56,9 +56,9 @@ function LoaderMark({
         { color: '#E4C077', phase: 240 },
       ] as const)
     : ([
-        { color: '#0065F3', phase: 0 },
-        { color: '#FF950A', phase: 120 },
-        { color: '#0FA96E', phase: 240 },
+        { color: '#1C2739', phase: 0 },
+        { color: '#F7B731', phase: 120 },
+        { color: '#8B5CF6', phase: 240 },
       ] as const)
 
   return (
@@ -240,7 +240,7 @@ function LoaderCopy({
             background:
               tone === 'report'
                 ? 'linear-gradient(90deg, #C9A24B, #F0D78A, #E4C077)'
-                : 'linear-gradient(90deg, #0065F3, #FF950A)',
+                : 'linear-gradient(90deg, #1C2739, #F7B731)',
           }}
           animate={{ x: ['-110%', '220%'] }}
           transition={{ duration: 1.45, repeat: Infinity, ease: 'easeInOut' }}

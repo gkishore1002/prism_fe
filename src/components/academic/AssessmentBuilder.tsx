@@ -36,7 +36,8 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
   } = useQuestionPapers()
   const { curriculum, batches, students, getBatchesForScope, ensureLoaded: ensureCurriculumLoaded } =
     useCurriculum()
-  const { centers: institutionCenters } = useCenters({ enabled: open })
+  const { centers: institutionCenters, activeCenterId, isAllBranches } = useCenters({ enabled: open })
+  const branchCenterId = isAllBranches ? undefined : activeCenterId
   const [step, setStep] = useState(1)
   const [title, setTitle] = useState('')
   const [board, setBoard] = useState('')
@@ -271,7 +272,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     setLoadingBatchStudents(true)
     setBatchStudentsError(null)
 
-    void fetchStudentsForBatch(selectedBatch.id)
+    void fetchStudentsForBatch(selectedBatch.id, branchCenterId)
       .then((list) => {
         if (cancelled) return
         setBatchStudents(list)
@@ -290,7 +291,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     return () => {
       cancelled = true
     }
-  }, [open, selectedBatch?.id])
+  }, [open, selectedBatch?.id, branchCenterId])
 
   const batchStudentIdSet = useMemo(
     () => new Set(batchStudents.map((s) => s.id)),

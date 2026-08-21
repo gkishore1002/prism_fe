@@ -7,12 +7,12 @@ export function getGreeting(): string {
 }
 
 export const subjectColors: Record<string, string> = {
-  math: '#0065f3',
-  science: '#0fa96e',
-  english: '#ff950a',
-  social: '#7c6cf0',
+  math: '#1C2739',
+  science: '#0CBF6E',
+  english: '#F7B731',
+  social: '#8B5CF6',
 }
 
 export function subjectColor(id: string): string {
-  return subjectColors[id] ?? '#0065f3'
+  return subjectColors[id] ?? '#1C2739'
 }

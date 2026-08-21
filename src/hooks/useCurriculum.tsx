@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { useCenters } from '@/hooks/useCenters'
 import * as curriculumApi from '@/lib/api/curriculumApi'
 import type { StudentSummary, TutorBatch } from '@/types'
 import type { CurriculumBoard, CurriculumTopic } from '@/types/curriculum'
@@ -47,17 +48,19 @@ interface CurriculumContextValue {
 
 const CurriculumContext = createContext<CurriculumContextValue | null>(null)
 
-async function loadFromApi() {
+async function loadFromApi(center?: string) {
   const [curriculum, batches, students] = await Promise.all([
     curriculumApi.fetchCurriculum(),
     curriculumApi.fetchBatches(),
-    curriculumApi.fetchStudents(),
+    curriculumApi.fetchStudents(center),
   ])
   return { curriculum, batches, students }
 }
 
 export function CurriculumProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, role } = useAuth()
+  const { activeCenterId, isAllBranches } = useCenters()
+  const branchCenterId = isAllBranches ? undefined : activeCenterId
   const [curriculum, setCurriculum] = useState<CurriculumBoard[]>([])
   const [batches, setBatches] = useState<TutorBatch[]>([])
   const [students, setStudents] = useState<StudentSummary[]>([])
@@ -71,7 +74,7 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
     if (isInitialLoad) setLoading(true)
     setError(null)
     try {
-      const data = await loadFromApi()
+      const data = await loadFromApi(branchCenterId)
       setCurriculum(data.curriculum)
       setBatches(data.batches)
       setStudents(data.students)
@@ -82,7 +85,7 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
     } finally {
       if (isInitialLoad) setLoading(false)
     }
-  }, [isAuthenticated, role, curriculum.length, batches.length])
+  }, [isAuthenticated, role, curriculum.length, batches.length, branchCenterId])
 
   const ensureLoaded = useCallback(async () => {
     if (!isAuthenticated || role === 'student') return
@@ -102,6 +105,14 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
       setStudents([])
     }
   }, [isAuthenticated, role])
+
+  useEffect(() => {
+    if (!isAuthenticated || role === 'student') return
+    if (curriculum.length === 0 && batches.length === 0) return
+    void refresh()
+    // Reload student lists when the header branch changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchCenterId])
 
   const addBoard = useCallback(async (name: string) => {
     await curriculumApi.addBoard(name.trim())
@@ -228,7 +239,7 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
   )
 
   const loadStudentsForBatch = useCallback(async (batchId: string) => {
-    const list = await curriculumApi.fetchStudentsForBatch(batchId)
+    const list = await curriculumApi.fetchStudentsForBatch(batchId, branchCenterId)
     const batch = batches.find((b) => b.id === batchId)
     if (batch) {
       const ids = new Set(list.map((s) => s.id))
@@ -241,7 +252,7 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
       )
     }
     return list
-  }, [batches])
+  }, [batches, branchCenterId])
 
   const getStudentsNotInBatch = useCallback(
     (batchId: string) => {

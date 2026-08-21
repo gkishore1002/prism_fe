@@ -23,28 +23,28 @@ export function TrendChart({ data, dataKey = 'week', height = 200, className }: 
         <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
           <defs>
             <linearGradient id="healthGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0065F3" stopOpacity={0.22} />
-              <stop offset="100%" stopColor="#0065F3" stopOpacity={0} />
+              <stop offset="0%" stopColor="#1C2739" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="#1C2739" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#EEEDEA" vertical={false} />
           <XAxis
             dataKey={dataKey}
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: '#a1a1aa' }}
+            tick={{ fontSize: 11, fill: '#94A3B8' }}
           />
           <YAxis
             domain={[50, 100]}
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: '#a1a1aa' }}
+            tick={{ fontSize: 11, fill: '#94A3B8' }}
           />
           <Tooltip
             contentStyle={{
               background: 'white',
-              border: '1px solid #e4e4e7',
-              borderRadius: '8px',
+              border: '1px solid #EEEDEA',
+              borderRadius: '10px',
               fontSize: '12px',
               boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
             }}
@@ -53,7 +53,7 @@ export function TrendChart({ data, dataKey = 'week', height = 200, className }: 
           <Area
             type="monotone"
             dataKey="health"
-            stroke="#0065F3"
+            stroke="#1C2739"
             strokeWidth={2}
             fill="url(#healthGradient)"
           />

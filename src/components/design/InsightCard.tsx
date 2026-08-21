@@ -30,10 +30,10 @@ export function InsightCard({
 }) {
   const toneMap = {
     default: 'text-muted-foreground bg-secondary',
-    accent: 'text-[#0065F3] bg-[#D9EAFF]',
-    success: 'text-[#0C8F5C] bg-[#E8F8F1]',
-    warning: 'text-[#C06F00] bg-[#FFEFD0]',
-    danger: 'text-[#CC3D42] bg-[#FCEEEF]',
+    accent: 'text-[#1C2739] bg-[#D9E4EE]',
+    success: 'text-[#047857] bg-[#ECFDF5]',
+    warning: 'text-[#9A6D04] bg-[#FEF3D6]',
+    danger: 'text-[#B91C1C] bg-[#FEF2F2]',
   }
 
   const body = (

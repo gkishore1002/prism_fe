@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { fetchBranchContext } from '@/lib/api/institutionsApi'
 import { isPlatformContext } from '@/modules/auth/lib/orgContext'
 import { ACTIVE_BRANCH_KEY } from '@/modules/auth/lib/authStorage'
-import { canManageTenant as computeCanManageTenant, isBranchScopedAdminPortal } from '@/lib/roles'
+import { canManageTenant as computeCanManageTenant } from '@/lib/roles'
 import type { Institution, InstitutionCenter } from '@/types'
 
 export type ActiveBranchSelection = 'all' | string
@@ -147,14 +147,6 @@ export function CentersProvider({ children }: { children: ReactNode }) {
   const isAllBranches = activeBranch === 'all'
   const activeCenterId = isAllBranches ? undefined : activeBranch
   const tenantCanManage = computeCanManageTenant(role, isOwner, isPlatformSuperUser)
-  const branchScopedAdminPortal = isBranchScopedAdminPortal(adminPortal, role, tenantCanManage)
-
-  useEffect(() => {
-    if (!branchScopedAdminPortal || centers.length <= 1) return
-    if (activeBranch !== 'all') {
-      setActiveBranch('all')
-    }
-  }, [branchScopedAdminPortal, centers.length, activeBranch, setActiveBranch])
 
   const value = useMemo(
     () => ({
