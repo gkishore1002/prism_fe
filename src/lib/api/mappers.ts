@@ -203,7 +203,9 @@ export interface ApiAssessment {
   questionPaperId?: string | null
   paperCoverage?: TutorAssessmentSchedule['paperCoverage']
   selectedTopics?: string[] | null
+  shuffleQuestions?: boolean
   studentSubmitted?: boolean
+  attemptInProgress?: boolean
   timingOver?: boolean
   accessRequestStatus?: TutorAssessmentSchedule['accessRequestStatus']
   canAttend?: boolean
@@ -227,14 +229,16 @@ export function mapAssessment(a: ApiAssessment): TutorAssessmentSchedule {
     classAvg: a.classAvg ?? undefined,
     centerIds: a.centerIds,
     selectedQuestionIds: a.selectedQuestionIds,
-    assignedStudentIds: a.assignedStudentIds,
+    assignedStudentIds: a.assignedStudentIds ?? [],
     createdByTutorId: a.createdByTutorId ?? undefined,
     chapter: a.chapter ?? undefined,
     topic: a.topic ?? undefined,
     questionPaperId: a.questionPaperId ?? undefined,
     paperCoverage: a.paperCoverage ?? undefined,
     selectedTopics: a.selectedTopics ?? undefined,
+    shuffleQuestions: Boolean(a.shuffleQuestions),
     studentSubmitted: Boolean(a.studentSubmitted),
+    attemptInProgress: Boolean(a.attemptInProgress),
     timingOver: Boolean(a.timingOver),
     accessRequestStatus: a.accessRequestStatus ?? undefined,
     canAttend: a.canAttend,

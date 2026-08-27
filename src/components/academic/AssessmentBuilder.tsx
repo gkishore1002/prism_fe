@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Clock, MapPin, CheckSquare, Square, Users, Search } from 'lucide-react'
+import { Clock, MapPin, CheckSquare, Square, Users, Search, Shuffle } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
 import { AppDropdown } from '@/components/ui/AppDropdown'
 import { InlineLoader } from '@/components/ui/PrismLoader'
@@ -62,12 +62,39 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
   const [topicSearch, setTopicSearch] = useState('')
   const [scopeInitialized, setScopeInitialized] = useState(false)
   const [showPaperPreview, setShowPaperPreview] = useState(false)
+  const [shuffleQuestions, setShuffleQuestions] = useState(false)
+
+  function resetForm() {
+    setStep(1)
+    setTitle('')
+    setBoard('')
+    setGrade('')
+    setSubject('')
+    setMode('assessment')
+    setBatchName('')
+    setDurationMinutes(0)
+    setScheduledAt('')
+    setAvailableUntil('')
+    setSelectedPaperId(null)
+    setPaperCoverage('full')
+    setSelectedTopics([])
+    setSelectedCenters([])
+    setAllCenters(true)
+    setAssignedStudents([])
+    setBatchStudents([])
+    setLoadingBatchStudents(false)
+    setBatchStudentsError(null)
+    setPublishError(null)
+    setPublishing(false)
+    setTopicSearch('')
+    setScopeInitialized(false)
+    setShowPaperPreview(false)
+    setShuffleQuestions(false)
+  }
 
   useEffect(() => {
     if (!open) {
-      setScopeInitialized(false)
-      setShowPaperPreview(false)
-      setPublishError(null)
+      resetForm()
       return
     }
     void ensureCurriculumLoaded()
@@ -435,21 +462,14 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
         questionPaperId: selectedPaperId ?? undefined,
         paperCoverage,
         selectedTopics: paperCoverage === 'selected_topics' ? selectedTopics : selectedPaper?.topics,
+        shuffleQuestions,
         topic:
           paperCoverage === 'selected_topics' && selectedTopics.length === 1
             ? selectedTopics[0]
             : undefined,
       })
       onClose()
-      setStep(1)
-      setAssignedStudents([])
-      setBatchStudents([])
-      setSelectedPaperId(null)
-      setPaperCoverage('full')
-      setSelectedTopics([])
-      setTopicSearch('')
-      setShowPaperPreview(false)
-      setPublishError(null)
+      resetForm()
     } catch (e) {
       setPublishError(e instanceof Error ? e.message : 'Failed to create assessment')
     } finally {
@@ -912,6 +932,25 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                 )}
               </div>
 
+              <label className="flex items-start gap-3 p-4 rounded-md border border-border cursor-pointer hover:bg-secondary/40">
+                <input
+                  type="checkbox"
+                  checked={shuffleQuestions}
+                  onChange={(e) => setShuffleQuestions(e.target.checked)}
+                  className="mt-1 rounded"
+                />
+                <span>
+                  <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <Shuffle className="w-4 h-4 text-accent" />
+                    Shuffle questions and options
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-1">
+                    Each student sees a different question and option order. The uploaded paper stays
+                    the same.
+                  </span>
+                </span>
+              </label>
+
               <AppCard className="!p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <MapPin className="w-4 h-4 text-accent" />
@@ -971,6 +1010,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                         ? ` (${selectedTopics.length} topic${selectedTopics.length !== 1 ? 's' : ''}: ${selectedTopics.join(', ')})`
                         : ' (topic-wise — no topics selected)'}{' '}
                     · {durationMinutes > 0 ? `${durationMinutes} min` : 'Untimed'} · {mode} mode
+                    {shuffleQuestions ? ' · Questions shuffled per student' : ''}
                   </li>
                   <li>
                     Schedule: {scheduledAt.trim() ? scheduledAt : 'Not set'}

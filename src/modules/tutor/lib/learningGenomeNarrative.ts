@@ -44,5 +44,15 @@ export function buildStudentNarrative(
     `On the current trajectory, the model projects a next-test score of approximately ${profile.predicted}% in the most recent subject cycle.`,
   )
 
+  if (profile.risk_level === 'High') {
+    parts.push(
+      'Combined signals place this student in the High Risk band — recommend a focused review with the subject teacher.',
+    )
+  } else if (profile.risk_level === 'Medium') {
+    parts.push('Overall risk sits in the Medium band — worth a light check-in, nothing urgent.')
+  } else {
+    parts.push('Overall risk is Low — no immediate intervention flagged.')
+  }
+
   return parts.join(' ')
 }

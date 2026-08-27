@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/cn'
-import { APP_NAME } from '@/lib/constants'
+import { APP_NAME, BRAND_MARK } from '@/lib/constants'
 import '@/modules/tutor/styles/learningGenome.css'
 
 export type PrismLoaderSize = 'xs' | 'sm' | 'md' | 'lg'
@@ -56,9 +56,9 @@ function LoaderMark({
         { color: '#E4C077', phase: 240 },
       ] as const)
     : ([
-        { color: '#1C2739', phase: 0 },
-        { color: '#F7B731', phase: 120 },
-        { color: '#8B5CF6', phase: 240 },
+        { color: '#003B7A', phase: 0 },
+        { color: '#FFC700', phase: 120 },
+        { color: '#2A60A8', phase: 240 },
       ] as const)
 
   return (
@@ -122,25 +122,19 @@ function LoaderMark({
         </motion.span>
       ))}
 
-      <motion.div
-        className="relative z-[1] grid place-items-center rounded-[4px] font-display font-bold leading-none"
+      <motion.img
+        src={BRAND_MARK}
+        alt=""
+        className="relative z-[1] rounded-xl object-contain"
         style={{
-          width: dim * 0.34,
-          height: dim * 0.34,
-          fontSize: dim * 0.2,
-          background: heritage ? '#0B1F3A' : '#131B2E',
-          color: heritage ? '#F0D78A' : '#fff',
-          border: heritage ? '1px solid rgba(201,162,75,0.55)' : undefined,
-          boxShadow: heritage
-            ? '0 8px 20px rgba(11,31,58,0.35)'
-            : '0 8px 20px rgba(19,27,46,0.25)',
-          rotate: 45,
+          width: dim * 0.62,
+          height: dim * 0.62,
         }}
-        animate={{ scale: [1, 1.08, 1] }}
+        animate={{ scale: [1, 1.06, 1] }}
         transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-      >
-        <span style={{ transform: 'rotate(-45deg)' }}>+</span>
-      </motion.div>
+        aria-hidden
+        draggable={false}
+      />
     </div>
   )
 }
@@ -169,7 +163,7 @@ function CyclingSteps({
           key={steps[index]}
           className={cn(
             'absolute inset-x-0 text-center text-[11px] font-mono uppercase tracking-[0.12em]',
-            tone === 'report' ? 'text-[#D8D0BC]' : 'text-muted-foreground',
+            tone === 'report' ? 'text-[#F0D78A]' : 'text-muted-foreground',
           )}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -217,7 +211,7 @@ function LoaderCopy({
         <motion.p
           className={cn(
             'text-sm font-medium',
-            tone === 'report' ? 'text-[#F6F1E4]' : 'text-foreground',
+            tone === 'report' ? 'text-[#F0D78A]' : 'text-foreground',
           )}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}

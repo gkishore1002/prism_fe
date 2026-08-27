@@ -1,10 +1,10 @@
-import { Link } from 'react-router-dom'
 import { useEffect } from 'react'
-import { Play } from 'lucide-react'
+import { Play, RotateCcw } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAssessments } from '@/hooks/useAssessments'
 import { useAnalytics } from '@/hooks/useAnalytics'
 import { resolveStudentProfile } from '@/modules/student/lib/studentProfile'
+import { ExamStartButton } from '@/modules/student/components/ExamStartButton'
 
 /** Live assessments the student can start now (not submitted, not timing over). */
 export function useLiveStudentAssessments() {
@@ -61,24 +61,37 @@ export function LiveAssessmentPrompt({ className }: LiveAssessmentPromptProps) {
       <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="text-[10px] uppercase tracking-[0.25em] text-accent font-display font-semibold">
-            Live assessment · attend now
+            {first.attemptInProgress ? 'Exam in progress · continue' : 'Live assessment · attend now'}
           </span>
           <h2 className="font-display text-2xl sm:text-3xl font-bold mt-2">{first.title}</h2>
           <p className="text-paper/70 text-sm mt-2">
             {liveAssessments.length === 1
               ? `${first.subject} · ${first.questionCount} questions${
                   first.durationMinutes > 0 ? ` · ${first.durationMinutes} min` : ''
-                } — your tutor has started this exam.`
+                }${
+                  first.attemptInProgress
+                    ? ' — your answers are saved. Continue from where you left.'
+                    : ' — your tutor has started this exam.'
+                }`
               : `${liveAssessments.length} assessments are live. Start with "${first.title}".`}
           </p>
         </div>
-        <Link
-          to={`/student/assessments/${first.id}/take`}
+        <ExamStartButton
+          assessmentId={first.id}
           className="inline-flex items-center justify-center gap-2 bg-accent text-accent-foreground px-6 py-3 rounded-md font-medium hover:opacity-90 shrink-0"
         >
-          <Play className="w-4 h-4" />
-          Start now
-        </Link>
+          {first.attemptInProgress ? (
+            <>
+              <RotateCcw className="w-4 h-4" />
+              Resume exam
+            </>
+          ) : (
+            <>
+              <Play className="w-4 h-4" />
+              Start now
+            </>
+          )}
+        </ExamStartButton>
       </div>
     </div>
   )

@@ -211,6 +211,7 @@ export function StudentPerformanceReportPage({
                 { href: '#history', label: labels.navHistory },
                 { href: '#summary', label: labels.navSummary },
                 { href: '#forecast', label: labels.navForecast },
+                { href: '#knowledge-layer', label: labels.navKnowledge },
               ]}
             >
               <OverallReportContent
@@ -313,7 +314,7 @@ export function StudentPerformanceReportPage({
             showExport
             navLinks={(labels) => [
               { href: '#narrative', label: labels.navNarrative },
-              { href: '#scores', label: labels.navAssessmentWise },
+              { href: '#knowledge-layer', label: labels.navKnowledge },
             ]}
           >
             <AssessmentReportBody

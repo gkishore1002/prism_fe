@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { Check, X, ArrowRight, FlaskConical, PartyPopper, Clock } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { btnClass } from '@/components/ui/Button'
+import { useConfirmModal } from '@/components/ui/AppModal'
 import {
   AssessmentExamLayout,
   ExamQuestionCard,
@@ -14,9 +15,20 @@ import {
   submitAssessment,
   fetchAssessmentQuestions,
   fetchMySubmission,
+  fetchExamAttempt,
+  saveExamAttempt,
 } from '@/lib/api/assessmentsApi'
 import { ApiError, isApiEnabled } from '@/lib/apiClient'
 import { useAnalytics } from '@/hooks/useAnalytics'
+import { useAuth } from '@/hooks/useAuth'
+import { shuffleQuestionsForStudent, mcqOptionsForDisplay } from '@/lib/shufflePaper'
+import { clearExamProgress, loadExamProgress, saveExamProgress } from '@/lib/examProgress'
+import {
+  enterExamFullscreen,
+  exitExamFullscreen,
+  isExamFullscreen,
+  isFullscreenApiAvailable,
+} from '@/lib/examFullscreen'
 import { cn } from '@/lib/cn'
 import {
   AccessRequestStatusBadge,
@@ -34,28 +46,6 @@ function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function buildOptions(q: {
-  optionA?: string
-  optionB?: string
-  optionC?: string
-  optionD?: string
-}) {
-  if (q.optionA && q.optionB) {
-    return [
-      { key: 'A', label: q.optionA },
-      { key: 'B', label: q.optionB },
-      ...(q.optionC ? [{ key: 'C', label: q.optionC }] : []),
-      ...(q.optionD ? [{ key: 'D', label: q.optionD }] : []),
-    ]
-  }
-  return [
-    { key: 'A', label: 'Option A' },
-    { key: 'B', label: 'Option B' },
-    { key: 'C', label: 'Option C' },
-    { key: 'D', label: 'Option D' },
-  ]
 }
 
 function ThanksCard({
@@ -113,11 +103,24 @@ export function StudentTakeAssessmentPage() {
     refresh: refreshAssessments,
   } = useAssessments()
   const { studentProfile, refresh: refreshAnalytics } = useAnalytics()
+  const { user } = useAuth()
+  const { confirm } = useConfirmModal()
   const [questions, setQuestions] = useState<QuestionBankEntry[]>([])
   const [questionsLoading, setQuestionsLoading] = useState(true)
   const [questionsError, setQuestionsError] = useState<string | null>(null)
   const [alreadySubmitted, setAlreadySubmitted] = useState(false)
   const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
+  const [saveLabel, setSaveLabel] = useState('Answers save automatically')
+  const allowLeaveRef = useRef(false)
+  const [progressReady, setProgressReady] = useState(false)
+  const autoAdvanceRef = useRef<number | null>(null)
+  const finishingRef = useRef(false)
+  const secondsLeftRef = useRef(0)
+  const timerFromResumeRef = useRef(false)
+  const selectionsRef = useRef<Record<string, string>>({})
+  const indexRef = useRef(0)
+  const flaggedRef = useRef<Set<string>>(new Set())
+  const [examSecureLock, setExamSecureLock] = useState(false)
 
   const assessmentFromStore = assessments.find((a) => a.id === assessmentId)
   const [lockedAssessment, setLockedAssessment] = useState(assessmentFromStore)
@@ -127,6 +130,16 @@ export function StudentTakeAssessmentPage() {
   }, [assessmentFromStore])
 
   const assessment = lockedAssessment ?? assessmentFromStore
+  const isPractice = assessment?.mode === 'practice'
+  const [index, setIndex] = useState(0)
+  const [selections, setSelections] = useState<Record<string, string>>({})
+  const [flagged, setFlagged] = useState<Set<string>>(() => new Set())
+  const [visited, setVisited] = useState<Set<string>>(() => new Set())
+  const [answers, setAnswers] = useState<AnswerRecord[]>([])
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [finished, setFinished] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [secondsLeft, setSecondsLeft] = useState(() => (assessment?.durationMinutes ?? 15) * 60)
 
   useEffect(() => {
     if (!assessmentId || !isApiEnabled()) {
@@ -151,6 +164,60 @@ export function StudentTakeAssessmentPage() {
         const qs = await fetchAssessmentQuestions(assessmentId)
         if (cancelled) return
         setQuestions(qs)
+
+        const local = loadExamProgress(assessmentId, user.id)
+        let attempt = null
+        try {
+          attempt = await fetchExamAttempt(assessmentId)
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 409) {
+            setAlreadySubmitted(true)
+            markAssessmentSubmitted(assessmentId)
+            setQuestionsLoading(false)
+            return
+          }
+        }
+        if (cancelled) return
+
+        const fromApi: Record<string, string> = {}
+        for (const ans of attempt?.answers ?? []) {
+          if (ans.questionId && ans.selectedOption) fromApi[ans.questionId] = ans.selectedOption
+        }
+        const apiLive = Boolean(
+          attempt &&
+            (Object.keys(fromApi).length > 0 ||
+              (attempt.currentIndex ?? 0) > 0 ||
+              (attempt.flaggedIds?.length ?? 0) > 0 ||
+              attempt.remainingSeconds != null),
+        )
+        const merged = { ...(local?.answers ?? {}), ...(apiLive ? fromApi : {}) }
+        if (Object.keys(merged).length > 0) setSelections(merged)
+
+        const flaggedMerged = new Set<string>([
+          ...(local?.flaggedIds ?? []),
+          ...(apiLive ? (attempt?.flaggedIds ?? []) : []),
+        ])
+        if (flaggedMerged.size > 0) setFlagged(flaggedMerged)
+
+        const resumeIndex = apiLive
+          ? (attempt?.currentIndex ?? 0)
+          : (local?.currentIndex ?? 0)
+        if (qs.length > 0) {
+          setIndex(Math.max(0, Math.min(resumeIndex, qs.length - 1)))
+        }
+
+        const resumeSeconds = apiLive
+          ? (attempt?.remainingSeconds ?? null)
+          : (local?.remainingSeconds ?? null)
+        if (resumeSeconds != null && resumeSeconds >= 0) {
+          setSecondsLeft(resumeSeconds)
+          timerFromResumeRef.current = true
+        } else if (assessmentFromStore && assessmentFromStore.durationMinutes > 0) {
+          setSecondsLeft(assessmentFromStore.durationMinutes * 60)
+        }
+        const visitedIds = new Set(Object.keys(merged))
+        if (visitedIds.size > 0) setVisited(visitedIds)
+        setProgressReady(true)
       } catch (e) {
         if (cancelled) return
         if (e instanceof ApiError && e.status === 409) {
@@ -163,138 +230,485 @@ export function StudentTakeAssessmentPage() {
           setQuestionsError(msg)
         }
       } finally {
-        if (!cancelled) setQuestionsLoading(false)
+        if (!cancelled) {
+          setQuestionsLoading(false)
+          setProgressReady(true)
+        }
       }
     })()
 
     return () => {
       cancelled = true
     }
-  }, [assessmentId, assessmentFromStore?.studentSubmitted, markAssessmentSubmitted])
+  }, [assessmentId, assessmentFromStore?.studentSubmitted, markAssessmentSubmitted, user.id])
 
-  const isPractice = assessment?.mode === 'practice'
-  const [index, setIndex] = useState(0)
-  const [selections, setSelections] = useState<Record<number, string>>({})
-  const [flagged, setFlagged] = useState<Set<number>>(() => new Set())
-  const [answers, setAnswers] = useState<AnswerRecord[]>([])
-  const [showFeedback, setShowFeedback] = useState(false)
-  const [finished, setFinished] = useState(false)
-  const [paletteOpen, setPaletteOpen] = useState(false)
-  const [secondsLeft, setSecondsLeft] = useState(() => (assessment?.durationMinutes ?? 15) * 60)
+  const studentId = user.id
+  const shuffleEnabled = Boolean(assessment?.shuffleQuestions)
+  const displayQuestions = useMemo(
+    () =>
+      shuffleEnabled
+        ? shuffleQuestionsForStudent(questions, assessmentId ?? '', studentId)
+        : questions,
+    [questions, assessmentId, studentId, shuffleEnabled],
+  )
 
-  const q = questions[index]
-  const picked = selections[index] ?? null
-  const options = q ? buildOptions(q) : []
+  const q = displayQuestions[index]
+  const picked = q ? selections[q.id] ?? null : null
+  const options = q
+    ? mcqOptionsForDisplay(q, {
+        shuffle: shuffleEnabled,
+        assessmentId: assessmentId ?? '',
+        studentId,
+      })
+    : []
 
   const attemptedCount = useMemo(
-    () => Object.keys(selections).filter((k) => selections[Number(k)]).length,
-    [selections],
+    () => displayQuestions.filter((question) => selections[question.id]).length,
+    [displayQuestions, selections],
   )
+
+  const flaggedIndices = useMemo(() => {
+    const next = new Set<number>()
+    displayQuestions.forEach((question, idx) => {
+      if (flagged.has(question.id)) next.add(idx)
+    })
+    return next
+  }, [displayQuestions, flagged])
 
   const board = assessment?.board ?? studentProfile?.board ?? 'CBSE'
   const grade = assessment?.grade ?? (studentProfile ? `Grade ${studentProfile.grade}` : 'Grade 8')
+  const examLocked = Boolean(assessment && !isPractice && !finished && !alreadySubmitted)
+  const timeWarning = Boolean(!isPractice && secondsLeft > 0 && secondsLeft <= 300)
 
   const getQuestionStatus = useCallback(
     (idx: number): QuestionGridStatus => {
       if (idx === index) return 'current'
-      if (selections[idx]) return 'answered'
+      const question = displayQuestions[idx]
+      if (question && selections[question.id]) return 'answered'
+      if (question && visited.has(question.id)) return 'skipped'
       return 'unanswered'
     },
-    [index, selections],
+    [index, selections, displayQuestions, visited],
   )
 
-  const hasAnswer = useCallback((idx: number) => Boolean(selections[idx]), [selections])
+  const hasAnswer = useCallback(
+    (idx: number) => {
+      const question = displayQuestions[idx]
+      return Boolean(question && selections[question.id])
+    },
+    [displayQuestions, selections],
+  )
 
   const goTo = useCallback((idx: number) => {
+    if (examSecureLock) return
+    if (autoAdvanceRef.current) {
+      window.clearTimeout(autoAdvanceRef.current)
+      autoAdvanceRef.current = null
+    }
     setIndex(idx)
     setShowFeedback(false)
-  }, [])
+  }, [examSecureLock])
 
-  const selectOption = (key: string) => {
-    if (showFeedback) return
-    setSelections((prev) => ({ ...prev, [index]: key }))
-  }
+  useEffect(() => {
+    if (!q) return
+    setVisited((prev) => {
+      if (prev.has(q.id)) return prev
+      const next = new Set(prev)
+      next.add(q.id)
+      return next
+    })
+  }, [q])
+
+  const selectOption = useCallback(
+    (key: string) => {
+      if (examSecureLock || showFeedback || !q) return
+      const alreadyAnswered = Boolean(selections[q.id])
+      setSelections((prev) => ({ ...prev, [q.id]: key }))
+      if (!isPractice && !alreadyAnswered && index < displayQuestions.length - 1) {
+        if (autoAdvanceRef.current) window.clearTimeout(autoAdvanceRef.current)
+        autoAdvanceRef.current = window.setTimeout(() => goTo(index + 1), 380)
+      }
+    },
+    [displayQuestions.length, examSecureLock, goTo, index, isPractice, q, selections, showFeedback],
+  )
 
   const toggleFlag = () => {
+    if (!q) return
     setFlagged((prev) => {
       const next = new Set(prev)
-      if (next.has(index)) next.delete(index)
-      else next.add(index)
+      if (next.has(q.id)) next.delete(q.id)
+      else next.add(q.id)
       return next
     })
   }
 
-  const finishExam = useCallback(() => {
-    const records: AnswerRecord[] = questions.map((question, idx) => {
-      const choice = selections[idx]
-      const correct = question.correctAnswer
-        ? choice === question.correctAnswer
-        : choice === 'B'
-      return {
-        questionId: question.id,
-        correct: Boolean(choice && correct),
-        topic: question.topic,
-      }
-    })
-    setAnswers(records)
-    setFinished(true)
-
-    if (isApiEnabled() && assessment) {
-      const durationMin = assessment.durationMinutes
-      const spentMin =
-        durationMin > 0
-          ? Math.max(1, durationMin - Math.floor(secondsLeft / 60))
-          : Math.max(1, Math.ceil((questions.length * 30) / 60))
-      setSubmitState('submitting')
-      void submitAssessment(
-        assessment.id,
-        questions.map((question, idx) => ({
-          questionId: question.id,
-          selectedOption: selections[idx] ?? '',
-        })),
-        spentMin,
-      )
-        .then(async () => {
-          setSubmitState('success')
-          markAssessmentSubmitted(assessment.id)
-          void refreshAssessments()
-          void refreshAnalytics('studentAssessments')
-        })
-        .catch((e) => {
-          if (e instanceof ApiError && e.status === 409) {
-            setSubmitState('success')
-            markAssessmentSubmitted(assessment.id)
-            return
+  const finishExam = useCallback(
+    (opts?: { skipConfirm?: boolean }) => {
+      void (async () => {
+        if (finishingRef.current) return
+        if (!opts?.skipConfirm && !isPractice) {
+          const unanswered = displayQuestions.filter((question) => !selections[question.id]).length
+          const ok = await confirm({
+            title: unanswered > 0 ? 'Submit with unanswered questions?' : 'Submit exam?',
+            message:
+              unanswered > 0
+                ? `You still have ${unanswered} unanswered question${unanswered === 1 ? '' : 's'}. After submit you cannot change answers.`
+                : 'You cannot change answers after submit. Submit this exam now?',
+            confirmLabel: 'Submit exam',
+            variant: unanswered > 0 ? 'danger' : 'default',
+          })
+          if (!ok) return
+        }
+        finishingRef.current = true
+        const records: AnswerRecord[] = displayQuestions.map((question) => {
+          const choice = selections[question.id]
+          const correct = question.correctAnswer
+            ? choice === question.correctAnswer
+            : choice === 'B'
+          return {
+            questionId: question.id,
+            correct: Boolean(choice && correct),
+            topic: question.topic,
           }
-          setSubmitState('error')
         })
-    }
-  }, [
-    assessment,
-    questions,
-    selections,
-    secondsLeft,
-    markAssessmentSubmitted,
-    refreshAssessments,
-    refreshAnalytics,
-  ])
+        setAnswers(records)
+        setFinished(true)
+        allowLeaveRef.current = true
+
+        if (isApiEnabled() && assessment) {
+          const durationMin = assessment.durationMinutes
+          const spentMin =
+            durationMin > 0
+              ? Math.max(1, durationMin - Math.floor(secondsLeft / 60))
+              : Math.max(1, Math.ceil((displayQuestions.length * 30) / 60))
+          setSubmitState('submitting')
+          void submitAssessment(
+            assessment.id,
+            displayQuestions.map((question) => ({
+              questionId: question.id,
+              selectedOption: selections[question.id] ?? '',
+            })),
+            spentMin,
+          )
+            .then(async () => {
+              setSubmitState('success')
+              clearExamProgress(assessment.id, studentId)
+              markAssessmentSubmitted(assessment.id)
+              void refreshAssessments()
+              void refreshAnalytics('studentAssessments')
+            })
+            .catch((e) => {
+              if (e instanceof ApiError && e.status === 409) {
+                setSubmitState('success')
+                clearExamProgress(assessment.id, studentId)
+                markAssessmentSubmitted(assessment.id)
+                return
+              }
+              finishingRef.current = false
+              setSubmitState('error')
+            })
+        } else if (assessmentId) {
+          clearExamProgress(assessmentId, studentId)
+        }
+      })()
+    },
+    [
+      assessment,
+      assessmentId,
+      confirm,
+      displayQuestions,
+      isPractice,
+      selections,
+      secondsLeft,
+      studentId,
+      markAssessmentSubmitted,
+      refreshAssessments,
+      refreshAnalytics,
+    ],
+  )
+
+  secondsLeftRef.current = secondsLeft
+  selectionsRef.current = selections
+  indexRef.current = index
+  flaggedRef.current = flagged
 
   useEffect(() => {
-    if (!assessment || finished || isPractice || assessment.durationMinutes <= 0) return
+    if (!progressReady || !assessment || isPractice) return
+    if (timerFromResumeRef.current) return
+    if (assessment.durationMinutes > 0) {
+      timerFromResumeRef.current = true
+      setSecondsLeft(assessment.durationMinutes * 60)
+    }
+  }, [assessment, isPractice, progressReady])
+
+  useEffect(() => {
+    if (
+      !assessment ||
+      finished ||
+      isPractice ||
+      assessment.durationMinutes <= 0 ||
+      questionsLoading ||
+      !progressReady
+    ) {
+      return
+    }
     const timer = window.setInterval(() => {
       setSecondsLeft((s) => {
         if (s <= 1) {
           window.clearInterval(timer)
-          window.setTimeout(() => finishExam(), 0)
+          window.setTimeout(() => finishExam({ skipConfirm: true }), 0)
           return 0
         }
         return s - 1
       })
     }, 1000)
     return () => window.clearInterval(timer)
-  }, [assessment, finished, isPractice, finishExam])
+  }, [assessment, finished, isPractice, finishExam, questionsLoading, progressReady])
+
+  const flushAttempt = useCallback(async () => {
+    if (!assessmentId || !isApiEnabled() || isPractice) return
+    await saveExamAttempt(assessmentId, {
+      answers: Object.entries(selectionsRef.current).map(([questionId, selectedOption]) => ({
+        questionId,
+        selectedOption,
+      })),
+      currentIndex: indexRef.current,
+      flaggedIds: [...flaggedRef.current],
+      remainingSeconds: secondsLeftRef.current,
+    }).catch(() => undefined)
+  }, [assessmentId, isPractice])
+
+  useEffect(() => {
+    if (
+      !progressReady ||
+      !assessmentId ||
+      isPractice ||
+      finished ||
+      alreadySubmitted ||
+      questions.length === 0
+    ) {
+      return
+    }
+    saveExamProgress(studentId, {
+      assessmentId,
+      answers: selections,
+      flaggedIds: [...flagged],
+      currentIndex: index,
+      remainingSeconds: secondsLeft,
+      savedAt: Date.now(),
+    })
+  }, [
+    assessmentId,
+    alreadySubmitted,
+    finished,
+    flagged,
+    index,
+    isPractice,
+    progressReady,
+    questions.length,
+    secondsLeft,
+    selections,
+    studentId,
+  ])
+
+  useEffect(() => {
+    if (
+      !progressReady ||
+      !isApiEnabled() ||
+      !assessmentId ||
+      isPractice ||
+      finished ||
+      alreadySubmitted ||
+      questions.length === 0
+    ) {
+      return
+    }
+    setSaveLabel('Saving…')
+    const timer = window.setTimeout(() => {
+      void saveExamAttempt(assessmentId, {
+        answers: Object.entries(selections).map(([questionId, selectedOption]) => ({
+          questionId,
+          selectedOption,
+        })),
+        currentIndex: index,
+        flaggedIds: [...flagged],
+        remainingSeconds: secondsLeftRef.current,
+      })
+        .then(() => setSaveLabel('Saved'))
+        .catch(() => setSaveLabel('Saved on this device'))
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [
+    alreadySubmitted,
+    assessmentId,
+    finished,
+    flagged,
+    index,
+    isPractice,
+    progressReady,
+    questions.length,
+    selections,
+  ])
+
+  useEffect(() => {
+    if (
+      !progressReady ||
+      !isApiEnabled() ||
+      !assessmentId ||
+      isPractice ||
+      finished ||
+      alreadySubmitted ||
+      questions.length === 0
+    ) {
+      return
+    }
+    const timer = window.setInterval(() => {
+      void saveExamAttempt(assessmentId, {
+        answers: Object.entries(selectionsRef.current).map(([questionId, selectedOption]) => ({
+          questionId,
+          selectedOption,
+        })),
+        currentIndex: indexRef.current,
+        flaggedIds: [...flaggedRef.current],
+        remainingSeconds: secondsLeftRef.current,
+      }).catch(() => undefined)
+    }, 15000)
+    return () => window.clearInterval(timer)
+  }, [alreadySubmitted, assessmentId, finished, isPractice, progressReady, questions.length])
+
+  const requestExit = useCallback(async () => {
+    if (allowLeaveRef.current) {
+      await exitExamFullscreen()
+      navigate('/student/assessments')
+      return true
+    }
+    const ok = await confirm({
+      title: 'Leave the exam?',
+      message:
+        'Your answers are saved. You can come back and continue as long as the exam time is still open. You cannot change answers after you submit.',
+      confirmLabel: 'Leave and resume later',
+      cancelLabel: 'Stay in exam',
+    })
+    if (!ok) return false
+    await flushAttempt()
+    allowLeaveRef.current = true
+    await exitExamFullscreen()
+    navigate('/student/assessments')
+    return true
+  }, [confirm, flushAttempt, navigate])
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      examLocked &&
+      !allowLeaveRef.current &&
+      currentLocation.pathname !== nextLocation.pathname,
+  )
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+    if (allowLeaveRef.current) {
+      blocker.proceed()
+      return
+    }
+    let active = true
+    void (async () => {
+      const ok = await confirm({
+        title: 'Leave the exam?',
+        message:
+          'Your answers are saved. You can come back and continue as long as the exam time is still open.',
+        confirmLabel: 'Leave and resume later',
+        cancelLabel: 'Stay in exam',
+      })
+      if (!active) return
+      if (ok) {
+        await flushAttempt()
+        allowLeaveRef.current = true
+        await exitExamFullscreen()
+        blocker.proceed()
+      } else {
+        blocker.reset()
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [blocker, confirm, flushAttempt])
+
+  const requireFullscreen = isFullscreenApiAvailable()
+  const leftExamRef = useRef(false)
+
+  const resumeExamFocus = useCallback(async () => {
+    if (requireFullscreen && !isExamFullscreen()) {
+      const ok = await enterExamFullscreen()
+      if (!ok && !isExamFullscreen()) {
+        leftExamRef.current = false
+        if (!document.hidden) setExamSecureLock(false)
+        return
+      }
+    }
+    leftExamRef.current = false
+    if (!document.hidden && (!requireFullscreen || isExamFullscreen())) {
+      setExamSecureLock(false)
+    }
+  }, [requireFullscreen])
+
+  useEffect(() => {
+    if (finished || alreadySubmitted) {
+      void exitExamFullscreen()
+    }
+  }, [alreadySubmitted, finished])
+
+  useEffect(() => {
+    if (!examLocked) {
+      leftExamRef.current = false
+      setExamSecureLock(false)
+      return
+    }
+    if (requireFullscreen && !isExamFullscreen()) {
+      setExamSecureLock(true)
+    }
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    const onVisibility = () => {
+      if (document.hidden) {
+        leftExamRef.current = true
+        setExamSecureLock(true)
+        void flushAttempt()
+      }
+    }
+    const onFullscreen = () => {
+      if (!isExamFullscreen()) {
+        leftExamRef.current = true
+        setExamSecureLock(true)
+        void flushAttempt()
+        return
+      }
+      if (!leftExamRef.current && !document.hidden) {
+        setExamSecureLock(false)
+      }
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    document.addEventListener('visibilitychange', onVisibility)
+    document.addEventListener('fullscreenchange', onFullscreen)
+    document.addEventListener('webkitfullscreenchange', onFullscreen)
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      document.removeEventListener('visibilitychange', onVisibility)
+      document.removeEventListener('fullscreenchange', onFullscreen)
+      document.removeEventListener('webkitfullscreenchange', onFullscreen)
+    }
+  }, [examLocked, flushAttempt, requireFullscreen])
+
+  useEffect(() => {
+    return () => {
+      if (autoAdvanceRef.current) window.clearTimeout(autoAdvanceRef.current)
+    }
+  }, [])
 
   const goNext = useCallback(() => {
+    if (examSecureLock) return
     if (isPractice && picked && !showFeedback) {
       const correct = q?.correctAnswer ? picked === q.correctAnswer : picked === 'B'
       setAnswers((prev) => [
@@ -305,19 +719,19 @@ export function StudentTakeAssessmentPage() {
       return
     }
     if (isPractice && showFeedback) {
-      if (index >= questions.length - 1) {
+      if (index >= displayQuestions.length - 1) {
         finishExam()
       } else {
         goTo(index + 1)
       }
       return
     }
-    if (index >= questions.length - 1) {
+    if (index >= displayQuestions.length - 1) {
       finishExam()
     } else {
       goTo(index + 1)
     }
-  }, [finishExam, goTo, index, isPractice, picked, q, questions.length, showFeedback])
+  }, [examSecureLock, finishExam, goTo, index, isPractice, picked, q, displayQuestions.length, showFeedback])
 
   const goPrevious = () => {
     if (index > 0) goTo(index - 1)
@@ -325,7 +739,18 @@ export function StudentTakeAssessmentPage() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (finished || showFeedback) return
+      if (finished || showFeedback || examSecureLock) return
+      const optionKeys = ['1', '2', '3', '4', 'a', 'b', 'c', 'd']
+      const optionIndex = optionKeys.indexOf(e.key.toLowerCase())
+      if (optionIndex >= 0) {
+        const mapped = optionIndex > 3 ? optionIndex - 4 : optionIndex
+        const opt = options[mapped]
+        if (opt) {
+          e.preventDefault()
+          selectOption(opt.originalKey)
+        }
+        return
+      }
       if (e.key === 'Enter' && picked) {
         e.preventDefault()
         goNext()
@@ -333,7 +758,7 @@ export function StudentTakeAssessmentPage() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [finished, goNext, picked, showFeedback])
+  }, [examSecureLock, finished, goNext, options, picked, selectOption, showFeedback])
 
   if (alreadySubmitted || assessment?.studentSubmitted) {
     return <ThanksCard title={assessment?.title ?? 'Assessment'} />
@@ -500,7 +925,7 @@ export function StudentTakeAssessmentPage() {
 
   const isCorrect = picked !== null && q.correctAnswer && picked === q.correctAnswer
   const showScienceVisual = q.subject === 'Science'
-  const isLast = index >= questions.length - 1
+  const isLast = index >= displayQuestions.length - 1
   const nextLabel = isPractice
     ? showFeedback
       ? isLast
@@ -517,25 +942,41 @@ export function StudentTakeAssessmentPage() {
       grade={grade}
       title={assessment.title}
       currentIndex={index}
-      totalQuestions={questions.length}
+      totalQuestions={displayQuestions.length}
       attemptedCount={attemptedCount}
       timeLabel={!isPractice ? formatTime(secondsLeft) : undefined}
-      flagged={flagged}
+      timeWarning={timeWarning}
+      saveLabel={!isPractice ? saveLabel : undefined}
+      flagged={flaggedIndices}
       getQuestionStatus={getQuestionStatus}
       hasAnswer={hasAnswer}
       onJumpTo={goTo}
       onPrevious={goPrevious}
       onNext={goNext}
       canPrevious={index > 0}
-      canNext={isPractice ? showFeedback || Boolean(picked) : Boolean(picked)}
+      canNext={isPractice ? showFeedback || Boolean(picked) : true}
       nextLabel={nextLabel}
       paletteOpen={paletteOpen}
       onPaletteOpenChange={setPaletteOpen}
+      lockExit={examLocked}
+      onRequestExit={() => void requestExit()}
+      secureGate={
+        examLocked && examSecureLock
+          ? {
+              title: requireFullscreen ? 'Fullscreen required' : 'Return to the exam',
+              message: requireFullscreen
+                ? 'This exam must stay in fullscreen. Switching tabs or leaving fullscreen pauses answering until you return. The timer keeps running.'
+                : 'You left the exam. Stay on this tab until you submit. The timer keeps running and your answers stay saved.',
+              resumeLabel: requireFullscreen ? 'Enter fullscreen' : 'Continue exam',
+              onResume: () => void resumeExamFocus(),
+            }
+          : null
+      }
     >
       <ExamQuestionCard
         questionNumber={index + 1}
-        totalQuestions={questions.length}
-        isFlagged={flagged.has(index)}
+        totalQuestions={displayQuestions.length}
+        isFlagged={Boolean(q && flagged.has(q.id))}
         onToggleFlag={toggleFlag}
       >
         <p className="text-base sm:text-lg lg:text-xl text-foreground font-semibold leading-relaxed mb-5 sm:mb-7 text-left w-full">
@@ -553,30 +994,30 @@ export function StudentTakeAssessmentPage() {
 
         <div className="space-y-3 w-full">
           {options.map((opt) => {
-            const selected = picked === opt.key
+            const selected = picked === opt.originalKey
             const showResult = showFeedback && isPractice
-            const isRight = q.correctAnswer === opt.key
+            const isRight = q.correctAnswer === opt.originalKey
             return (
               <button
-                key={opt.key}
+                key={opt.originalKey}
                 type="button"
                 disabled={showFeedback}
-                onClick={() => selectOption(opt.key)}
+                onClick={() => selectOption(opt.originalKey)}
                 className={cn(
                   'w-full flex items-start gap-4 text-left px-5 py-4 sm:py-5 rounded-xl border-2 bg-card transition-all',
-                  selected && !showResult && 'border-ink bg-ink/5 ring-1 ring-ink/20 shadow-card',
+                  selected && !showResult && 'border-ink bg-ink/5 ring-1 ring-ink/15',
                   showResult && isRight && 'border-leaf bg-leaf/10',
                   showResult && selected && !isRight && 'border-rose bg-rose/10',
-                  !selected && !showResult && 'border-border hover:border-ink/40 hover:bg-secondary/40',
+                  !selected && !showResult && 'border-border hover:border-gold-400 hover:bg-gold-50/40',
                 )}
               >
                 <span
                   className={cn(
                     'w-6 h-6 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center font-bold text-xs',
-                    selected ? 'border-ink bg-ink text-paper' : 'border-muted-foreground/40 text-muted-foreground',
+                    selected ? 'border-ink bg-ink text-paper' : 'border-border text-muted-foreground',
                   )}
                 >
-                  {opt.key}
+                  {opt.displayKey}
                 </span>
                 <span className="text-sm sm:text-base text-foreground font-medium text-left flex-1">
                   {opt.label}
@@ -603,7 +1044,7 @@ export function StudentTakeAssessmentPage() {
         )}
 
         <p className="mt-4 text-[10px] sm:text-xs text-muted-foreground">
-          {q.chapter} · {q.topic} · {q.marks} mark{q.marks !== 1 ? 's' : ''}
+          {q.marks} mark{q.marks !== 1 ? 's' : ''}
         </p>
       </ExamQuestionCard>
     </AssessmentExamLayout>

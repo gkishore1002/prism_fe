@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { AppCard } from '@/components/layout/AppShell'
 import type { QuestionBankEntry } from '@/types'
 import { cn } from '@/lib/cn'
@@ -20,15 +19,6 @@ export function AssessmentPaperPreview({
   totalMarks,
   className,
 }: AssessmentPaperPreviewProps) {
-  const questionsByTopic = useMemo(() => {
-    const groups = new Map<string, QuestionBankEntry[]>()
-    for (const q of questions) {
-      const list = groups.get(q.topic) ?? []
-      list.push(q)
-      groups.set(q.topic, list)
-    }
-    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))
-  }, [questions])
 
   if (questions.length === 0) {
     return (
@@ -64,33 +54,18 @@ export function AssessmentPaperPreview({
         )}
       </div>
 
-      <div className="space-y-4 max-h-64 overflow-y-auto scrollbar-thin border border-border rounded-md p-3">
-        {questionsByTopic.map(([topic, topicQuestions]) => (
-          <div key={topic}>
-            <p className="text-xs font-medium text-accent uppercase tracking-wide mb-2">
-              {topic}
-              <span className="text-muted-foreground font-normal normal-case ml-2">
-                ({topicQuestions.length} question{topicQuestions.length !== 1 ? 's' : ''})
+      <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-thin border border-border rounded-md p-3">
+        <ol className="space-y-2">
+          {questions.map((q, i) => (
+            <li key={q.id} className="text-sm text-foreground pl-3 border-l-2 border-border">
+              <span className="text-xs text-muted-foreground font-mono-data mr-2">Q{i + 1}.</span>
+              <span className="line-clamp-2">{q.text}</span>
+              <span className="text-[10px] text-muted-foreground ml-1">
+                · {q.marks} mark{q.marks !== 1 ? 's' : ''}
               </span>
-            </p>
-            <ol className="space-y-2">
-              {topicQuestions.map((q, i) => (
-                <li
-                  key={q.id}
-                  className="text-sm text-foreground pl-3 border-l-2 border-border"
-                >
-                  <span className="text-xs text-muted-foreground font-mono-data mr-2">
-                    Q{i + 1}.
-                  </span>
-                  <span className="line-clamp-2">{q.text}</span>
-                  <span className="text-[10px] text-muted-foreground ml-1">
-                    · {q.marks} mark{q.marks !== 1 ? 's' : ''}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        ))}
+            </li>
+          ))}
+        </ol>
       </div>
     </AppCard>
   )

@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/cn'
 import {
   APP_NAME,
   APP_TAGLINE,
   APP_WORKFLOW,
+  BRAND_ACCENT,
   BRAND_LOGO_FULL,
   BRAND_MARK,
   BRAND_MARK_DARK,
@@ -19,9 +20,9 @@ interface PrismLogoProps {
 }
 
 const sizes = {
-  sm: { mark: 32, gap: 10, title: 'text-[15px]', tag: 'text-[8px]' },
-  md: { mark: 40, gap: 12, title: 'text-lg', tag: 'text-[9px]' },
-  lg: { mark: 56, gap: 14, title: 'text-2xl', tag: 'text-[10px]' },
+  sm: { mark: 36, gap: 10, title: 'text-[15px]', tag: 'text-[8px]' },
+  md: { mark: 44, gap: 12, title: 'text-lg', tag: 'text-[9px]' },
+  lg: { mark: 72, gap: 14, title: 'text-2xl', tag: 'text-[10px]' },
 }
 
 function BrandMarkImage({
@@ -41,14 +42,14 @@ function BrandMarkImage({
       alt={alt}
       width={size}
       height={size}
-      className={cn('shrink-0 object-contain', className)}
+      className={cn('shrink-0 rounded-xl object-contain', className)}
       draggable={false}
       aria-hidden={!alt}
     />
   )
 }
 
-/** Brand mark — stylized P with gold prism and book pages. */
+/** Brand mark — P with gold prism and open book. */
 export function PrismLogoMark({
   size = 32,
   className,
@@ -75,7 +76,7 @@ export function PrismLogoMarkMotion({
       alt=""
       width={size}
       height={size}
-      className={cn('shrink-0 object-contain', className)}
+      className={cn('shrink-0 rounded-2xl object-contain', className)}
       draggable={false}
       aria-hidden
       initial={{ opacity: 0, scale: 0.92 }}
@@ -88,7 +89,7 @@ export function PrismLogoMarkMotion({
 /** Full brand lockup image — login / marketing */
 export function PrismLogoFull({
   className,
-  maxWidth = 280,
+  maxWidth = 200,
 }: {
   className?: string
   maxWidth?: number
@@ -97,14 +98,98 @@ export function PrismLogoFull({
     <img
       src={BRAND_LOGO_FULL}
       alt={`${APP_NAME} — ${APP_TAGLINE}`}
-      className={cn('h-auto w-full object-contain', className)}
+      className={cn('h-auto w-full rounded-2xl object-contain', className)}
       style={{ maxWidth }}
       draggable={false}
     />
   )
 }
 
-/** Dark-background icon mark — navy hero panels */
+/** Login form logo — 3D sideways twist-in with soft glow */
+export function PrismLogoFullMotion({
+  className,
+  maxWidth = 148,
+}: {
+  className?: string
+  maxWidth?: number
+}) {
+  const reduceMotion = useReducedMotion()
+
+  if (reduceMotion) {
+    return <PrismLogoFull maxWidth={maxWidth} className={cn('mx-auto', className)} />
+  }
+
+  return (
+    <div
+      className={cn('relative mx-auto flex justify-center', className)}
+      style={{ maxWidth, perspective: 1000 }}
+    >
+      <motion.div
+        className="pointer-events-none absolute inset-0 -z-10 rounded-3xl"
+        initial={{ opacity: 0, scale: 0.7 }}
+        animate={{ opacity: [0, 0.55, 0.28], scale: [0.7, 1.15, 1] }}
+        transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+        style={{
+          background:
+            'radial-gradient(ellipse at center, rgba(255, 199, 0, 0.35) 0%, rgba(0, 59, 122, 0.12) 45%, transparent 72%)',
+          filter: 'blur(14px)',
+        }}
+        aria-hidden
+      />
+
+      <motion.div
+        className="relative w-full"
+        style={{ transformStyle: 'preserve-3d', maxWidth }}
+        initial={{
+          opacity: 0,
+          rotateY: -88,
+          rotateX: 14,
+          scale: 0.82,
+          y: 10,
+          filter: 'blur(6px)',
+        }}
+        animate={{
+          opacity: 1,
+          rotateY: 0,
+          rotateX: 0,
+          scale: 1,
+          y: 0,
+          filter: 'blur(0px)',
+        }}
+        transition={{
+          duration: 1.05,
+          ease: [0.16, 1, 0.3, 1],
+          opacity: { duration: 0.55, ease: 'easeOut' },
+          filter: { duration: 0.75, ease: 'easeOut' },
+        }}
+        whileHover={{
+          rotateY: -10,
+          rotateX: 4,
+          scale: 1.03,
+          transition: { type: 'spring', stiffness: 260, damping: 22 },
+        }}
+      >
+        <motion.div
+          animate={{
+            rotateY: [0, 5, -5, 0],
+            y: [0, -3, 0],
+          }}
+          transition={{
+            duration: 7,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: 1.2,
+          }}
+          style={{ transformStyle: 'preserve-3d' }}
+        >
+          <PrismLogoFull maxWidth={maxWidth} className="mx-auto drop-shadow-[0_12px_28px_rgba(0,59,122,0.18)]" />
+        </motion.div>
+      </motion.div>
+    </div>
+  )
+}
+
+/** Dark-background icon mark */
 export function PrismLogoMarkDark({
   size = 96,
   className,
@@ -138,10 +223,16 @@ export function PrismLogo({
             )}
           >
             {APP_NAME}
-            <span className="inline-block ml-0.5 w-1.5 h-1.5 rounded-[1px] bg-[#F7B731] rotate-45 translate-y-[-6px] align-top" />
+            <span
+              className="inline-block ml-0.5 w-1.5 h-1.5 rounded-[1px] rotate-45 translate-y-[-6px] align-top"
+              style={{ backgroundColor: BRAND_ACCENT }}
+            />
           </div>
           {showTagline && (
-            <div className={cn('uppercase tracking-[0.12em] text-[#F7B731] mt-1 truncate font-semibold', s.tag)}>
+            <div
+              className={cn('uppercase tracking-[0.12em] mt-1 truncate font-semibold', s.tag)}
+              style={{ color: BRAND_ACCENT }}
+            >
               {APP_TAGLINE}
             </div>
           )}
@@ -166,7 +257,7 @@ export function PrismBrandLockup({
   variant = 'light',
   className,
   showWorkflow = true,
-  markSize = 88,
+  markSize = 120,
 }: {
   variant?: 'light' | 'dark'
   className?: string
@@ -177,7 +268,7 @@ export function PrismBrandLockup({
   if (variant === 'light') {
     return (
       <div className={cn('flex flex-col items-center text-center', className)}>
-        <PrismLogo size="lg" showTagline />
+        <PrismLogoFull maxWidth={markSize} />
       </div>
     )
   }
@@ -187,9 +278,15 @@ export function PrismBrandLockup({
       <PrismLogoMarkMotion size={markSize} />
       <div className="mt-5 font-display font-extrabold text-3xl tracking-[0.12em] uppercase text-white">
         {APP_NAME}
-        <span className="inline-block ml-1 w-2 h-2 rounded-[1px] bg-[#F7B731] rotate-45 -translate-y-3 align-top" />
+        <span
+          className="inline-block ml-1 w-2 h-2 rounded-[1px] rotate-45 -translate-y-3 align-top"
+          style={{ backgroundColor: BRAND_ACCENT }}
+        />
       </div>
-      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F7B731]">
+      <p
+        className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
+        style={{ color: BRAND_ACCENT }}
+      >
         {APP_TAGLINE}
       </p>
       {showWorkflow && (
@@ -202,7 +299,7 @@ export function PrismBrandLockup({
                 <span
                   className="h-1 w-1 rounded-full"
                   style={{
-                    backgroundColor: ['#8B5CF6', '#0CBF6E', '#F7B731'][i] ?? '#8B5CF6',
+                    backgroundColor: ['#003B7A', '#0CBF6E', BRAND_ACCENT][i] ?? '#003B7A',
                   }}
                 />
               )}

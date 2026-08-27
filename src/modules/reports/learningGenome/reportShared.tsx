@@ -18,7 +18,7 @@ export function ReportVsClass({
 }
 
 export function ReportScoreBar({ pct, gold }: { pct: number; gold?: boolean }) {
-  const barColor = (p: number) => (p >= 75 ? '#3E6B9C' : p >= 60 ? '#B7862E' : '#A8402F')
+  const barColor = (p: number) => (p >= 75 ? '#C5A059' : p >= 60 ? '#E0C36A' : '#9B4437')
   return (
     <div className="lg-score-bar">
       <span
@@ -44,7 +44,7 @@ export function pctGrade(pct: number): string {
 }
 
 export function barColor(pct: number): string {
-  if (pct >= 75) return '#3E6B9C'
-  if (pct >= 60) return '#B7862E'
-  return '#A8402F'
+  if (pct >= 75) return '#C5A059'
+  if (pct >= 60) return '#E0C36A'
+  return '#9B4437'
 }

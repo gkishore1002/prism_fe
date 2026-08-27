@@ -7,16 +7,6 @@ import { fetchAssessment } from '@/lib/api/assessmentsApi'
 import { useConfirmModal } from '@/components/ui/AppModal'
 import type { QuestionBankEntry, TutorAssessmentSchedule } from '@/types'
 
-function groupQuestionsByTopic(items: QuestionBankEntry[]) {
-  const groups = new Map<string, QuestionBankEntry[]>()
-  for (const q of items) {
-    const list = groups.get(q.topic) ?? []
-    list.push(q)
-    groups.set(q.topic, list)
-  }
-  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))
-}
-
 function renderOptions(q: QuestionBankEntry) {
   const opts = [
     q.optionA && { key: 'A', label: q.optionA },
@@ -130,9 +120,6 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
         ? 'Full question paper'
         : null
 
-  const topicGroups = groupQuestionsByTopic(questions)
-  let questionIndex = 0
-
   return (
     <>
       {showHeader && (
@@ -178,18 +165,6 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
             {assessment && <span>Date: {assessment.scheduledAt}</span>}
             {paper && <span>Created: {paper.createdAt}</span>}
           </div>
-          {assessment?.paperCoverage === 'selected_topics' && assessment.selectedTopics && (
-            <div className="flex flex-wrap justify-center gap-1.5 mt-3">
-              {assessment.selectedTopics.map((topic) => (
-                <span
-                  key={topic}
-                  className="text-[10px] px-2 py-0.5 rounded-full bg-accent/15 text-accent"
-                >
-                  {topic}
-                </span>
-              ))}
-            </div>
-          )}
           <p className="text-xs text-muted-foreground mt-4 max-w-lg mx-auto">
             Answer all questions. Each MCQ carries marks as indicated. No negative marking.
           </p>
@@ -198,67 +173,49 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
         {questions.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">No questions in this paper yet.</p>
         ) : (
-          <div className="space-y-10">
-            {topicGroups.map(([topic, topicQuestions]) => (
-              <div key={topic}>
-                <div className="mb-4 pb-2 border-b border-accent/30">
-                  <h3 className="text-sm font-medium text-accent uppercase tracking-wide">
-                    {topic}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {topicQuestions.length} question{topicQuestions.length !== 1 ? 's' : ''}
-                  </p>
+          <div className="space-y-8">
+            {questions.map((q, idx) => (
+              <div key={q.id} className="pb-6 border-b border-border last:border-0">
+                <div className="flex items-baseline justify-between gap-4 mb-2">
+                  <div className="text-sm font-medium">
+                    Q{idx + 1}. <span className="font-normal text-foreground">{q.text}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-mono-data text-xs text-muted-foreground">
+                      [{q.marks} mark{q.marks !== 1 ? 's' : ''}]
+                    </span>
+                    {editable && paper && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void confirm({
+                            title: 'Delete question?',
+                            message: 'Delete this question from the bank? This cannot be undone.',
+                            confirmLabel: 'Delete',
+                            variant: 'danger',
+                          }).then((ok) => {
+                            if (ok) void removeQuestion(q.id)
+                          })
+                        }}
+                        className="text-rose hover:opacity-80"
+                        aria-label="Delete question"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-8">
-                  {topicQuestions.map((q) => {
-                    questionIndex += 1
-                    const num = questionIndex
-                    return (
-                      <div key={q.id} className="pb-6 border-b border-border last:border-0">
-                        <div className="flex items-baseline justify-between gap-4 mb-2">
-                          <div className="text-sm font-medium">
-                            Q{num}. <span className="font-normal text-foreground">{q.text}</span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="font-mono-data text-xs text-muted-foreground">
-                              [{q.marks} mark{q.marks !== 1 ? 's' : ''}]
-                            </span>
-                            {editable && paper && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  void confirm({
-                                    title: 'Delete question?',
-                                    message: 'Delete this question from the bank? This cannot be undone.',
-                                    confirmLabel: 'Delete',
-                                    variant: 'danger',
-                                  }).then((ok) => {
-                                    if (ok) void removeQuestion(q.id)
-                                  })
-                                }}
-                                className="text-rose hover:opacity-80"
-                                aria-label="Delete question"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {q.chapter} · {q.topic} · {q.difficulty} · {q.questionType.toUpperCase()}
-                        </div>
-                        {q.questionType === 'mcq' ? (
-                          renderOptions(q)
-                        ) : (
-                          <div className="mt-4 space-y-6">
-                            <div className="h-20 border border-dashed border-border rounded-md" />
-                            <div className="h-20 border border-dashed border-border rounded-md" />
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                <div className="text-[10px] text-muted-foreground">
+                  {q.chapter} · {q.difficulty} · {q.questionType.toUpperCase()}
                 </div>
+                {q.questionType === 'mcq' ? (
+                  renderOptions(q)
+                ) : (
+                  <div className="mt-4 space-y-6">
+                    <div className="h-20 border border-dashed border-border rounded-md" />
+                    <div className="h-20 border border-dashed border-border rounded-md" />
+                  </div>
+                )}
               </div>
             ))}
           </div>

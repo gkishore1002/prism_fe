@@ -1,6 +1,7 @@
 export interface ConceptNotMastered {
   concept: string
   subject: string
+  chapter?: string
   masteryPct: number
 }
 

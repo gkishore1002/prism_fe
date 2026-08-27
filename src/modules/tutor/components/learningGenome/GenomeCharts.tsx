@@ -1,5 +1,5 @@
 import type { GenomeDailyPoint, GenomeStudentProfile, SubjectCode } from '@/modules/tutor/lib/learningGenomeTypes'
-import { SUBJECT_COLORS } from '@/modules/tutor/lib/learningGenomeData'
+import { SUBJECT_COLORS, SUBJECT_FULL } from '@/modules/tutor/lib/learningGenomeData'
 
 const SUBJECT_ORDER: SubjectCode[] = ['TAM', 'ENG', 'MAT', 'SCI', 'SOC']
 
@@ -30,10 +30,87 @@ export function MiniRadarChart({
       <polygon points={ringPoly} fill="none" stroke="#E4DCC4" strokeWidth={1} />
       <polygon
         points={poly}
-        fill="rgba(201,162,75,0.35)"
-        stroke="#C9A24B"
+        fill="rgba(197,160,89,0.35)"
+        stroke="#C5A059"
         strokeWidth={1.5}
       />
+    </svg>
+  )
+}
+
+export function GenomeFingerprintChart({
+  subjAvg,
+  size = 220,
+}: {
+  subjAvg: GenomeStudentProfile['subj_avg']
+  size?: number
+}) {
+  const cx = size / 2
+  const cy = size / 2
+  const R = size * 0.32
+  const labelR = size * 0.44
+  const pts = SUBJECT_ORDER.map((s, i) => {
+    const val = (subjAvg[s] ?? 0) / 100
+    const ang = -Math.PI / 2 + i * ((2 * Math.PI) / 5)
+    return [cx + Math.cos(ang) * R * val, cy + Math.sin(ang) * R * val] as const
+  })
+  const rings = [0.4, 0.7, 1].map((scale) =>
+    SUBJECT_ORDER.map((_, i) => {
+      const ang = -Math.PI / 2 + i * ((2 * Math.PI) / 5)
+      return [cx + Math.cos(ang) * R * scale, cy + Math.sin(ang) * R * scale] as const
+    }),
+  )
+  const poly = pts.map((p) => p.join(',')).join(' ')
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      role="img"
+      aria-label="Learning genome fingerprint"
+    >
+      {rings.map((ring, idx) => (
+        <polygon
+          key={idx}
+          points={ring.map((p) => p.join(',')).join(' ')}
+          fill="none"
+          stroke="#E4DCC4"
+          strokeWidth={1}
+        />
+      ))}
+      {SUBJECT_ORDER.map((_, i) => {
+        const ang = -Math.PI / 2 + i * ((2 * Math.PI) / 5)
+        return (
+          <line
+            key={i}
+            x1={cx}
+            y1={cy}
+            x2={cx + Math.cos(ang) * R}
+            y2={cy + Math.sin(ang) * R}
+            stroke="#E4DCC4"
+            strokeWidth={1}
+          />
+        )
+      })}
+      <polygon points={poly} fill="rgba(197,160,89,0.35)" stroke="#C5A059" strokeWidth={1.8} />
+      {SUBJECT_ORDER.map((s, i) => {
+        const ang = -Math.PI / 2 + i * ((2 * Math.PI) / 5)
+        return (
+          <text
+            key={s}
+            x={cx + Math.cos(ang) * labelR}
+            y={cy + Math.sin(ang) * labelR}
+            fontSize={10}
+            fontWeight={600}
+            fill="#0D1B2A"
+            textAnchor="middle"
+            dominantBaseline="middle"
+          >
+            {SUBJECT_FULL[s]}
+          </text>
+        )
+      })}
     </svg>
   )
 }
@@ -73,11 +150,11 @@ export function DailyCurveChart({ curve, height = 180 }: { curve: GenomeDailyPoi
         y1={avgY}
         x2={w - pad.r}
         y2={avgY}
-        stroke="#C9A24B"
+        stroke="#C5A059"
         strokeWidth={1}
         strokeDasharray="3,3"
       />
-      <polyline points={linePts} fill="none" stroke="#0B1F3A" strokeWidth={2} />
+      <polyline points={linePts} fill="none" stroke="#5B6570" strokeWidth={2} />
       {curve.map((d, i) => (
         <circle
           key={`${d.date}-${d.subject}`}

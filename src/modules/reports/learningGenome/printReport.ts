@@ -107,9 +107,8 @@ export function solidifyCloneForPdf(clone: HTMLElement) {
     el.style.backdropFilter = 'none'
     el.style.setProperty('-webkit-backdrop-filter', 'none')
 
-    const inHero = el.closest('.lg-hero') !== null
-    const inInsight = el.closest('.lg-insight-feed') !== null
-    const bgBase = inHero || inInsight ? NAVY : PARCHMENT
+    const inHero = el.closest('.lg-hero, .lg-detail-head, .lg-footer, .lg-kl-section, .lg-insight-feed') !== null
+    const bgBase = inHero ? NAVY : PARCHMENT
     solidifyBackground(el, bgBase)
   })
 }
@@ -586,7 +585,17 @@ export function scrollToReportSection(href: string) {
   if (!id) return
   const el = document.getElementById(id)
   if (!el) return
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const scroller = el.closest('main')
+  if (scroller instanceof HTMLElement) {
+    const scrollerTop = scroller.getBoundingClientRect().top
+    const elTop = el.getBoundingClientRect().top
+    scroller.scrollTo({
+      top: scroller.scrollTop + elTop - scrollerTop - 8,
+      behavior: 'smooth',
+    })
+  } else {
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }
   try {
     window.history.replaceState(null, '', `#${id}`)
   } catch {

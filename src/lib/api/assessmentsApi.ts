@@ -78,6 +78,7 @@ export async function createAssessment(
       questionPaperId: assessment.questionPaperId,
       paperCoverage: assessment.paperCoverage,
       selectedTopics: assessment.selectedTopics,
+      shuffleQuestions: assessment.shuffleQuestions ?? false,
     }),
   })
   return mapAssessment(data)
@@ -145,6 +146,53 @@ export async function fetchMySubmission(
     }
     throw e
   }
+}
+
+export interface ExamAttemptAnswer {
+  questionId: string
+  selectedOption: string
+}
+
+export interface ExamAttempt {
+  answers: ExamAttemptAnswer[]
+  currentIndex: number
+  flaggedIds: string[]
+  remainingSeconds: number | null
+  status: 'in_progress' | 'attended' | 'absent'
+}
+
+export async function fetchExamAttempt(assessmentId: string): Promise<ExamAttempt | null> {
+  try {
+    const data = await apiFetch<ExamAttempt>(`/assessments/${assessmentId}/attempt`)
+    return data
+  } catch (e) {
+    if (e instanceof Error && 'status' in e) {
+      const status = (e as { status: number }).status
+      if (status === 404) return null
+      if (status === 409) throw e
+    }
+    throw e
+  }
+}
+
+export async function saveExamAttempt(
+  assessmentId: string,
+  body: {
+    answers: ExamAttemptAnswer[]
+    currentIndex: number
+    flaggedIds: string[]
+    remainingSeconds: number | null
+  },
+): Promise<void> {
+  await apiFetch(`/assessments/${assessmentId}/attempt`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      answers: body.answers,
+      currentIndex: body.currentIndex,
+      flaggedIds: body.flaggedIds,
+      remainingSeconds: body.remainingSeconds,
+    }),
+  })
 }
 
 export async function createAccessRequest(

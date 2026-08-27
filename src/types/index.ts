@@ -66,6 +66,7 @@ export interface TopicReadinessPrediction {
   topic: string
   topicId?: string
   subject: string
+  chapter?: string
   mastery: number
   currentMastery?: number
   predictedScore?: number
@@ -146,10 +147,20 @@ export interface AssessmentSubjectScore {
   accuracy: number
 }
 
+export interface AssessmentTopicScore {
+  concept: string
+  subject: string
+  chapter?: string
+  correct?: number
+  total?: number
+  masteryPct: number
+}
+
 export interface AssessmentReport {
   id: string
   assessmentId: string
   studentId: string
+  studentName?: string
   submissionId?: string | null
   assessmentTitle: string
   subject: string
@@ -162,6 +173,8 @@ export interface AssessmentReport {
   timeSpentMin: number
   submittedAt: string
   subjectScores: AssessmentSubjectScore[]
+  topicScores?: AssessmentTopicScore[]
+  knowledgeSummary?: string
   strongTopics: string[]
   weakTopics: string[]
   summary: string
@@ -541,8 +554,12 @@ export interface TutorAssessmentSchedule {
   questionPaperId?: string
   paperCoverage?: 'full' | 'selected_topics'
   selectedTopics?: string[]
+  /** When true, each student sees a shuffled question and option order in the exam UI. */
+  shuffleQuestions?: boolean
   /** True when this student has already submitted (cannot retake). */
   studentSubmitted?: boolean
+  /** True when the student started the exam but has not submitted yet. */
+  attemptInProgress?: boolean
   timingOver?: boolean
   accessRequestStatus?: 'pending' | 'approved' | 'rejected' | null
   canAttend?: boolean

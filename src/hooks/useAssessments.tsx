@@ -49,6 +49,7 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
   const attendanceCacheRef = useRef<Map<string, AssessmentAttendanceRecord[]>>(new Map())
 
   const loadedBranchRef = useRef<string | 'all' | null>(null)
+  const loadedRoleRef = useRef<string | null>(null)
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated) return
@@ -62,6 +63,7 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
       setAssessments(data)
       attendanceCacheRef.current.clear()
       loadedBranchRef.current = role === 'student' ? 'all' : (branchCenterId ?? 'all')
+      loadedRoleRef.current = role
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load assessments')
     } finally {
@@ -72,7 +74,13 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
   const ensureLoaded = useCallback(async () => {
     if (!isAuthenticated) return
     const key = role === 'student' ? 'all' : (branchCenterId ?? 'all')
-    if (assessments.length > 0 && loadedBranchRef.current === key) return
+    if (
+      loadedRoleRef.current === role &&
+      assessments.length > 0 &&
+      loadedBranchRef.current === key
+    ) {
+      return
+    }
     if (!loadPromiseRef.current) {
       loadPromiseRef.current = refresh().finally(() => {
         loadPromiseRef.current = null
@@ -85,11 +93,11 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
     if (!isAuthenticated) {
       setAssessments([])
       loadedBranchRef.current = null
+      loadedRoleRef.current = null
       return
     }
-    if (role === 'student') return
-    const key = branchCenterId ?? 'all'
-    if (loadedBranchRef.current === key) return
+    const key = role === 'student' ? 'all' : (branchCenterId ?? 'all')
+    if (loadedRoleRef.current === role && loadedBranchRef.current === key) return
     void refresh()
   }, [isAuthenticated, role, branchCenterId, refresh])
 
@@ -120,29 +128,31 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
 
   const getAssessmentsForStudent = useCallback(
     (query: StudentAssessmentQuery) =>
-      assessments.filter(
-        (a) =>
-          a.status !== 'draft' &&
-          a.assignedStudentIds.includes(query.studentId) &&
-          assessmentMatchesScope(a, query),
-      ),
-    [assessments],
+      assessments.filter((a) => {
+        if (a.status === 'draft') return false
+        // Student list API already returns this student's papers. Re-checking
+        // assignedStudentIds/board/grade drops live exams when login id and
+        // profile id differ, or when scope labels do not match exactly.
+        if (role === 'student') return true
+        const ids = a.assignedStudentIds ?? []
+        return ids.includes(query.studentId) && assessmentMatchesScope(a, query)
+      }),
+    [assessments, role],
   )
 
   const canStudentAttend = useCallback(
     (query: StudentAssessmentQuery, assessmentId: string) => {
       const assessment = assessments.find((a) => a.id === assessmentId)
-      return Boolean(
-        assessment &&
-          (assessment.canAttend ??
-            (assessment.status === 'live' &&
-              !assessment.studentSubmitted &&
-              !assessment.timingOver)) &&
-          assessment.assignedStudentIds.includes(query.studentId) &&
-          assessmentMatchesScope(assessment, query),
-      )
+      if (!assessment) return false
+      const allowed =
+        assessment.canAttend ??
+        (assessment.status === 'live' && !assessment.studentSubmitted && !assessment.timingOver)
+      if (!allowed) return false
+      if (role === 'student') return true
+      const ids = assessment.assignedStudentIds ?? []
+      return ids.includes(query.studentId) && assessmentMatchesScope(assessment, query)
     },
-    [assessments],
+    [assessments, role],
   )
 
   const markAssessmentSubmitted = useCallback((assessmentId: string) => {

@@ -80,7 +80,7 @@ export function SetupPage() {
         animate="visible"
       >
         <div className="mb-6 flex flex-col items-center text-center gap-3">
-          <PrismBrandLockup className="h-8" />
+          <PrismBrandLockup markSize={148} />
           <div>
             <h1 className="text-xl font-semibold text-foreground">First-run setup</h1>
             <p className="text-sm text-muted-foreground mt-1">

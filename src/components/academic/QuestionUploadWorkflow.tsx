@@ -225,14 +225,14 @@ export function QuestionUploadWorkflow({
   )
 
   const preview = uploaded ? (
-    <div className="rounded-[14px] border border-border overflow-hidden bg-card">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 px-4 py-4 border-b border-border bg-ink/[0.03]">
+    <div className="rounded-[14px] border border-border bg-card overflow-hidden">
+      <div className="px-4 sm:px-5 py-4 border-b border-border space-y-4">
         <div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
             Step 3–4 · Validate & publish
           </div>
           <h3 className="font-display text-lg text-foreground mt-1">Import review</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="text-sm text-muted-foreground mt-1">
             <span className="text-leaf font-medium">{validRows.length} valid</span>
             {' · '}
             <span className={invalidRows.length ? 'text-rose font-medium' : ''}>
@@ -241,40 +241,40 @@ export function QuestionUploadWorkflow({
             {fileLabel ? ` · ${fileLabel}` : ''}
           </p>
         </div>
-        <form
-          onSubmit={(e) => void handleCommit(e)}
-          className="flex flex-col sm:flex-row gap-2 sm:items-end w-full lg:w-auto"
-        >
-          <label className="flex-1 sm:min-w-[240px]">
-            <span className="text-xs text-muted-foreground">Paper title in library *</span>
-            <input
-              required
-              value={paperName}
-              onChange={(e) => setPaperName(e.target.value)}
-              placeholder="e.g. Grade 8 Algebra — Term 1"
-              className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
-            />
-          </label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={resetPreview}
-              className="px-3 py-2 rounded-md text-sm border border-border hover:bg-secondary/60"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={validRows.length === 0 || saving}
-              className="btn btn-primary px-4 py-2 text-sm disabled:opacity-40"
-            >
-              {saving ? 'Publishing…' : `Publish ${validRows.length} Qs`}
-            </button>
+
+        <form onSubmit={(e) => void handleCommit(e)} className="space-y-3">
+          <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+            <label className="block flex-1 min-w-0">
+              <span className="mb-1.5 block text-xs text-muted-foreground">Paper title in library *</span>
+              <input
+                required
+                value={paperName}
+                onChange={(e) => setPaperName(e.target.value)}
+                placeholder="e.g. Grade 8 Algebra — Term 1"
+                className="h-10 w-full border border-border rounded-md px-3 text-sm bg-background"
+              />
+            </label>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={resetPreview}
+                className="h-10 px-4 rounded-md text-sm border border-border hover:bg-secondary/60"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={validRows.length === 0 || saving}
+                className="h-10 px-4 rounded-md text-sm font-medium bg-ink text-paper disabled:opacity-40"
+              >
+                {saving ? 'Publishing…' : `Publish ${validRows.length} Qs`}
+              </button>
+            </div>
           </div>
         </form>
       </div>
 
-      {saveError && <p className="text-sm text-rose px-4 pt-3">{saveError}</p>}
+      {saveError && <p className="text-sm text-rose px-4 sm:px-5 pt-3">{saveError}</p>}
 
       <div className="overflow-x-auto max-h-[420px]">
         <table className="w-full text-sm">
@@ -304,17 +304,17 @@ export function QuestionUploadWorkflow({
                   {row.questionType || '—'}
                 </td>
                 <td className="px-4 py-2.5">
-                  {row.valid ? (
-                    <span className="inline-flex items-center gap-1 text-leaf text-xs font-medium">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Ready
-                    </span>
-                  ) : (
+                  {!row.valid ? (
                     <div>
                       <span className="inline-flex items-center gap-1 text-rose text-xs font-medium">
                         <XCircle className="w-3.5 h-3.5" /> Blocked
                       </span>
                       <p className="text-[10px] text-rose mt-0.5">{row.errors.join(', ')}</p>
                     </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-leaf text-xs font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                    </span>
                   )}
                 </td>
               </tr>
@@ -367,8 +367,8 @@ export function QuestionUploadWorkflow({
       <AppCard className="p-4 sm:p-5">
         <h3 className="text-sm font-semibold text-foreground mb-1">Required schema</h3>
         <p className="text-xs text-muted-foreground mb-3">
-          Board → Grade → Subject → Chapter → Topic, plus difficulty, marks, type, and text. JSON may
-          use {'{ "name": "…", "questions": […] }'}.
+          Board → Grade → Subject → Chapter → Topic, plus difficulty, marks, type, and text. JSON
+          may use {'{ "name": "…", "questions": […] }'}.
         </p>
         <div className="flex flex-wrap gap-1.5">
           {QUESTION_UPLOAD_COLUMNS.map((col) => (

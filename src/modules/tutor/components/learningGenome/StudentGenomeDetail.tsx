@@ -1,38 +1,19 @@
-import type {
-  GenomeExamSubjectRow,
-  GenomeStudentProfile,
-} from '@/modules/tutor/lib/learningGenomeTypes'
+import type { GenomeStudentProfile } from '@/modules/tutor/lib/learningGenomeTypes'
+import type { ConceptNotMastered } from '@/modules/tutor/lib/learningGenomeConcepts'
 import {
   SUBJECT_COLORS,
   SUBJECT_FULL,
   deriveRiskLevel,
 } from '@/modules/tutor/lib/learningGenomeData'
 import { buildStudentNarrative } from '@/modules/tutor/lib/learningGenomeNarrative'
-import { DailyCurveChart, TrendMark } from './GenomeCharts'
-import { LgBoardTable, LgSection } from '@/modules/reports/learningGenome/LearningGenomeShell'
+import { DailyCurveChart, GenomeFingerprintChart, TrendMark } from './GenomeCharts'
 import { fallbackGenomeNarrativeTa } from '@/lib/reportBilingual'
-import { formatVsClass } from '@/lib/reportFormatters'
-import { formatSubjectCount, translateRisk, translateTrendValue } from '@/lib/reportLabels'
+import { translateRisk, translateTrendValue } from '@/lib/reportLabels'
 import { useReportLabels } from '@/lib/useReportLabels'
 import { ReportNarrative } from '@/components/reports/ReportLanguageToggle'
+import { KnowledgeChapterTopicBars } from '@/modules/reports/learningGenome/KnowledgeDistribution'
 
 const SUBJECT_ORDER_LIST = ['TAM', 'ENG', 'MAT', 'SCI', 'SOC'] as const
-
-function pctGrade(pct: number): string {
-  if (pct >= 90) return 'A+'
-  if (pct >= 80) return 'A'
-  if (pct >= 70) return 'B+'
-  if (pct >= 60) return 'B'
-  if (pct >= 50) return 'C'
-  if (pct >= 40) return 'D'
-  return 'E'
-}
-
-function barColor(pct: number): string {
-  if (pct >= 75) return '#3E6B9C'
-  if (pct >= 60) return '#B7862E'
-  return '#A8402F'
-}
 
 function AffinityBars({ subjAvg }: { subjAvg: GenomeStudentProfile['subj_avg'] }) {
   return (
@@ -57,50 +38,6 @@ function AffinityBars({ subjAvg }: { subjAvg: GenomeStudentProfile['subj_avg'] }
   )
 }
 
-function ScoreBar({ pct, gold }: { pct: number; gold?: boolean }) {
-  return (
-    <div className="lg-score-bar">
-      <span
-        style={{
-          width: `${Math.min(100, pct)}%`,
-          background: gold
-            ? 'linear-gradient(90deg, var(--lg-gold), var(--lg-gold-bright))'
-            : barColor(pct),
-        }}
-      />
-    </div>
-  )
-}
-
-function VsClass({ delta, language }: { delta: number | null | undefined; language: 'en' | 'ta' }) {
-  if (delta == null) return <span className="lg-vs-flat">—</span>
-  const text = formatVsClass(delta === 0 ? 0 : delta, language)
-  if (delta > 0) return <span className="lg-vs-up">{text}</span>
-  if (delta < 0) return <span className="lg-vs-down">{text}</span>
-  return <span className="lg-vs-up">{text}</span>
-}
-
-function subjectRowsFrom(rows: GenomeExamSubjectRow[], language: 'en' | 'ta') {
-  return rows.map((row) => {
-    const marks =
-      row.scored != null && row.maxMarks != null
-        ? `${Number(row.scored).toFixed(1)} / ${Number(row.maxMarks).toFixed(1)}`
-        : `${row.pct.toFixed(1)}%`
-    return [
-      <span key={`${row.code}-n`} className="lg-subj-cell">
-        {row.name || SUBJECT_FULL[row.code] || row.code}
-      </span>,
-      <span key={`${row.code}-m`}>{marks}</span>,
-      <span key={`${row.code}-p`}>{row.pct.toFixed(1)}%</span>,
-      <ScoreBar key={`${row.code}-b`} pct={row.pct} />,
-      <span key={`${row.code}-g`} className="lg-serif font-semibold">
-        {row.grade || pctGrade(row.pct)}
-      </span>,
-      <VsClass key={`${row.code}-v`} delta={row.vsClass} language={language} />,
-    ]
-  })
-}
-
 interface StudentGenomeDetailProps {
   name: string
   profile: GenomeStudentProfile
@@ -109,10 +46,13 @@ interface StudentGenomeDetailProps {
   narrative?: string | null
   narrativeTa?: string | null
   narrativeSource?: 'vertex' | 'rule-based'
+  topicMastery?: ConceptNotMastered[]
+  knowledgeSummary?: string
   onClose?: () => void
   embedded?: boolean
   hideHeader?: boolean
   hideKpis?: boolean
+  pageLayout?: boolean
 }
 
 export function StudentGenomeDetail({
@@ -123,62 +63,22 @@ export function StudentGenomeDetail({
   narrative: narrativeFromApi,
   narrativeTa: narrativeTaFromApi,
   narrativeSource,
+  topicMastery = [],
+  knowledgeSummary,
   onClose,
   embedded = false,
   hideHeader = false,
   hideKpis = false,
+  pageLayout = false,
 }: StudentGenomeDetailProps) {
-  const { L, language, subjectHeaders, historyHeaders } = useReportLabels()
+  const { L, language } = useReportLabels()
   const narrative = narrativeFromApi ?? buildStudentNarrative(name, profile, totalStudents)
   const narrativeTa =
     narrativeTaFromApi ??
     fallbackGenomeNarrativeTa(name, profile.overall, profile.rank, totalStudents)
   const risk = deriveRiskLevel(profile, {}, name)
-  const exams = profile.exam_history?.length
-    ? profile.exam_history
-    : (() => {
-        const byDate = new Map<string, { date: string; points: typeof profile.daily_curve; overall: number }>()
-        for (const point of profile.daily_curve) {
-          const list = byDate.get(point.date) ?? { date: point.date, points: [], overall: 0 }
-          list.points.push(point)
-          byDate.set(point.date, list)
-        }
-        return [...byDate.values()].map((exam, idx, arr) => {
-          const overall =
-            exam.points.reduce((sum, p) => sum + p.score, 0) / Math.max(exam.points.length, 1)
-          const prev = idx > 0 ? arr[idx - 1] : null
-          const prevOverall = prev
-            ? prev.points.reduce((s, p) => s + p.score, 0) / Math.max(prev.points.length, 1)
-            : null
-          return {
-            title: exam.points[0]?.title ?? `Assessment ${idx + 1}`,
-            date: exam.date,
-            overall,
-            subjectCount: exam.points.length,
-            vsPrev: prevOverall == null ? null : overall - prevOverall,
-            subjects: exam.points.map((p) => ({
-              name: SUBJECT_FULL[p.subject],
-              code: p.subject,
-              pct: p.score,
-              grade: pctGrade(p.score),
-            })),
-          }
-        })
-      })()
-
-  const latest = profile.latest_assessment
-  const assessmentSubjects =
-    latest?.subjects ??
-    (exams.length > 0 ? exams[exams.length - 1].subjects : null) ??
-    SUBJECT_ORDER_LIST.filter((code) => profile.subj_avg[code] != null).map((code) => ({
-      name: SUBJECT_FULL[code],
-      code,
-      pct: profile.subj_avg[code] ?? 0,
-      grade: pctGrade(profile.subj_avg[code] ?? 0),
-    }))
-
-  const assessmentTitle = latest?.title ?? (exams.length ? exams[exams.length - 1].title : 'Subject mastery')
-  const assessmentDate = latest?.date ?? (exams.length ? exams[exams.length - 1].date : undefined)
+  const weakTopics = [...topicMastery].sort((a, b) => a.masteryPct - b.masteryPct).slice(0, 5)
+  const genomeSummary = `${name}'s five-point subject fingerprint is strongest in ${SUBJECT_FULL[profile.strongest]} (${(profile.subj_avg[profile.strongest] ?? 0).toFixed(0)}%) and has the most room to grow in ${SUBJECT_FULL[profile.weakest]} (${(profile.subj_avg[profile.weakest] ?? 0).toFixed(0)}%).`
 
   const content = (
     <>
@@ -187,8 +87,10 @@ export function StudentGenomeDetail({
           <div>
             <h2>{name}</h2>
             <div className="sub">
-              {L.rankOf}{profile.rank} {L.of.toUpperCase()} {totalStudents}
-              {batchLabel ? ` · ${batchLabel}` : ''} · {L.attendance.toUpperCase()} {profile.attendance_pct}% · {L.risk.toUpperCase()}{' '}
+              {L.rankOf}
+              {profile.rank} {L.of.toUpperCase()} {totalStudents}
+              {batchLabel ? ` · ${batchLabel}` : ''} · {L.attendance.toUpperCase()}{' '}
+              {profile.attendance_pct}% · {L.risk.toUpperCase()}{' '}
               {translateRisk(risk, language).toUpperCase()}
             </div>
           </div>
@@ -199,9 +101,9 @@ export function StudentGenomeDetail({
           )}
         </div>
       )}
-      <div className={embedded ? '' : 'lg-detail-body'}>
+      <div className={embedded && !pageLayout ? '' : 'lg-detail-body'}>
         {!hideKpis && (
-          <div className="lg-kpi-strip">
+          <div className="lg-kpi-row">
             <div className="lg-kpi">
               <div className="v">{profile.overall}%</div>
               <div className="l">{L.overallScore}</div>
@@ -229,160 +131,156 @@ export function StudentGenomeDetail({
           </div>
         )}
 
-        {assessmentSubjects.length > 0 && (
-          <LgSection
-            id="assessment-wise"
-            eyebrow={L.eyebrowAssessmentWise}
-            title={assessmentTitle}
-            description={
-              language === 'ta'
-                ? 'இந்த தேர்வுக்கான பாட மதிப்பெண்கள் — வகுப்பு சராசரியுடன் ஒப்பீடு.'
-                : 'Subject marks for this assessment — compared to the class average on the same test.'
-            }
-          >
-            <LgBoardTable
-              headers={subjectHeaders}
-              rows={subjectRowsFrom(assessmentSubjects, language)}
-            />
-            {assessmentDate && (
-              <p className="lg-kl-note mt-2" style={{ color: 'var(--lg-text-muted)' }}>
-                {L.conducted} {assessmentDate}
+        <div className="lg-detail-grid">
+          <div className="lg-panel-block">
+            <h4>{L.subjectAffinity}</h4>
+            <AffinityBars subjAvg={profile.subj_avg} />
+          </div>
+          <div className="lg-panel-block">
+            <h4>{L.examPerformanceTrend}</h4>
+            {profile.daily_curve.length > 0 ? (
+              <DailyCurveChart curve={profile.daily_curve} height={180} />
+            ) : (
+              <p className="text-sm" style={{ color: 'var(--lg-text-muted)' }}>
+                {L.trendAfterMore}
               </p>
             )}
-          </LgSection>
-        )}
-
-        <section className="lg-section" id="trend-map">
-          <div className="lg-eyebrow">{L.eyebrowTrendMap}</div>
-          <h2 className="lg-section-title lg-serif">{L.titleSubjectAffinity}</h2>
-          <p className="lg-section-desc">{L.descSubjectAffinity}</p>
-          <div className="lg-detail-grid">
-            <div className="lg-panel-block">
-              <h4>{L.subjectAffinity}</h4>
-              <AffinityBars subjAvg={profile.subj_avg} />
-            </div>
-            <div className="lg-panel-block">
-              <h4>{L.examPerformanceTrend}</h4>
-              {profile.daily_curve.length > 0 ? (
-                <DailyCurveChart curve={profile.daily_curve} height={180} />
-              ) : (
-                <p className="text-sm" style={{ color: 'var(--lg-text-muted)' }}>
-                  {L.trendAfterMore}
-                </p>
-              )}
-            </div>
           </div>
-        </section>
+        </div>
 
-        {exams.length > 0 && (
-          <LgSection
-            id="history"
-            eyebrow={L.eyebrowExamHistory}
-            title={L.titlePastExams}
-            description={L.descPastExams}
-          >
-            <LgBoardTable
-              headers={historyHeaders}
-              rows={exams.map((exam, idx) => [
-                String(idx + 1),
-                exam.title,
-                exam.date,
-                `${exam.overall.toFixed(1)}%`,
-                <ScoreBar key={`${exam.date}-bar`} pct={exam.overall} gold />,
-                formatSubjectCount(exam.subjectCount, language),
-                exam.vsPrev == null ? (
-                  <span key={`${exam.date}-d`} className="lg-vs-flat">
-                    —
-                  </span>
-                ) : (
-                  <span
-                    key={`${exam.date}-d`}
-                    className={exam.vsPrev >= 0 ? 'lg-vs-up' : 'lg-vs-down'}
-                  >
-                    {exam.vsPrev >= 0 ? '▲' : '▼'} {exam.vsPrev >= 0 ? '+' : ''}
-                    {exam.vsPrev.toFixed(1)}%
-                  </span>
-                ),
-              ])}
-            />
-          </LgSection>
-        )}
+        <ReportNarrative
+          id="report-lang-focus"
+          english={narrative}
+          tamil={narrativeTa}
+          englishNote={narrativeSource === 'vertex' ? L.noteEnglishAiNarrative : undefined}
+          tamilNote={narrativeSource === 'vertex' ? L.noteTamilAiNarrative : undefined}
+        />
 
-        <section className="lg-section" id="narrative" style={{ paddingTop: 0 }}>
-          <ReportNarrative
-            id="report-lang-focus"
-            english={narrative}
-            tamil={narrativeTa}
-            englishNote={narrativeSource === 'vertex' ? L.noteEnglishAiNarrative : undefined}
-            tamilNote={narrativeSource === 'vertex' ? L.noteTamilAiNarrative : undefined}
-          />
-
-          <div className="lg-panel-block" style={{ marginTop: '1.25rem' }}>
-            <h4>{L.fullMetricSet}</h4>
-            <div className="lg-metric-strip">
-              <div className="lg-mstrip-item">
-                <div className="l">{L.bestExam}</div>
-                <div className="v">
-                  {profile.best_day.date} · {profile.best_day.score}%
-                </div>
+        <div className="lg-panel-block" style={{ marginTop: '1.25rem' }}>
+          <h4>{L.fullMetricSet}</h4>
+          <div className="lg-metric-strip">
+            <div className="lg-mstrip-item">
+              <div className="l">{L.bestExam}</div>
+              <div className="v">
+                {profile.best_day.date} · {profile.best_day.score}%
               </div>
-              <div className="lg-mstrip-item">
-                <div className="l">{L.lowestExam}</div>
-                <div className="v">
-                  {profile.worst_day.date} · {profile.worst_day.score}%
-                </div>
+            </div>
+            <div className="lg-mstrip-item">
+              <div className="l">{L.lowestExam}</div>
+              <div className="v">
+                {profile.worst_day.date} · {profile.worst_day.score}%
               </div>
-              <div className="lg-mstrip-item">
-                <div className="l">{L.recoveryAbility}</div>
-                <div className="v">{profile.recovery || L.na}</div>
+            </div>
+            <div className="lg-mstrip-item">
+              <div className="l">{L.recoveryAbility}</div>
+              <div className="v">{profile.recovery || L.na}</div>
+            </div>
+            <div className="lg-mstrip-item">
+              <div className="l">{L.subjectBalance}</div>
+              <div className="v">{profile.balance}</div>
+            </div>
+            <div className="lg-mstrip-item">
+              <div className="l">{L.velocity}</div>
+              <div className="v">
+                <TrendMark trend={profile.trend} velocity={profile.velocity} />
               </div>
-              <div className="lg-mstrip-item">
-                <div className="l">{L.subjectBalance}</div>
-                <div className="v">{profile.balance}</div>
+            </div>
+            <div className="lg-mstrip-item">
+              <div className="l">{L.absences}</div>
+              <div className="v">
+                {profile.absent_count}{' '}
+                {language === 'ta' ? 'தேர்வு' : `test${profile.absent_count === 1 ? '' : 's'}`}
               </div>
-              <div className="lg-mstrip-item">
-                <div className="l">{L.velocity}</div>
-                <div className="v">
-                  <TrendMark trend={profile.trend} velocity={profile.velocity} />
-                </div>
+            </div>
+            <div className="lg-mstrip-item">
+              <div className="l">{L.examShock}</div>
+              <div className="v">
+                {profile.exam_shock.length ? profile.exam_shock.join(', ') : L.noneDetected}
               </div>
-              <div className="lg-mstrip-item">
-                <div className="l">{L.examShock}</div>
-                <div className="v">
-                  {profile.exam_shock.length ? profile.exam_shock.join(', ') : L.noneDetected}
-                </div>
-              </div>
-              <div className="lg-mstrip-item">
-                <div className="l">{L.attendanceImpact}</div>
-                <div className="v">
-                  {profile.attendance_impact === null
-                    ? L.na
-                    : `${profile.attendance_impact > 0 ? '+' : ''}${profile.attendance_impact}%`}
-                </div>
-              </div>
-              <div className="lg-mstrip-item">
-                <div className="l">{L.absences}</div>
-                <div className="v">
-                  {profile.absent_count} {language === 'ta' ? 'தேர்வு' : `test${profile.absent_count === 1 ? '' : 's'}`}
-                </div>
+            </div>
+            <div className="lg-mstrip-item">
+              <div className="l">{L.attendanceImpact}</div>
+              <div className="v">
+                {profile.attendance_impact === null
+                  ? L.na
+                  : `${profile.attendance_impact > 0 ? '+' : ''}${profile.attendance_impact}%`}
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="lg-profile-status">
-            <span
-              className={`dot ${risk === 'High' ? 'dot-high' : risk === 'Medium' ? 'dot-medium' : ''}`}
-            />
-            {translateRisk(risk, language)} {L.genomeProfile}
-            {latest ? ` · ${L.latestPct} ${latest.overall.toFixed(1)}%` : ''}
+        <section className="lg-genome-block" id="genome">
+          <h4>Learning Genome</h4>
+          <div className="lg-genome-fingerprint">
+            <GenomeFingerprintChart subjAvg={profile.subj_avg} />
+            <p>{genomeSummary}</p>
           </div>
         </section>
       </div>
+
+      <section className="lg-section lg-kl-section" id="knowledge-layer">
+        <div className="lg-eyebrow">Level 2 · Knowledge Layer</div>
+        <h2 className="lg-section-title">The Knowledge Layer</h2>
+        <p className="lg-section-desc">
+          Topic and subject mastery from tagged questions — what this student knows now, and where
+          to focus next.
+        </p>
+        <div className="lg-kl-banner">
+          <b>Summary.</b> {knowledgeSummary || 'Topic measures appear after assessments with tagged questions.'}
+        </div>
+        <KnowledgeChapterTopicBars
+          items={topicMastery}
+          emptyNote="No tagged chapter or topic attempts yet for this student."
+        />
+        <div className="lg-kl-grid lg-kl-grid-pair" style={{ marginTop: '0.85rem' }}>
+          <div className="lg-kl-card">
+            <h4>Subject mastery</h4>
+            {SUBJECT_ORDER_LIST.map((code) => {
+              const pct = profile.subj_avg[code]
+              if (pct == null) return null
+              return (
+                <div key={code} className="lg-kl-bar-row">
+                  <span className="n">{SUBJECT_FULL[code]}</span>
+                  <div className="lg-kl-bar-track">
+                    <div
+                      className="lg-kl-bar-fill"
+                      style={{ width: `${pct}%`, background: SUBJECT_COLORS[code] }}
+                    />
+                  </div>
+                  <span className="lg-kl-bar-val">{pct.toFixed(0)}%</span>
+                </div>
+              )
+            })}
+          </div>
+          <div className="lg-kl-card">
+            <h4>Most-missed topics</h4>
+            {weakTopics.length === 0 ? (
+              <p className="lg-kl-note">No topic error pattern yet.</p>
+            ) : (
+              <ul className="lg-kl-error-list">
+                {weakTopics.map((item) => (
+                  <li key={`${item.subject}-${item.chapter}-${item.concept}`}>
+                    {item.chapter ? `${item.chapter} · ${item.concept}` : item.concept}
+                    <span className="pct">{item.masteryPct}% mastery</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        {knowledgeSummary && (
+          <div className="lg-kl-narrative">
+            <b>AI Narrative — {name}</b>
+            <br />
+            {knowledgeSummary}
+          </div>
+        )}
+      </section>
     </>
   )
 
   if (embedded) {
-    return <>{content}</>
+    return <div className={pageLayout ? 'lg-student-page' : undefined}>{content}</div>
   }
 
   return <div className="lg-report lg-detail-panel">{content}</div>

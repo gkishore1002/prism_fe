@@ -12,6 +12,7 @@ import {
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { ActionMenu, ActionMenuItem, ActionMenuLink } from '@/components/ui/ActionMenu'
 import { QuestionUploadWorkflow } from '@/components/academic/QuestionUploadWorkflow'
+import { SyllabusBooksPanel } from '@/components/academic/SyllabusBooksPanel'
 import { ManualQuestionEntry } from '@/components/academic/ManualQuestionEntry'
 import { EmptyState } from '@/components/design/InsightCard'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
@@ -25,7 +26,7 @@ interface QuestionBankPageProps {
   readOnly?: boolean
 }
 
-type WorkspaceTab = 'library' | 'create' | 'import'
+type WorkspaceTab = 'library' | 'create' | 'import' | 'books'
 
 const SOURCE_LABEL: Record<string, string> = {
   upload: 'Imported',
@@ -144,6 +145,7 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
     { id: 'library', label: 'Library' },
     { id: 'create', label: 'Create', hide: readOnly },
     { id: 'import', label: 'Import', hide: readOnly },
+    { id: 'books', label: 'Books', hide: readOnly },
   ]
 
   return (
@@ -433,6 +435,12 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
               setTab('library')
             }}
           />
+        </section>
+      )}
+
+      {tab === 'books' && !readOnly && (
+        <section>
+          <SyllabusBooksPanel />
         </section>
       )}
     </>

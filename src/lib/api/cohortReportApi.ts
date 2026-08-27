@@ -86,6 +86,8 @@ export interface ApiCohortReport {
   clusters: Record<string, string[]>
   students: Record<string, ApiGenomeStudentProfile>
   conceptsNotMastered: ConceptNotMastered[]
+  topicMastery?: ConceptNotMastered[]
+  knowledgeSummary?: string
   dataSource: 'live' | 'empty'
 }
 
@@ -99,6 +101,8 @@ export interface ApiStudentGenome {
   narrative?: string | null
   narrativeTa?: string | null
   narrativeSource?: 'vertex' | 'rule-based'
+  topicMastery?: ConceptNotMastered[]
+  knowledgeSummary?: string
 }
 
 function mapProfile(p: ApiGenomeStudentProfile): GenomeStudentProfile {

@@ -5,6 +5,7 @@ import { useAssessments } from '@/hooks/useAssessments'
 import { useAnalytics } from '@/hooks/useAnalytics'
 import { useToast } from '@/components/ui/Toast'
 import { useLiveStudentAssessments } from '@/modules/student/components/LiveAssessmentPrompt'
+import { beginStudentExam } from '@/lib/examFullscreen'
 
 export const STUDENT_ASSESSMENT_REMINDER_KEY = 'prism_student_assessment_reminder'
 
@@ -50,7 +51,7 @@ export function StudentPendingAssessmentReminder() {
             ? `"${first.title}" is live. Start it now before the window closes.`
             : `You have ${liveAssessments.length} live assessments. Start "${first.title}" now.`,
         actionLabel: 'Start assessment',
-        onAction: () => navigate(`/student/assessments/${first.id}/take`),
+        onAction: () => void beginStudentExam(navigate, first.id),
         variant: 'urgent',
         durationMs: 14000,
       })

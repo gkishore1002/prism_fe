@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle, BarChart3, BookOpen, LineChart, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { PageHeader } from '@/components/layout/AppShell'
-import { pageUnfold } from '@/lib/motion'
+import { fadeUp } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
 interface ReportsLayoutShellProps {
@@ -40,10 +40,9 @@ export function ReportsLayoutShell({
 
   return (
     <motion.div
-      variants={pageUnfold}
+      variants={fadeUp}
       initial="hidden"
       animate="visible"
-      style={{ transformOrigin: 'top center' }}
     >
       <PageHeader
         eyebrow="Prism Spectrum"
@@ -74,11 +73,10 @@ export function ReportsLayoutShell({
       <AnimatePresence mode="wait">
         <motion.div
           key={pathname}
-          variants={pageUnfold}
+          variants={fadeUp}
           initial="hidden"
           animate="visible"
           exit={{ opacity: 0, y: -6, transition: { duration: 0.18 } }}
-          style={{ transformOrigin: 'top center' }}
         >
           <Outlet />
         </motion.div>

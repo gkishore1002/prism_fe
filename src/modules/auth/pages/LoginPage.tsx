@@ -12,7 +12,7 @@ import {
   type RoleOption,
 } from '@/modules/auth/lib/authApi'
 import { LoginHeroPanel } from '@/modules/auth/components/LoginHeroPanel'
-import { PrismLogoFull } from '@/components/brand/PrismLogo'
+import { PrismLogoFullMotion } from '@/components/brand/PrismLogo'
 import type { UserRole } from '@/types'
 
 const roleIcons: Record<UserRole, React.ComponentType<{ className?: string }>> = {
@@ -57,8 +57,8 @@ function orgOptionLabel(org: LoginOrganization): string {
 
 function LoginFormBrandHeader() {
   return (
-    <div className="mb-4 pb-4 border-b border-secondary flex justify-center">
-      <PrismLogoFull maxWidth={168} className="mx-auto" />
+    <div className="mb-4 pb-4 border-b border-secondary flex justify-center overflow-visible">
+      <PrismLogoFullMotion maxWidth={148} />
     </div>
   )
 }

@@ -68,6 +68,7 @@ export const R = {
   navAllTests: { en: 'All tests', ta: 'அனைத்து தேர்வுகள்' },
   navSummary: { en: 'Summary', ta: 'சுருக்கம்' },
   navForecast: { en: 'Forecast', ta: 'முன்னறிவிப்பு' },
+  navKnowledge: { en: 'Knowledge', ta: 'அறிவு' },
   navCards: { en: 'Cards', ta: 'அட்டைகள்' },
   navNarrative: { en: 'Narrative', ta: 'விளக்கம்' },
   navAssessmentWise: { en: 'Assessment-wise', ta: 'தேர்வு வாரியாக' },

@@ -24,6 +24,7 @@ import type { LearningGenomeDataset } from '@/modules/tutor/lib/learningGenomeTy
 import { TrendMark } from './GenomeCharts'
 import { GenomeStudentCard } from './GenomeStudentCard'
 import { StudentGenomeDetail } from './StudentGenomeDetail'
+import { KnowledgeChapterTopicBars } from '@/modules/reports/learningGenome/KnowledgeDistribution'
 import '@/modules/tutor/styles/learningGenome.css'
 
 interface LearningGenomeCohortReportProps {
@@ -56,6 +57,8 @@ export function LearningGenomeCohortReport({
   const [batchId, setBatchId] = useState(initialBatchId ?? '')
   const [liveData, setLiveData] = useState<LearningGenomeDataset | null>(null)
   const [concepts, setConcepts] = useState<ConceptNotMastered[]>([])
+  const [topicMastery, setTopicMastery] = useState<ConceptNotMastered[]>([])
+  const [knowledgeSummary, setKnowledgeSummary] = useState('')
   const [studentIdByName, setStudentIdByName] = useState<Map<string, string>>(new Map())
   const [dataSource, setDataSource] = useState<string>('empty')
   const [reportMeta, setReportMeta] = useState<{
@@ -97,6 +100,8 @@ export function LearningGenomeCohortReport({
         if (cancelled) return
         setLiveData(mapCohortReportToDataset(report))
         setConcepts(report.conceptsNotMastered)
+        setTopicMastery(report.topicMastery ?? report.conceptsNotMastered ?? [])
+        setKnowledgeSummary(report.knowledgeSummary ?? '')
         setDataSource(report.dataSource)
         setReportMeta({
           assessmentResultCount: report.meta.assessmentResultCount,
@@ -185,7 +190,8 @@ export function LearningGenomeCohortReport({
 
   const windowLabel = meta.window_label ?? 'Current term'
   const subjectsLabel = meta.subjects_label ?? 'All curriculum subjects'
-  const topicConcepts = concepts.length > 0 ? concepts : []
+  const topicRows = topicMastery.length > 0 ? topicMastery : concepts
+  const topicConcepts = topicRows.filter((t) => t.masteryPct < 55)
   const subjectMeasures = useMemo(() => cohortSubjectMeasures(data), [data])
 
   const batchOptions = useMemo(
@@ -412,8 +418,8 @@ export function LearningGenomeCohortReport({
           <div>
             <h2 className="lg-section-title">Learning Genome — {meta.total_students} Students</h2>
             <p className="lg-section-desc mb-0">
-              A five-point subject fingerprint for every learner. Click any card to open the full AI
-              profile — daily curve, recovery score, confidence, and a plain-language narrative.
+              A five-point subject fingerprint for every learner — daily curve, recovery score,
+              confidence, and a plain-language narrative live on each student report.
             </p>
           </div>
           {isClassInsights && allStudentReportsHref && (
@@ -425,7 +431,6 @@ export function LearningGenomeCohortReport({
         <div className="lg-genome-grid">
           {names.map((name) => {
             const s = students[name]
-            const href = isClassInsights ? resolveStudentReportHref(name) : undefined
             return (
               <GenomeStudentCard
                 key={name}
@@ -434,8 +439,6 @@ export function LearningGenomeCohortReport({
                 overall={s.overall}
                 subjAvg={s.subj_avg}
                 riskLevel={deriveRiskLevel(s, data.clusters, name)}
-                href={href}
-                onClick={href ? undefined : () => setSelectedStudent(name)}
               />
             )
           })}
@@ -446,18 +449,22 @@ export function LearningGenomeCohortReport({
         <div className="lg-eyebrow">Level 2 · Subject & topic measures</div>
         <h2 className="lg-section-title">The Knowledge Layer</h2>
         <p className="lg-section-desc">
-          Subject mastery and predictive readiness from tagged assessments — what learners know
-          now, and what they are likely to score if tested soon.
+          Same tests. One extra field per question — Subject → Lesson → Topic — and the engine
+          stops reporting marks and starts reporting learning.
         </p>
 
         <div className="lg-kl-banner">
-          <b>★ Live measures.</b> Bars show class mastery; gold markers show predicted readiness
-          (velocity-adjusted). Topic chips come from tagged question attempts in this batch.
+          <b>Summary.</b> {knowledgeSummary || 'Topic measures appear after assessments with tagged questions.'}
         </div>
 
-        <div className="lg-kl-grid">
+        <KnowledgeChapterTopicBars
+          items={topicRows}
+          emptyNote="Chapter and topic scores appear after tagged question attempts."
+        />
+
+        <div className="lg-kl-grid lg-kl-grid-pair" style={{ marginTop: '0.85rem' }}>
           <div className="lg-kl-card">
-            <h4>Subject mastery & predicted readiness</h4>
+            <h4>Subject mastery</h4>
             {subjectMeasures.length === 0 ? (
               <p className="lg-kl-note">Subject measures appear after assessments or marks.</p>
             ) : (
@@ -472,40 +479,35 @@ export function LearningGenomeCohortReport({
                         background: row.color,
                       }}
                     />
-                    <span
-                      className="lg-kl-bar-pred"
-                      style={{ left: `calc(${Math.min(100, row.predicted)}% - 1px)` }}
-                      title={`Predicted ${row.predicted}%`}
-                    />
                   </div>
-                  <span className="lg-kl-bar-val">
-                    {row.mastery}%→{row.predicted}%
-                  </span>
+                  <span className="lg-kl-bar-val">{row.mastery}%</span>
                 </div>
               ))
             )}
-            <p className="lg-kl-note">Mastery → predicted if assessed soon</p>
           </div>
 
           <div className="lg-kl-card">
-            <h4>Topic mastery — concepts not mastered</h4>
+            <h4>Error heatmap — most-missed topics</h4>
             {topicConcepts.length === 0 ? (
               <p className="lg-kl-note">
-                Tag questions with topics and run assessments to unlock concept-level mastery.
+                {topicRows.length > 0
+                  ? 'No topics are below 55% mastery.'
+                  : 'Topic errors appear after tagged question attempts.'}
               </p>
             ) : (
-              <div className="lg-kl-heatmap">
-                {topicConcepts.slice(0, 12).map((item) => (
-                  <div key={`${item.subject}-${item.concept}`} className="lg-kl-chip">
-                    <div className="t">{item.concept}</div>
-                    <div className="p">{item.masteryPct}%</div>
-                    <div className="s">{item.subject}</div>
-                  </div>
+              <ul className="lg-kl-error-list">
+                {topicConcepts.slice(0, 6).map((item) => (
+                  <li key={`${item.subject}-${item.chapter}-${item.concept}`}>
+                    {item.chapter ? `${item.chapter} · ${item.concept}` : item.concept}
+                    <span className="pct">{item.masteryPct}% mastery</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </div>
         </div>
+
+        {knowledgeSummary && <div className="lg-kl-narrative">{knowledgeSummary}</div>}
 
         <div style={{ marginTop: 22, position: 'relative', zIndex: 1 }}>
           <h4

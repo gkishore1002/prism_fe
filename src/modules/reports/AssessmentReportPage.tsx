@@ -3,17 +3,18 @@ import { ReportLoader } from '@/components/ui/PrismLoader'
 import { analyticsApi } from '@/lib/api/analyticsApi'
 import type { AssessmentReport } from '@/types'
 import { AssessmentReportNarratives } from '@/components/reports/AssessmentReportNarratives'
-import { formatReportDate, formatVsClass } from '@/lib/reportFormatters'
+import { formatReportDate } from '@/lib/reportFormatters'
 import { useReportLabels } from '@/lib/useReportLabels'
 import {
-  LgBoardTable,
-  LgFooter,
   LgHero,
-  LgKpiRow,
   LgReportLayout,
-  LgSection,
 } from '@/modules/reports/learningGenome/LearningGenomeShell'
-import { pctGrade, ReportScoreBar } from '@/modules/reports/learningGenome/reportShared'
+import {
+  KnowledgeChapterTopicBars,
+  knowledgeFill,
+  type KnowledgeItem,
+} from '@/modules/reports/learningGenome/KnowledgeDistribution'
+import { subjectColorForName } from '@/modules/tutor/lib/learningGenomeData'
 
 interface AssessmentReportPageProps {
   assessmentId: string
@@ -22,142 +23,200 @@ interface AssessmentReportPageProps {
   backLabel: string
 }
 
+function barColorForName(name: string): string {
+  return subjectColorForName(name)
+}
+
 export function AssessmentReportBody({
   report,
-  backHref,
-  backLabel,
-  embedded = false,
 }: {
   report: AssessmentReport
-  backHref: string
-  backLabel: string
+  backHref?: string
+  backLabel?: string
   embedded?: boolean
 }) {
-  const { L, language, subjectHeaders } = useReportLabels()
-
-  const stats: { value: string | number; unit?: string; label: string }[] = [
-    { value: report.accuracy, unit: '%', label: L.yourScore },
-    { value: `${report.score}/${report.maxScore}`, label: L.rawMarks },
-  ]
-  if (report.classAvg != null) {
-    stats.push({ value: report.classAvg, unit: '%', label: L.classAverage })
-  }
-  if (report.rankInClass != null && report.totalInClass != null) {
-    stats.push({
-      value: `#${report.rankInClass}`,
-      unit: `${L.of} ${report.totalInClass}`,
-      label: L.classRank,
-    })
-  }
+  const { L, language } = useReportLabels()
+  const topics: KnowledgeItem[] = (report.topicScores ?? []).map((row) => ({
+    concept: row.concept,
+    subject: row.subject,
+    chapter: row.chapter,
+    masteryPct: row.masteryPct,
+    correct: row.correct,
+    total: row.total,
+  }))
+  const vsClass =
+    report.classAvg == null ? null : Math.round((report.accuracy - report.classAvg) * 10) / 10
+  const displayName = report.studentName || report.assessmentTitle
+  const weakTopics = [...topics].sort((a, b) => a.masteryPct - b.masteryPct).slice(0, 5)
 
   return (
-    <>
-      {!embedded && (
-      <LgHero
-        reportKind={L.reportKindAssessment}
-        title={report.assessmentTitle}
-        quickFacts={`${report.subject} · ${L.submitted} ${formatReportDate(report.submittedAt, language)}`}
-        detailLines={[
-          `${L.thisAssessment}: ${report.assessmentTitle} · ${report.timeSpentMin} ${L.min}`,
-          report.rankInClass != null && report.totalInClass != null
-            ? `${L.classStanding}: #${report.rankInClass} ${L.of} ${report.totalInClass}`
-            : `${L.thSubject}: ${report.subject}`,
-        ]}
-        stats={[
-          ...stats.map((s) => ({
-            value: `${s.value}${s.unit ?? ''}`,
-            label: s.label,
-          })),
-          ...(stats.length < 6
-            ? [{ value: `${report.timeSpentMin}m`, label: L.timeSpent }]
-            : []),
-        ].slice(0, 6)}
-        statsPlacement="below"
-        showSeal
-        backHref={backHref}
-        backLabel={backLabel}
-      />
-      )}
-
-      <LgSection
-        id="narrative"
-        eyebrow={L.eyebrowSummary}
-        title={L.titleAssessmentNarrative}
-        description={report.summarySource === 'vertex' ? L.descAiStored : L.descRuleAssessment}
-      >
-        <AssessmentReportNarratives report={report} />
-      </LgSection>
-
-      <LgSection
-        id="scores"
-        eyebrow={L.eyebrowAssessmentWise}
-        title={L.titleSubjectBreakdown}
-        description={L.descSubjectBreakdown}
-      >
-        <LgBoardTable
-          headers={subjectHeaders}
-          rows={report.subjectScores.map((row) => {
-            const grade = pctGrade(row.accuracy)
-            const delta =
-              report.classAvg == null ? null : Math.round((row.accuracy - report.classAvg) * 10) / 10
-            return [
-              <span key={`${row.subject}-n`} className="lg-subj-cell">
-                {row.subject}
-              </span>,
-              `${row.score} / ${row.maxScore}`,
-              `${row.accuracy}%`,
-              <ReportScoreBar key={`${row.subject}-b`} pct={row.accuracy} />,
-              <span key={`${row.subject}-g`} className="lg-serif font-semibold">
-                {grade}
-              </span>,
-              delta == null ? (
-                <span key={`${row.subject}-v`} className="lg-vs-flat">
-                  —
-                </span>
-              ) : (
-                <span
-                  key={`${row.subject}-v`}
-                  className={delta >= 0 ? 'lg-vs-up' : 'lg-vs-down'}
-                >
-                  {formatVsClass(delta, language)}
-                </span>
-              ),
-            ]
-          })}
-        />
-      </LgSection>
-
-      <LgSection eyebrow={L.eyebrowTopics} title={L.titleStrongFocus}>
-        <div className="grid md:grid-cols-2 gap-3">
-          <div>
-            <h4 className="lg-mono text-[0.62rem] uppercase tracking-widest text-[var(--lg-emerald)] mb-2">
-              {L.strongTopics}
-            </h4>
-            <LgKpiRow
-              items={
-                report.strongTopics.length > 0
-                  ? report.strongTopics.map((t) => ({ value: '✓', label: t }))
-                  : [{ value: '—', label: L.noneIdentified }]
-              }
-            />
-          </div>
-          <div>
-            <h4 className="lg-mono text-[0.62rem] uppercase tracking-widest text-[#EF4444] mb-2">
-              {L.focusTopics}
-            </h4>
-            <LgKpiRow
-              items={
-                report.weakTopics.length > 0
-                  ? report.weakTopics.map((t) => ({ value: '!', label: t }))
-                  : [{ value: '—', label: L.noneFlagged }]
-              }
-            />
+    <div className="lg-student-page">
+      <div className="lg-detail-head">
+        <div>
+          <h2>{displayName}</h2>
+          <div className="sub">
+            {report.rankInClass != null && report.totalInClass
+              ? `${L.rankOf}${report.rankInClass} ${L.of.toUpperCase()} ${report.totalInClass}  ·  `
+              : ''}
+            {report.assessmentTitle.toUpperCase()}  ·  {report.subject.toUpperCase()}  ·  {formatReportDate(report.submittedAt, language)}  ·  {report.accuracy}%
           </div>
         </div>
-      </LgSection>
+      </div>
 
-      {!embedded && <LgFooter />}
-    </>
+      <div className="lg-detail-body">
+        <div className="lg-kpi-row">
+          <div className="lg-kpi">
+            <div className="v">{report.accuracy}%</div>
+            <div className="l">{L.yourScore}</div>
+          </div>
+          <div className="lg-kpi">
+            <div className="v">
+              {report.score}/{report.maxScore}
+            </div>
+            <div className="l">{L.rawMarks}</div>
+          </div>
+          <div className="lg-kpi">
+            <div className="v">{report.classAvg != null ? `${report.classAvg}%` : '—'}</div>
+            <div className="l">{L.classAverage}</div>
+          </div>
+          <div className="lg-kpi">
+            <div className="v">
+              {report.rankInClass != null && report.totalInClass
+                ? `#${report.rankInClass}`
+                : '—'}
+            </div>
+            <div className="l">{L.classRank}</div>
+          </div>
+          <div className="lg-kpi">
+            <div className="v">{vsClass == null ? '—' : `${vsClass > 0 ? '+' : ''}${vsClass}%`}</div>
+            <div className="l">{L.vsClass}</div>
+          </div>
+          <div className="lg-kpi">
+            <div className="v">{report.timeSpentMin}m</div>
+            <div className="l">{L.timeSpent}</div>
+          </div>
+        </div>
+
+        <div className="lg-detail-grid">
+          <div className="lg-panel-block">
+            <h4>{L.subjectAffinity}</h4>
+            {report.subjectScores.length === 0 ? (
+              <p className="text-sm" style={{ color: 'var(--lg-text-muted)' }}>
+                {L.reportUnavailable}
+              </p>
+            ) : (
+              report.subjectScores.map((row) => (
+                <div key={row.subject} className="lg-affinity-row">
+                  <div className="sname">{row.subject}</div>
+                  <div className="lg-affinity-track">
+                    <div
+                      className="lg-affinity-fill"
+                      style={{ width: `${row.accuracy}%`, background: barColorForName(row.subject) }}
+                    />
+                  </div>
+                  <div className="lg-affinity-val">{row.accuracy}%</div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="lg-panel-block">
+            <h4>Topic mastery — this exam</h4>
+            {topics.length === 0 ? (
+              <p className="text-sm" style={{ color: 'var(--lg-text-muted)' }}>
+                Topic scores appear once questions on this paper are tagged.
+              </p>
+            ) : (
+              topics.map((row) => (
+                <div key={`${row.subject}-${row.chapter}-${row.concept}`} className="lg-affinity-row">
+                  <div className="sname" title={row.chapter ? `${row.chapter} · ${row.concept}` : row.concept}>
+                    {row.chapter ? `${row.chapter} · ${row.concept}` : row.concept}
+                  </div>
+                  <div className="lg-affinity-track">
+                    <div
+                      className="lg-affinity-fill"
+                      style={{
+                        width: `${row.masteryPct}%`,
+                        background: knowledgeFill(row.masteryPct, row.subject),
+                      }}
+                    />
+                  </div>
+                  <div className="lg-affinity-val">{row.masteryPct}%</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div id="narrative">
+          <AssessmentReportNarratives report={report} />
+        </div>
+
+        <div className="lg-panel-block" style={{ marginTop: '0.5rem' }}>
+          <h4>{L.fullMetricSet}</h4>
+          <div className="lg-metric-strip">
+            <div className="lg-mstrip-item">
+              <div className="l">{L.strongTopics}</div>
+              <div className="v">
+                {report.strongTopics.length ? report.strongTopics.slice(0, 2).join(', ') : L.noneIdentified}
+              </div>
+            </div>
+            <div className="lg-mstrip-item">
+              <div className="l">{L.focusTopics}</div>
+              <div className="v">
+                {report.weakTopics.length ? report.weakTopics.slice(0, 2).join(', ') : L.noneFlagged}
+              </div>
+            </div>
+            <div className="lg-mstrip-item">
+              <div className="l">{L.thSubject}</div>
+              <div className="v">{report.subject}</div>
+            </div>
+            <div className="lg-mstrip-item">
+              <div className="l">{L.thisAssessment}</div>
+              <div className="v">{report.assessmentTitle}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section className="lg-section lg-kl-section" id="knowledge-layer">
+        <div className="lg-eyebrow">Level 2 · This exam</div>
+        <h2 className="lg-section-title">Knowledge Layer</h2>
+        <p className="lg-section-desc">
+          Chapter and topic breakdown for {report.assessmentTitle} only — not the full-term genome.
+        </p>
+        <div className="lg-kl-banner">
+          <b>Summary.</b> {report.knowledgeSummary || 'Topic measures appear after tagged questions on this paper.'}
+        </div>
+        <KnowledgeChapterTopicBars
+          items={topics}
+          emptyNote="No tagged chapters or topics on this exam yet."
+        />
+        <div className="lg-kl-grid lg-kl-grid-pair" style={{ marginTop: '0.85rem' }}>
+          <div className="lg-kl-card">
+            <h4>Most-missed topics</h4>
+            {weakTopics.length === 0 ? (
+              <p className="lg-kl-note">No topic error pattern on this paper.</p>
+            ) : (
+              <ul className="lg-kl-error-list">
+                {weakTopics.map((item) => (
+                  <li key={`${item.subject}-${item.chapter}-${item.concept}`}>
+                    {item.chapter ? `${item.chapter} · ${item.concept}` : item.concept}
+                    <span className="pct">{item.masteryPct}%</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        {report.knowledgeSummary && (
+          <div className="lg-kl-narrative">
+            <b>Exam narrative — {report.assessmentTitle}</b>
+            <br />
+            {report.knowledgeSummary}
+          </div>
+        )}
+      </section>
+    </div>
   )
 }
 
@@ -212,16 +271,12 @@ export function AssessmentReportPage({
       printTitle={`${report.assessmentTitle} — Assessment report`}
       backHref={backHref}
       backLabel={backLabel}
-      navLinks={(L) => [
-        { href: '#narrative', label: L.navNarrative },
-        { href: '#scores', label: L.navAssessmentWise },
+      navLinks={[
+        { href: '#narrative', label: 'Summary' },
+        { href: '#knowledge-layer', label: 'Knowledge Layer' },
       ]}
     >
-      <AssessmentReportBody
-        report={report}
-        backHref={backHref}
-        backLabel={backLabel}
-      />
+      <AssessmentReportBody report={report} backHref={backHref} backLabel={backLabel} />
     </LgReportLayout>
   )
 }

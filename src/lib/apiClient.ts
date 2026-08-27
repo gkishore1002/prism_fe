@@ -27,8 +27,9 @@ export async function apiFetch<T>(
 
   const { auth = true, headers: initHeaders, ...rest } = options
   const headers = new Headers(initHeaders)
+  const isFormData = typeof FormData !== 'undefined' && rest.body instanceof FormData
 
-  if (!headers.has('Content-Type') && rest.body) {
+  if (!headers.has('Content-Type') && rest.body && !isFormData) {
     headers.set('Content-Type', 'application/json')
   }
 
@@ -49,9 +50,40 @@ export async function apiFetch<T>(
     try {
       const body = (await res.json()) as {
         detail?: string | { msg?: string; loc?: unknown[] }[] | { message?: string }
+        message?: string
+        error?: unknown
+        error_message?: string
       }
-      if (typeof body.detail === 'string') {
-        message = body.detail
+      const raw =
+        typeof body.detail === 'string'
+          ? body.detail
+          : body.detail &&
+              typeof body.detail === 'object' &&
+              !Array.isArray(body.detail) &&
+              typeof (body.detail as { message?: string }).message === 'string'
+            ? String((body.detail as { message?: string }).message)
+            : typeof body.message === 'string'
+              ? body.message
+              : typeof body.error_message === 'string'
+                ? body.error_message
+                : typeof body.error === 'string'
+                  ? body.error
+                  : null
+      if (raw) {
+        message = raw
+          .replace(/\s*Pass force\s*=\s*true to publish anyway\.?/gi, '')
+          .trim()
+        const incomplete = message.match(/^(\d+)\s+subject\(s\) are not fully entered yet\.?$/i)
+        if (incomplete) {
+          const n = Number(incomplete[1])
+          message =
+            n === 1
+              ? '1 subject is not fully entered yet. Enter and save marks for every student in that subject, then publish again.'
+              : `${n} subjects are not fully entered yet. Enter and save marks for every student in those subjects, then publish again.`
+        }
+        if (!message || message === 'true' || message === 'false') {
+          message = res.statusText || 'Request failed'
+        }
       } else if (Array.isArray(body.detail)) {
         message = body.detail
           .map((item) => {
@@ -62,7 +94,8 @@ export async function apiFetch<T>(
           })
           .join('; ')
       } else if (body.detail && typeof body.detail === 'object' && 'message' in body.detail) {
-        message = String(body.detail.message)
+        const nested = String(body.detail.message || '').trim()
+        message = nested && nested !== 'true' ? nested : res.statusText || 'Request failed'
       }
     } catch {
       // ignore parse errors

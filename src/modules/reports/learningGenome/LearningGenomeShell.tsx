@@ -62,8 +62,7 @@ function LgReportShell({
       )}
       <div
         id="lg-report-print-root"
-        className="lg-report atlas-page-reveal -mx-2 sm:-mx-4 rounded-xl border border-[var(--lg-line)] shadow-sm print:mx-0 print:rounded-none print:border-0 print:shadow-none"
-        style={{ overflow: 'visible' }}
+        className="lg-report -mx-2 sm:-mx-4 rounded-xl border border-[var(--lg-line)] shadow-sm print:mx-0 print:rounded-none print:border-0 print:shadow-none"
         data-active-lang="en"
       >
         {bilingual && <ReportLanguageBar />}
@@ -145,7 +144,7 @@ function HeroBrandMark() {
   const letter = APP_NAME.charAt(0).toUpperCase()
   return (
     <div
-      className="flex size-10 shrink-0 items-center justify-center rounded-full border-[1.5px] border-[var(--lg-gold)] font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--lg-accent-on-dark)]"
+      className="flex size-10 shrink-0 items-center justify-center rounded-full border-[1.5px] border-[var(--lg-gold)] font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--lg-gold-bright)]"
       aria-hidden
     >
       {letter}
@@ -159,7 +158,7 @@ function HeroSeal() {
       <polygon
         points="26,3 48,19 40,46 12,46 4,19"
         fill="none"
-        stroke="rgba(246,241,228,0.85)"
+        stroke="rgba(240,215,138,0.85)"
         strokeWidth="1.5"
       />
       <polygon points="26,30 32,42 20,42" fill="var(--lg-gold)" />

@@ -8,6 +8,8 @@ export const APP_ORG = 'Prism Software'
 export const BRAND_MARK = '/brand/prism-mark.png'
 export const BRAND_LOGO_FULL = '/brand/prism-logo-full.png'
 export const BRAND_MARK_DARK = '/brand/prism-mark.png'
+export const BRAND_PRIMARY = '#003B7A'
+export const BRAND_ACCENT = '#FFC700'
 
 /**
  * Health status → Swotify semantic colour families:

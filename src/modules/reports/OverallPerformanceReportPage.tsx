@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   BarChart,
   Bar,
@@ -28,6 +28,7 @@ import {
   LgSection,
 } from '@/modules/reports/learningGenome/LearningGenomeShell'
 import { StudentAssessmentInsightsBody } from '@/modules/reports/learningGenome/StudentAssessmentInsightsBody'
+import { KnowledgeChapterTopicBars } from '@/modules/reports/learningGenome/KnowledgeDistribution'
 
 interface OverallPerformanceReportPageProps {
   studentId?: string
@@ -64,6 +65,26 @@ function OverallReportContent({
       : dates.length === 1
         ? formatReportDate(dates[0], language)
         : `${formatReportDate(dates[0], language)} – ${formatReportDate(dates[dates.length - 1], language)}`
+
+  const knowledgeItems = useMemo(() => {
+    const fromOverall = report.topicBreakdown.map((t) => ({
+      concept: t.topic,
+      subject: t.subject,
+      chapter: t.chapter,
+      masteryPct: t.currentMastery ?? t.mastery,
+    }))
+    if (fromOverall.length > 0) return fromOverall
+    return assessmentReports.flatMap((exam) =>
+      (exam.topicScores ?? []).map((t) => ({
+        concept: t.concept,
+        subject: t.subject,
+        chapter: t.chapter,
+        masteryPct: t.masteryPct,
+        correct: t.correct,
+        total: t.total,
+      })),
+    )
+  }, [report.topicBreakdown, assessmentReports])
 
   const topicChartData = report.topicBreakdown.slice(0, 6).map((t) => ({
     name: t.topic.length > 14 ? `${t.topic.slice(0, 12)}…` : t.topic,
@@ -165,14 +186,14 @@ function OverallReportContent({
           description={L.descTopicReadiness}
         >
           <div className="lg-chart-panel mb-3">
-            <div style={{ width: '100%', minWidth: 280, height: 160 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="lg-chart-frame" style={{ height: 160 }}>
+              <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={topicChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(28,26,21,0.12)" />
                   <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#3f3c34' }} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#3f3c34' }} />
                   <Bar dataKey="mastery" fill="#E4DCC4" radius={[4, 4, 0, 0]} name={L.thMastery} />
-                  <Bar dataKey="predicted" fill="#0B1F3A" radius={[4, 4, 0, 0]} name={L.thPredicted} />
+                  <Bar dataKey="predicted" fill="#C5A059" radius={[4, 4, 0, 0]} name={L.thPredicted} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -180,7 +201,7 @@ function OverallReportContent({
           <LgBoardTable
             headers={forecastHeaders}
             rows={report.topicBreakdown.slice(0, 8).map((t) => [
-              t.topic,
+              t.chapter ? `${t.chapter} · ${t.topic}` : t.topic,
               t.subject,
               `${t.currentMastery ?? t.mastery}%`,
               `${t.predictedScore ?? t.mastery}%`,
@@ -193,7 +214,19 @@ function OverallReportContent({
         </LgSection>
       )}
 
-      {!embedded && <LgFooter windowLabel={windowLabel} cohortNote={report.batch} />}
+      <section className="lg-section lg-kl-section" id="knowledge-layer">
+        <div className="lg-eyebrow">Level 2 · Knowledge Layer</div>
+        <h2 className="lg-section-title">The Knowledge Layer</h2>
+        <p className="lg-section-desc">
+          Chapter and topic mastery from tagged questions across this student&apos;s assessments.
+        </p>
+        <KnowledgeChapterTopicBars
+          items={knowledgeItems}
+          emptyNote="Chapter and topic scores appear after tagged question attempts."
+        />
+      </section>
+
+      <LgFooter windowLabel={windowLabel} cohortNote={report.batch} />
     </>
   )
 }
@@ -265,6 +298,7 @@ export function OverallPerformanceReportPage({
         { href: '#summary', label: L.navSummary },
         { href: '#insights', label: L.navAssessment },
         { href: '#forecast', label: L.navForecast },
+        { href: '#knowledge-layer', label: L.navKnowledge },
       ]}
     >
       <OverallReportContent

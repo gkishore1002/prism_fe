@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PageLoader } from '@/components/ui/PrismLoader'
-import { Link } from 'react-router-dom'
-import { Play, Clock, Calendar, Lock, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Play, Clock, Calendar, Lock, CheckCircle2, AlertTriangle, RotateCcw } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { useAuth } from '@/hooks/useAuth'
 import { useAssessments } from '@/hooks/useAssessments'
@@ -9,6 +8,7 @@ import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { resolveStudentProfile, scopeLabelFromProfile } from '@/modules/student/lib/studentProfile'
 import { scopeLabel } from '@/lib/academicScope'
 import { RequestReassignmentModal } from '@/modules/student/components/RequestReassignmentModal'
+import { ExamStartButton } from '@/modules/student/components/ExamStartButton'
 import { useNotifications } from '@/hooks/useNotifications'
 import { CscFullReportModal } from '@/modules/student/components/CscFullReportModal'
 import { btnClass } from '@/components/ui/Button'
@@ -35,7 +35,7 @@ export function StudentAssessmentsPage() {
   }, [ensureLoaded])
   const profile = resolveStudentProfile(studentProfile, user)
 
-  if (analyticsLoading || assessmentsLoading) {
+  if (!profile && (analyticsLoading || assessmentsLoading)) {
     return <PageLoader label="Loading assessments…" />
   }
 
@@ -110,7 +110,9 @@ export function StudentAssessmentsPage() {
 
       {availableNow.length > 0 && (
         <div className="space-y-3 mb-8">
-          <h3 className="font-display text-lg text-foreground">Start now</h3>
+          <h3 className="font-display text-lg text-foreground">
+            {availableNow.some((a) => a.attemptInProgress) ? 'Continue exam' : 'Start now'}
+          </h3>
           {availableNow.map((a) => (
             <div key={a.id} className="bg-ink text-paper rounded-lg p-6 relative overflow-hidden">
               <div className="absolute inset-0 paper-grid opacity-[0.08]" aria-hidden />
@@ -118,6 +120,7 @@ export function StudentAssessmentsPage() {
                 <div>
                   <span className="text-[10px] uppercase tracking-[0.2em] text-accent font-display font-semibold">
                     Live · {a.mode} mode
+                    {a.attemptInProgress ? ' · in progress' : ''}
                   </span>
                   <h4 className="font-display text-2xl font-bold mt-2">{a.title}</h4>
                   <p className="text-paper/70 text-sm mt-1">
@@ -128,14 +131,27 @@ export function StudentAssessmentsPage() {
                     {scopeLabel({ board: a.board, grade: a.grade })} · {a.batchName}
                     {a.scheduledAt ? ` · ${a.scheduledAt}` : ''}
                   </p>
+                  {a.attemptInProgress && (
+                    <p className="text-accent text-xs mt-2">
+                      Your previous answers are saved. Re-enter to continue from where you left.
+                    </p>
+                  )}
                 </div>
                 {canStudentAttend(query, a.id) ? (
-                  <Link
-                    to={`/student/assessments/${a.id}/take`}
+                  <ExamStartButton
+                    assessmentId={a.id}
                     className="inline-flex items-center gap-2 bg-accent text-accent-foreground px-6 py-3 rounded-md font-medium hover:opacity-90 shrink-0"
                   >
-                    <Play className="w-4 h-4" /> Start
-                  </Link>
+                    {a.attemptInProgress ? (
+                      <>
+                        <RotateCcw className="w-4 h-4" /> Resume exam
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4" /> Start
+                      </>
+                    )}
+                  </ExamStartButton>
                 ) : (
                   <span className="text-xs text-paper/60">Not on invite list</span>
                 )}
@@ -177,12 +193,12 @@ export function StudentAssessmentsPage() {
                     </p>
                   </div>
                   {a.accessRequestStatus === 'approved' ? (
-                    <Link
-                      to={`/student/assessments/${a.id}/take`}
+                    <ExamStartButton
+                      assessmentId={a.id}
                       className={`${btnClass.primary} text-sm px-4 py-2 inline-flex items-center gap-2 ${accessRequestTheme.approveBtn} shrink-0`}
                     >
-                      <Play className="w-4 h-4" /> Start exam
-                    </Link>
+                      <Play className="w-4 h-4" /> {a.attemptInProgress ? 'Resume exam' : 'Start exam'}
+                    </ExamStartButton>
                   ) : a.accessRequestStatus === 'pending' ? (
                     <span
                       className={`text-xs font-semibold uppercase tracking-wide px-3 py-2 rounded-lg shrink-0 ${accessRequestTheme.badgeEmphasis}`}
@@ -364,6 +380,7 @@ export function StudentAssessmentsPage() {
         assessmentId={reassignTarget?.id ?? ''}
         assessmentTitle={reassignTarget?.title ?? ''}
         onSubmitted={() => {
+          setReassignTarget(null)
           void refresh()
           void refreshNotifications()
         }}

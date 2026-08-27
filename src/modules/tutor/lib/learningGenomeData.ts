@@ -3,13 +3,23 @@ import type {
   SubjectCode,
 } from './learningGenomeTypes'
 
-/** Bar / chart fills (decorative). Prefer darker ink tokens when these appear as text. */
+/** Subject bar / chart fills — cream-report palette. */
 export const SUBJECT_COLORS: Record<SubjectCode, string> = {
-  TAM: '#C9A24B',
-  ENG: '#2F6B4F',
-  MAT: '#A8402F',
-  SCI: '#3E6B9C',
-  SOC: '#7A5AA8',
+  TAM: '#C5A059',
+  ENG: '#2D5A41',
+  MAT: '#9B4437',
+  SCI: '#3A6191',
+  SOC: '#7A5197',
+}
+
+export function subjectColorForName(name: string | undefined | null): string {
+  const n = (name || '').toLowerCase()
+  if (n.includes('tamil') || n === 'tam') return SUBJECT_COLORS.TAM
+  if (n.includes('english') || n === 'eng') return SUBJECT_COLORS.ENG
+  if (n.includes('math') || n === 'mat') return SUBJECT_COLORS.MAT
+  if (n.includes('social') || n === 'soc') return SUBJECT_COLORS.SOC
+  if (n.includes('sci')) return SUBJECT_COLORS.SCI
+  return SUBJECT_COLORS.TAM
 }
 
 export const SUBJECT_FULL: Record<SubjectCode, string> = {

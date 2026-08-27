@@ -9,10 +9,8 @@ import {
 } from '@/lib/api/cohortReportApi'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import type { GenomeStudentProfile } from '@/modules/tutor/lib/learningGenomeTypes'
+import type { ConceptNotMastered } from '@/modules/tutor/lib/learningGenomeConcepts'
 import { deriveRiskLevel } from '@/modules/tutor/lib/learningGenomeData'
-import { formatGenomeQuickFacts } from '@/lib/reportFormatters'
-import { translateRisk, translateTrendValue } from '@/lib/reportLabels'
-import { useReportLabels } from '@/lib/useReportLabels'
 import {
   LgFooter,
   LgHero,
@@ -23,94 +21,6 @@ import '@/modules/tutor/styles/learningGenome.css'
 interface StudentGenomeReportPageProps {
   reportsBackHref: string
   reportsBackLabel: string
-}
-
-function GenomeReportView({
-  displayName,
-  profile,
-  totalStudents,
-  batchLabel,
-  windowMeta,
-  risk,
-  narrative,
-  narrativeTa,
-  narrativeSource,
-  reportsBackHref,
-  reportsBackLabel,
-}: {
-  displayName: string
-  profile: GenomeStudentProfile
-  totalStudents: number
-  batchLabel?: string
-  windowMeta: { window: string; latest: string; subjectCount: number } | null
-  risk: string
-  narrative: string | null
-  narrativeTa: string | null
-  narrativeSource?: 'vertex' | 'rule-based'
-  reportsBackHref: string
-  reportsBackLabel: string
-}) {
-  const { L, language } = useReportLabels()
-
-  return (
-    <>
-      <LgHero
-        reportKind={L.reportKindEngine}
-        title={displayName}
-        quickFacts={formatGenomeQuickFacts(
-          profile.rank,
-          totalStudents,
-          profile.attendance_pct,
-          translateRisk(risk, language),
-          language,
-        )}
-        detailLines={[
-          windowMeta
-            ? `${L.assessmentWindow}: ${windowMeta.window}`
-            : batchLabel
-              ? `${L.batch}: ${batchLabel}`
-              : `${L.assessmentWindow}: —`,
-          profile.latest_assessment
-            ? `${L.thisAssessment}: ${profile.latest_assessment.title} · ${L.conducted} ${profile.latest_assessment.date}`
-            : windowMeta
-              ? `${L.thisAssessment}: ${L.scoredWindow} · ${windowMeta.latest} · ${windowMeta.subjectCount} ${L.subjectCount}`
-              : L.awaitingMarks,
-        ]}
-        stats={[
-          { value: `${profile.overall}%`, label: L.overallScore },
-          { value: translateTrendValue(profile.consistency, language), label: L.consistency },
-          { value: translateTrendValue(profile.trend, language), label: L.learningTrend },
-          { value: `${profile.predicted}%`, label: L.predictedNext },
-          { value: `${profile.confidence}%`, label: L.confidenceScore },
-          { value: `${profile.growth_potential}%`, label: L.growthPotential },
-        ]}
-        statsPlacement="below"
-        showSeal
-        backHref={reportsBackHref}
-        backLabel={reportsBackLabel}
-      />
-
-      <div id="profile">
-        <StudentGenomeDetail
-          name={displayName}
-          profile={profile}
-          totalStudents={totalStudents}
-          batchLabel={batchLabel}
-          narrative={narrative}
-          narrativeTa={narrativeTa}
-          narrativeSource={narrativeSource}
-          embedded
-          hideHeader
-          hideKpis
-        />
-      </div>
-
-      <LgFooter
-        windowLabel={windowMeta?.window}
-        cohortNote={`${totalStudents} ${L.studentsInCohort}`}
-      />
-    </>
-  )
 }
 
 export function StudentGenomeReportPage({
@@ -128,6 +38,8 @@ export function StudentGenomeReportPage({
   const [narrative, setNarrative] = useState<string | null>(null)
   const [narrativeTa, setNarrativeTa] = useState<string | null>(null)
   const [narrativeSource, setNarrativeSource] = useState<'vertex' | 'rule-based' | undefined>()
+  const [topicMastery, setTopicMastery] = useState<ConceptNotMastered[]>([])
+  const [knowledgeSummary, setKnowledgeSummary] = useState('')
   const [source, setSource] = useState<'live' | 'empty' | 'unavailable'>('empty')
   const [loading, setLoading] = useState(Boolean(studentId && cohortReportApiAvailable()))
   const [message, setMessage] = useState<string | null>(null)
@@ -157,6 +69,8 @@ export function StudentGenomeReportPage({
         setDisplayName(data.name)
         setTotalStudents(data.totalStudents)
         setBatchLabel(data.batchLabel ?? undefined)
+        setTopicMastery(data.topicMastery ?? [])
+        setKnowledgeSummary(data.knowledgeSummary ?? '')
         if (!data.profile) {
           setProfile(null)
           setSource('empty')
@@ -201,7 +115,6 @@ export function StudentGenomeReportPage({
     return {
       window: first === last ? first : `${first} – ${last}`,
       latest: last,
-      subjectCount: new Set(profile.daily_curve.map((d) => d.subject)).size,
     }
   }, [profile])
 
@@ -213,7 +126,6 @@ export function StudentGenomeReportPage({
           title="Student not found"
           backHref={reportsBackHref}
           backLabel={reportsBackLabel}
-          showSeal
         />
       </LgReportLayout>
     )
@@ -232,7 +144,6 @@ export function StudentGenomeReportPage({
           description={message ?? 'Reports are built from assessment submissions and saved marks.'}
           backHref={reportsBackHref}
           backLabel={reportsBackLabel}
-          showSeal
         />
       </LgReportLayout>
     )
@@ -246,26 +157,33 @@ export function StudentGenomeReportPage({
       printTitle={`${displayName} — Learning Genome`}
       backHref={reportsBackHref}
       backLabel={reportsBackLabel}
-      navLinks={(L) => [
-        { href: '#assessment-wise', label: L.navAssessment },
-        { href: '#trend-map', label: L.navTrend },
-        { href: '#history', label: L.navHistory },
-        { href: '#narrative', label: L.navSummary },
+      navLinks={[
+        { href: '#profile', label: 'Profile' },
+        { href: '#genome', label: 'Learning Genome' },
+        { href: '#knowledge-layer', label: 'Knowledge Layer' },
+        { href: '#report-lang-focus', label: 'Summary' },
       ]}
     >
-      <GenomeReportView
-        displayName={displayName}
-        profile={profile}
-        totalStudents={totalStudents}
-        batchLabel={batchLabel}
-        windowMeta={windowMeta}
-        risk={risk}
-        narrative={narrative}
-        narrativeTa={narrativeTa}
-        narrativeSource={narrativeSource}
-        reportsBackHref={reportsBackHref}
-        reportsBackLabel={reportsBackLabel}
+      <div id="profile">
+        <StudentGenomeDetail
+          name={displayName}
+          profile={{ ...profile, risk_level: risk }}
+          totalStudents={totalStudents}
+          batchLabel={batchLabel}
+          narrative={narrative}
+          narrativeTa={narrativeTa}
+          narrativeSource={narrativeSource}
+          topicMastery={topicMastery}
+          knowledgeSummary={knowledgeSummary}
+          embedded
+          pageLayout
+        />
+      </div>
+      <LgFooter
+        windowLabel={windowMeta?.window}
+        cohortNote={`${totalStudents} students in cohort`}
       />
     </LgReportLayout>
   )
 }
+

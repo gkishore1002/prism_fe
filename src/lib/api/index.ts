@@ -1,6 +1,7 @@
 export * from './mappers'
 export * from './curriculumApi'
 export * from './questionsApi'
+export * from './syllabusBooksApi'
 export * from './assessmentsApi'
 export * from './notificationsApi'
 export * from './institutionsApi'

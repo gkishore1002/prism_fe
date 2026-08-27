@@ -1,7 +1,6 @@
 import { ParticleBackground } from './ParticleBackground'
-import { CscLogo } from './CscLogo'
-import { PrismLogoMark } from '@/components/brand/PrismLogo'
-import { APP_NAME } from '@/lib/constants'
+import { PrismLogoMark, PrismLogoMarkMotion } from '@/components/brand/PrismLogo'
+import { APP_NAME, APP_TAGLINE } from '@/lib/constants'
 
 interface LoginHeroPanelProps {
   headline: string
@@ -31,10 +30,10 @@ export function LoginHeroPanel({ headline, subtitle, footer }: LoginHeroPanelPro
       <div className="relative z-10 px-10 xl:px-14 pt-10 pointer-events-none">
         <div className="inline-flex flex-col gap-1 rounded-[16px] glass-dark px-4 py-3 ios-shadow-md">
           <p className="text-[10px] font-display font-semibold uppercase tracking-[0.28em] text-yellow-300/80">
-            Computer Software College
+            {APP_NAME}
           </p>
           <p className="text-[11px] font-display font-medium text-white/50 tracking-wide">
-            Centre Division · Prism Software
+            {APP_TAGLINE}
           </p>
         </div>
       </div>
@@ -50,7 +49,13 @@ export function LoginHeroPanel({ headline, subtitle, footer }: LoginHeroPanelPro
 
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-8 xl:px-14 py-8 pointer-events-none">
         <div className="flex flex-col items-center w-full max-w-lg">
-          <CscLogo size="lg" variant="onDark" />
+          <PrismLogoMarkMotion size={148} className="drop-shadow-[0_18px_40px_rgba(0,0,0,0.35)]" />
+
+          <div className="mt-8 w-full text-center space-y-2">
+            <p className="text-[11px] font-display font-semibold uppercase tracking-[0.22em] text-[#FFC700]">
+              {APP_TAGLINE}
+            </p>
+          </div>
 
           <div className="mt-10 xl:mt-12 w-full text-center space-y-4">
             <div

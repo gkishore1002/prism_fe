@@ -5,11 +5,20 @@ export function normalizeGrade(grade: string): string {
 }
 
 export function boardsMatch(a: string, b: string): boolean {
-  return a.trim().toLowerCase() === b.trim().toLowerCase()
+  return (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase()
 }
 
 export function gradesMatch(a: string, b: string): boolean {
   return normalizeGrade(a) === normalizeGrade(b)
+}
+
+export function subjectsMatch(a: string, b: string): boolean {
+  const left = (a ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+  const right = (b ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!left || !right) return false
+  if (left === right) return true
+  const [shorter, longer] = left.length <= right.length ? [left, right] : [right, left]
+  return shorter.length >= 4 && longer.includes(shorter)
 }
 
 export interface CurriculumSubjectScope {

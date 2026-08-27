@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Calendar, Clock, MapPin, Users, FileText } from 'lucide-react'
+import { Plus, Calendar, Clock, MapPin, Users, FileText, Shuffle } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { AssessmentBuilder } from '@/components/academic/AssessmentBuilder'
 import { AccessRequestsPanel } from '@/components/academic/AccessRequestsPanel'
@@ -79,6 +79,7 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
       questionPaperId: draft.questionPaperId,
       paperCoverage: draft.paperCoverage,
       selectedTopics: draft.selectedTopics,
+      shuffleQuestions: draft.shuffleQuestions ?? false,
       topic: draft.topic,
     }
     try {
@@ -200,6 +201,12 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                   <Clock className="w-3.5 h-3.5" />
                   {assessment.durationMinutes} min
                 </span>
+                {assessment.shuffleQuestions && (
+                  <span className="inline-flex items-center gap-1 text-accent">
+                    <Shuffle className="w-3.5 h-3.5" />
+                    Shuffled
+                  </span>
+                )}
                 {canManage && (
                   <Link
                     to={`${portalBase}/assessments/${assessment.id}/paper`}

@@ -342,7 +342,7 @@ export function StudentFullReportView({ periodLabel }: StudentFullReportViewProp
                                 <Cell key={entry.name} fill={entry.fill} />
                               ))}
                             </Bar>
-                            <Bar dataKey="predicted" barSize={8} fill="#1C2739" name="Predicted" />
+                            <Bar dataKey="predicted" barSize={8} fill="#C5A059" name="Predicted" />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -380,9 +380,9 @@ export function StudentFullReportView({ periodLabel }: StudentFullReportViewProp
                         <Line
                           type="monotone"
                           dataKey="score"
-                          stroke="#1C2739"
+                          stroke="#C5A059"
                           strokeWidth={2}
-                          dot={{ r: 2, fill: '#F7B731', stroke: '#1C2739' }}
+                          dot={{ r: 2, fill: '#E8D5A3', stroke: '#C5A059' }}
                         />
                       </LineChart>
                     </ResponsiveContainer>

@@ -99,13 +99,14 @@ function parseMarks(value: string): number {
   return Number.isFinite(n) ? n : NaN
 }
 
-function validateRow(partial: Omit<QuestionUploadRow, 'valid' | 'errors'>): QuestionUploadRow {
+export function validateQuestionUploadRow(
+  partial: Omit<QuestionUploadRow, 'valid' | 'errors'>,
+): QuestionUploadRow {
   const errors: string[] = []
   if (!partial.board) errors.push('Board is required')
   if (!partial.grade) errors.push('Grade is required')
   if (!partial.subject) errors.push('Subject is required')
   if (!partial.chapter) errors.push('Chapter is required')
-  if (!partial.topic) errors.push('Topic is required')
   if (!partial.text) errors.push('Question text is required')
 
   const diff = partial.difficulty.toLowerCase()
@@ -145,7 +146,7 @@ function recordToRow(record: RawQuestionRecord, rowNumber: number): QuestionUplo
   const difficulty = normalizeDifficulty(pickField(record, 'difficulty'))
   const questionType = normalizeQuestionType(pickField(record, 'questionType'))
   const marksRaw = pickField(record, 'marks')
-  return validateRow({
+  return validateQuestionUploadRow({
     row: rowNumber,
     board: pickField(record, 'board'),
     grade: pickField(record, 'grade').replace(/^grade\s*/i, ''),
@@ -294,11 +295,33 @@ function extractJsonQuestions(payload: unknown): {
   )
 }
 
+export function applyMappedTopics(
+  rows: QuestionUploadRow[],
+  mappings: { row: number; topic: string; chapter?: string }[],
+): QuestionUploadRow[] {
+  const byRow = new Map(mappings.map((item) => [item.row, item]))
+  return rows.map((row) => {
+    const mapped = byRow.get(row.row)
+    if (!mapped?.topic) return row
+    const { valid: _valid, errors: _errors, ...partial } = row
+    return validateQuestionUploadRow({
+      ...partial,
+      topic: mapped.topic,
+      chapter: mapped.chapter?.trim() ? mapped.chapter : row.chapter,
+    })
+  })
+}
+
 function toUploadRows(
   records: RawQuestionRecord[],
   rowOffset = 2,
 ): QuestionUploadRow[] {
   return records.map((record, idx) => recordToRow(record, rowOffset + idx))
+}
+
+function readFileText(file: File): Promise<string> {
+  if (typeof file.text === 'function') return file.text()
+  return file.arrayBuffer().then((buffer) => new TextDecoder().decode(buffer))
 }
 
 export async function parseQuestionUploadFile(file: File): Promise<QuestionUploadParseResult> {
@@ -314,7 +337,7 @@ export async function parseQuestionUploadFile(file: File): Promise<QuestionUploa
     const ext = name.split('.').pop()?.toLowerCase() ?? ''
 
     if (ext === 'json') {
-      const text = await file.text()
+      const text = await readFileText(file)
       const payload = JSON.parse(text) as unknown
       const { questions, suggestedName } = extractJsonQuestions(payload)
       if (questions.length === 0) {
@@ -324,7 +347,7 @@ export async function parseQuestionUploadFile(file: File): Promise<QuestionUploa
     }
 
     if (ext === 'csv') {
-      const text = await file.text()
+      const text = await readFileText(file)
       const records = matrixToRecords(parseDelimitedText(text))
       if (records.length === 0) {
         return { ok: false, error: 'No question rows found in the CSV.' }

@@ -164,18 +164,18 @@ export function StudentAssessmentInsightsBody({
           <div className="lg-panel-block">
             <h4>{L.examPerformanceTrend}</h4>
             {trendData.length > 0 ? (
-              <div style={{ width: '100%', minWidth: 280, height: 180 }}>
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="lg-chart-frame" style={{ height: 180 }}>
+                <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={trendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(28,26,21,0.12)" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#3f3c34' }} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#3f3c34' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(13,27,42,0.1)" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#5B6570' }} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#5B6570' }} />
                     <Line
                       type="monotone"
                       dataKey="score"
-                      stroke="#0B1F3A"
+                      stroke="#C5A059"
                       strokeWidth={2}
-                      dot={{ r: 4, fill: '#C9A24B' }}
+                      dot={{ r: 4, fill: '#C5A059' }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -191,14 +191,14 @@ export function StudentAssessmentInsightsBody({
             <h4 className="lg-mono text-[0.62rem] uppercase tracking-widest text-[var(--lg-amber)] mb-2">
               {L.allAssessmentsChart}
             </h4>
-            <div style={{ width: '100%', minWidth: 280, height: 200 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="lg-chart-frame" style={{ height: 200 }}>
+              <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={comparisonBars}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(28,26,21,0.12)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#3f3c34' }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#3f3c34' }} />
-                  <Bar dataKey="score" fill="#0B1F3A" name={L.chartYourScore} radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="classAvg" fill="#C9A24B" name={L.chartClassAvg} radius={[3, 3, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(13,27,42,0.1)" />
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#5B6570' }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#5B6570' }} />
+                  <Bar dataKey="score" fill="#C5A059" name={L.chartYourScore} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="classAvg" fill="#0D1B2A" name={L.chartClassAvg} radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
