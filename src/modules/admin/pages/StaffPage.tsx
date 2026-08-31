@@ -2,10 +2,9 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Mail, Plus, Upload, Users, Search, Edit3, User, TrendingUp, BookOpen, Award, ShieldCheck } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
-import { AppModal, useConfirmModal } from '@/components/ui/AppModal'
+import { AppModal } from '@/components/ui/AppModal'
 import { ResponsiveTable } from '@/components/ui/ResponsiveTable'
 import { ActionMenu, ActionMenuItem } from '@/components/ui/ActionMenu'
-import { Pagination } from '@/components/ui/Pagination'
 import { btnClass } from '@/components/ui/Button'
 import { PhoneCredentialFields } from '@/components/auth/PhoneCredentialFields'
 import { useCenters } from '@/hooks/useCenters'
@@ -16,7 +15,6 @@ import type { TeacherRow } from '@/lib/api/analyticsApi'
 import {
   createStaff,
   fetchStaff,
-  setStaffBranches,
   updateStaff,
   type StaffMember,
 } from '@/lib/api/staffApi'
@@ -65,7 +63,6 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const { organizationScoped } = useAdminPortalContext()
   const { centers, isPlatformSuperUser, ensureLoaded, refresh: refreshCenters, activeCenterId, isAllBranches } = useCenters()
   const { teachers, loading: analyticsLoading, refresh } = useAnalytics()
-  const { confirm } = useConfirmModal()
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

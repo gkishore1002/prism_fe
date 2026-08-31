@@ -65,7 +65,7 @@ export type AnalyticsLoadKey =
 interface AnalyticsContextValue {
   loading: boolean
   error: string | null
-  load: (key: AnalyticsLoadKey | AnalyticsLoadKey[]) => Promise<void>
+  load: (key: AnalyticsLoadKey | AnalyticsLoadKey[], force?: boolean) => Promise<void>
   refresh: (key?: AnalyticsLoadKey | AnalyticsLoadKey[]) => Promise<void>
   overview: InstitutionOverview | null
   operationalStats: InstitutionOperationalStats | null
