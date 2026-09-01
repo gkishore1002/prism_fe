@@ -28,14 +28,14 @@ VITE_API_BASE_URL=http://127.0.0.1:8002/api/v1
 Production builds (`npm run build`) read [`.env.production`](.env.production):
 
 ```env
-VITE_API_BASE_URL=https://api.prism.com/api/v1
+VITE_API_BASE_URL=https://prism-be.onrender.com/api/v1
 ```
 
 | Mode | File | `VITE_API_BASE_URL` |
 |------|------|---------------------|
 | `npm run dev` | `.env` | `http://127.0.0.1:8002/api/v1` |
 | Local uvicorn on 8000 | `.env` | `http://127.0.0.1:8000/api/v1` |
-| `npm run build` | `.env.production` | `https://api.prism.com/api/v1` |
+| `npm run build` | `.env.production` | `https://prism-be.onrender.com/api/v1` |
 
 Anything starting with `VITE_` is bundled into the browser and is public. Keep `GEMINI_API_KEY`, Google credentials, `DATABASE_URL`, and JWT/secret keys in the backend only.
 

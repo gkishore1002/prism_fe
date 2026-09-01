@@ -69,6 +69,7 @@ export function LoginPage() {
 
   const [organizations, setOrganizations] = useState<LoginOrganization[]>([])
   const [orgsLoading, setOrgsLoading] = useState(true)
+  const [orgsError, setOrgsError] = useState('')
   const [selectedOrgCode, setSelectedOrgCode] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -81,12 +82,19 @@ export function LoginPage() {
     fetchLoginOrganizations()
       .then((orgs) => {
         if (cancelled) return
+        setOrgsError('')
         setOrganizations(orgs)
         const stored = sessionStorage.getItem(LAST_ORG_KEY) ?? ''
         setSelectedOrgCode(pickDefaultOrgCode(orgs, stored))
       })
-      .catch(() => {
-        if (!cancelled) setOrganizations([])
+      .catch((err) => {
+        if (cancelled) return
+        setOrganizations([])
+        setOrgsError(
+          err instanceof Error
+            ? err.message
+            : 'Could not load organizations from the API. Check the frontend API URL and CORS.',
+        )
       })
       .finally(() => {
         if (!cancelled) setOrgsLoading(false)
@@ -246,7 +254,9 @@ export function LoginPage() {
               </div>
             ) : organizations.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center">
-                No organizations available yet. Restart the backend with demo seed enabled (SEED_DEMO=true).
+                {orgsError
+                  ? `Could not load organizations. ${orgsError}`
+                  : 'No organizations found for this API. Complete first-run setup, then refresh.'}
               </p>
             ) : (
               <form className="space-y-3" onSubmit={handleSignIn}>

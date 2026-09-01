@@ -43,7 +43,15 @@ export async function apiFetch<T>(
     }
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...rest, headers })
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...rest, headers })
+  } catch {
+    throw new ApiError(
+      `Cannot reach the API at ${API_BASE}. If this site is on Vercel, the backend CORS_ORIGINS must include this origin.`,
+      0,
+    )
+  }
 
   if (!res.ok) {
     let message = res.statusText
