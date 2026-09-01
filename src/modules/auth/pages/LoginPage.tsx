@@ -60,6 +60,7 @@ function StackRackCredit({ className = '' }: { className?: string }) {
     <p
       className={`flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground font-sans ${className}`}
     >
+      <span>powered by stackrack</span>
       <img
         src="/brand/stackrack-logo.png"
         alt=""
@@ -67,7 +68,6 @@ function StackRackCredit({ className = '' }: { className?: string }) {
         height={14}
         className="h-3.5 w-3.5 object-contain"
       />
-      <span>powered by stackrack</span>
     </p>
   )
 }

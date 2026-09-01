@@ -87,7 +87,13 @@ export interface LoginOrganization {
 }
 
 export async function fetchLoginOrganizations(): Promise<LoginOrganization[]> {
-  return apiFetch<LoginOrganization[]>('/auth/organizations', { auth: false })
+  const data = await apiFetch<LoginOrganization[] | { organizations?: LoginOrganization[] }>(
+    '/auth/organizations',
+    { auth: false },
+  )
+  if (Array.isArray(data)) return data
+  if (data && Array.isArray(data.organizations)) return data.organizations
+  return []
 }
 
 export async function loginPrism(

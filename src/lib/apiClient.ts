@@ -1,7 +1,38 @@
 import { readSession } from '@/modules/auth/lib/authStorage'
 import { readActiveOrgCode, isPlatformContext } from '@/modules/auth/lib/orgContext'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? ''
+const PRODUCTION_API = 'https://prism-be.onrender.com/api/v1'
+
+function resolveApiBase(raw: string | undefined): string {
+  let value = (raw || '').trim().replace(/\/$/, '')
+  if (import.meta.env.PROD && !value) {
+    value = PRODUCTION_API
+  }
+  if (!value) return ''
+
+  try {
+    const url = new URL(value)
+    if (url.hostname.endsWith('.vercel.app')) {
+      return PRODUCTION_API
+    }
+    const path = url.pathname.replace(/\/$/, '')
+    if (url.hostname.endsWith('.onrender.com') && path !== '/api/v1') {
+      url.pathname = '/api/v1'
+      url.search = ''
+      url.hash = ''
+      return url.toString().replace(/\/$/, '')
+    }
+    if (path === '/api') {
+      url.pathname = '/api/v1'
+      return url.toString().replace(/\/$/, '')
+    }
+    return value
+  } catch {
+    return value
+  }
+}
+
+const API_BASE = resolveApiBase(import.meta.env.VITE_API_BASE_URL as string | undefined)
 
 export function isApiEnabled(): boolean {
   return API_BASE.length > 0
@@ -108,7 +139,12 @@ export async function apiFetch<T>(
     } catch {
       // ignore parse errors
     }
-    throw new ApiError(message, res.status)
+    throw new ApiError(
+      res.status === 404
+        ? `API not found at ${API_BASE}${path}. Set VITE_API_BASE_URL to ${PRODUCTION_API} on Vercel and redeploy.`
+        : message,
+      res.status,
+    )
   }
 
   if (res.status === 204) return undefined as T
