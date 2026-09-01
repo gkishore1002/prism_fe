@@ -55,6 +55,23 @@ function orgOptionLabel(org: LoginOrganization): string {
   return `${org.name} (${org.code})`
 }
 
+function StackRackCredit({ className = '' }: { className?: string }) {
+  return (
+    <p
+      className={`flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground font-sans ${className}`}
+    >
+      <img
+        src="/brand/stackrack-logo.png"
+        alt=""
+        width={14}
+        height={14}
+        className="h-3.5 w-3.5 object-contain"
+      />
+      <span>powered by stackrack</span>
+    </p>
+  )
+}
+
 function LoginFormBrandHeader() {
   return (
     <div className="mb-4 pb-4 border-b border-secondary flex justify-center overflow-visible">
@@ -353,18 +370,8 @@ export function LoginPage() {
               </form>
             )}
 
-            <p className="mt-4 pt-3 border-t border-secondary text-[10px] text-muted-foreground text-center font-sans leading-relaxed">
-              Demo: <span className="font-mono-data text-foreground">admin@demo.com</span>
-              {' · '}
-              <span className="font-mono-data text-foreground">DEMO001</span>
-              {' · '}
-              <span className="font-mono-data text-foreground">demo1234</span>
-            </p>
+            <StackRackCredit className="mt-4 pt-3 border-t border-secondary" />
           </div>
-
-          <p className="mt-3 text-center text-[9px] text-muted-foreground/60 font-display uppercase tracking-[0.16em] hidden lg:block">
-            Powered by Prism · CSC Centre Division
-          </p>
         </div>
       </div>
     </div>
