@@ -94,14 +94,40 @@ export async function addBoard(name: string): Promise<void> {
   await apiFetch('/curriculum/boards', { method: 'POST', body: JSON.stringify({ name }) })
 }
 
+export async function renameBoard(board: string, newName: string): Promise<void> {
+  await apiFetch('/curriculum/boards', {
+    method: 'PATCH',
+    body: JSON.stringify({ board, newName }),
+  })
+}
+
 export async function addGrade(board: string, grade: string): Promise<void> {
   await apiFetch('/curriculum/grades', { method: 'POST', body: JSON.stringify({ board, grade }) })
+}
+
+export async function renameGrade(board: string, grade: string, newName: string): Promise<void> {
+  await apiFetch('/curriculum/grades', {
+    method: 'PATCH',
+    body: JSON.stringify({ board, grade, newName }),
+  })
 }
 
 export async function addSubject(board: string, grade: string, subject: string): Promise<void> {
   await apiFetch('/curriculum/subjects', {
     method: 'POST',
     body: JSON.stringify({ board, grade, subject }),
+  })
+}
+
+export async function renameSubject(
+  board: string,
+  grade: string,
+  subject: string,
+  newName: string,
+): Promise<void> {
+  await apiFetch('/curriculum/subjects', {
+    method: 'PATCH',
+    body: JSON.stringify({ board, grade, subject, newName }),
   })
 }
 
@@ -114,6 +140,29 @@ export async function addTopic(
   await apiFetch('/curriculum/topics', {
     method: 'POST',
     body: JSON.stringify({ board, grade, subject, topic }),
+  })
+}
+
+export async function renameTopic(
+  board: string,
+  grade: string,
+  subject: string,
+  topic: string,
+  newName: string,
+): Promise<void> {
+  await apiFetch('/curriculum/topics', {
+    method: 'PATCH',
+    body: JSON.stringify({ board, grade, subject, topic, newName }),
+  })
+}
+
+export async function updateBatch(
+  batchId: string,
+  patch: { name?: string; subject?: string; scheduleTiming?: string },
+): Promise<void> {
+  await apiFetch(`/batches/${batchId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
   })
 }
 

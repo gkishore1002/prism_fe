@@ -22,12 +22,17 @@ interface CurriculumContextValue {
   loading: boolean
   error: string | null
   addBoard: (name: string) => Promise<void>
+  renameBoard: (board: string, newName: string) => Promise<void>
   addGrade: (board: string, grade: string) => Promise<void>
+  renameGrade: (board: string, grade: string, newName: string) => Promise<void>
   addSubject: (board: string, grade: string, subject: string) => Promise<void>
+  renameSubject: (board: string, grade: string, subject: string, newName: string) => Promise<void>
   addTopic: (board: string, grade: string, subject: string, topic: string) => Promise<void>
+  renameTopic: (board: string, grade: string, subject: string, topic: string, newName: string) => Promise<void>
   addBatch: (
     batch: Omit<TutorBatch, 'id' | 'studentIds'> & { studentIds?: string[] },
   ) => Promise<string>
+  updateBatch: (batchId: string, patch: { name?: string; subject?: string; scheduleTiming?: string }) => Promise<void>
   addStudentToBatch: (batchId: string, name: string) => Promise<void>
   assignStudentToBatch: (studentId: string, batchId: string) => Promise<void>
   removeStudentFromBatch: (studentId: string, batchId: string) => Promise<void>
@@ -119,8 +124,18 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
     await refresh()
   }, [refresh])
 
+  const renameBoard = useCallback(async (board: string, newName: string) => {
+    await curriculumApi.renameBoard(board, newName.trim())
+    await refresh()
+  }, [refresh])
+
   const addGrade = useCallback(async (board: string, grade: string) => {
     await curriculumApi.addGrade(board, grade.trim())
+    await refresh()
+  }, [refresh])
+
+  const renameGrade = useCallback(async (board: string, grade: string, newName: string) => {
+    await curriculumApi.renameGrade(board, grade, newName.trim())
     await refresh()
   }, [refresh])
 
@@ -129,9 +144,25 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
     await refresh()
   }, [refresh])
 
+  const renameSubject = useCallback(
+    async (board: string, grade: string, subject: string, newName: string) => {
+      await curriculumApi.renameSubject(board, grade, subject, newName.trim())
+      await refresh()
+    },
+    [refresh],
+  )
+
   const addTopic = useCallback(
     async (board: string, grade: string, subject: string, topic: string) => {
       await curriculumApi.addTopic(board, grade, subject, topic.trim())
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const renameTopic = useCallback(
+    async (board: string, grade: string, subject: string, topic: string, newName: string) => {
+      await curriculumApi.renameTopic(board, grade, subject, topic, newName.trim())
       await refresh()
     },
     [refresh],
@@ -148,6 +179,14 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
       })
       await refresh()
       return created.id
+    },
+    [refresh],
+  )
+
+  const updateBatch = useCallback(
+    async (batchId: string, patch: { name?: string; subject?: string; scheduleTiming?: string }) => {
+      await curriculumApi.updateBatch(batchId, patch)
+      await refresh()
     },
     [refresh],
   )
@@ -276,10 +315,15 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       addBoard,
+      renameBoard,
       addGrade,
+      renameGrade,
       addSubject,
+      renameSubject,
       addTopic,
+      renameTopic,
       addBatch,
+      updateBatch,
       addStudentToBatch,
       assignStudentToBatch,
       removeStudentFromBatch,
@@ -303,10 +347,15 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       addBoard,
+      renameBoard,
       addGrade,
+      renameGrade,
       addSubject,
+      renameSubject,
       addTopic,
+      renameTopic,
       addBatch,
+      updateBatch,
       addStudentToBatch,
       assignStudentToBatch,
       removeStudentFromBatch,

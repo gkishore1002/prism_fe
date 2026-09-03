@@ -12,6 +12,7 @@ import {
   Layers,
   Trash2,
   Clock,
+  Pencil,
 } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { AppDropdown } from '@/components/ui/AppDropdown'
@@ -29,6 +30,7 @@ interface CurriculumSetupPanelProps {
 }
 
 type AddTarget = 'board' | 'grade' | 'subject' | 'topic' | 'batch' | null
+type EditTarget = { kind: 'board'; name: string } | { kind: 'grade'; name: string } | { kind: 'subject'; name: string } | { kind: 'topic'; name: string } | { kind: 'batch'; id: string; name: string; subject: string; scheduleTiming: string } | null
 
 function topicMatches(questionTopic: string, selectedTopic: string): boolean {
   const q = questionTopic.toLowerCase()
@@ -176,6 +178,110 @@ function DeleteButton({
   )
 }
 
+function EditButton({
+  label,
+  onEdit,
+  className,
+}: {
+  label: string
+  onEdit: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        onEdit()
+      }}
+      className={cn(
+        'p-1 rounded shrink-0 text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors',
+        className,
+      )}
+      aria-label={`Edit ${label}`}
+      title={`Rename ${label}`}
+    >
+      <Pencil className="w-3.5 h-3.5" />
+    </button>
+  )
+}
+
+function InlineEditForm({
+  label,
+  currentValue,
+  existingItems = [],
+  saving = false,
+  onSubmit,
+  onCancel,
+}: {
+  label: string
+  currentValue: string
+  existingItems?: string[]
+  saving?: boolean
+  onSubmit: (value: string) => boolean | Promise<boolean>
+  onCancel: () => void
+}) {
+  const [value, setValue] = useState(currentValue)
+  const [localError, setLocalError] = useState<string | null>(null)
+
+  return (
+    <form
+      className="mt-1 p-2 rounded-md border border-accent/30 bg-accent/5 space-y-2"
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault()
+        void (async () => {
+          setLocalError(null)
+          const trimmed = value.trim()
+          if (!trimmed) {
+            setLocalError('Enter a name before saving.')
+            return
+          }
+          if (trimmed === currentValue) {
+            onCancel()
+            return
+          }
+          if (existingItems.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
+            setLocalError(`"${trimmed}" already exists — pick a different name.`)
+            return
+          }
+          const ok = await onSubmit(trimmed)
+          if (!ok) setLocalError('Could not rename. Try again.')
+        })()
+      }}
+    >
+      <label className="block text-[10px] text-muted-foreground">{label}</label>
+      <input
+        autoFocus
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value)
+          if (localError) setLocalError(null)
+        }}
+        disabled={saving}
+        className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background disabled:opacity-60"
+      />
+      {localError ? <p className="text-xs text-rose">{localError}</p> : null}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="text-xs btn btn-primary px-2 py-1 disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Rename'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="text-xs text-muted-foreground px-2 py-1 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
 export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   const {
     curriculum,
@@ -185,10 +291,15 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
     error,
     ensureLoaded: ensureCurriculumLoaded,
     addBoard,
+    renameBoard,
     addGrade,
+    renameGrade,
     addSubject,
+    renameSubject,
     addTopic,
+    renameTopic,
     addBatch,
+    updateBatch,
     addStudentToBatch,
     assignStudentToBatch,
     removeStudentFromBatch,
@@ -214,6 +325,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   const [subject, setSubject] = useState('')
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
   const [addTarget, setAddTarget] = useState<AddTarget>(null)
+  const [editTarget, setEditTarget] = useState<EditTarget>(null)
   const [batchName, setBatchName] = useState('')
   const [batchSubject, setBatchSubject] = useState('')
   const [batchScheduleTiming, setBatchScheduleTiming] = useState('')
@@ -580,43 +692,68 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               <p className="text-xs text-muted-foreground py-4 text-center">No boards yet</p>
             ) : (
               curriculum.map((b) => (
-              <div key={b.board} className="flex items-stretch gap-0.5 group">
-                <button
-                  type="button"
-                  onClick={() => selectBoard(b.board)}
-                  className={cn(
-                    'flex-1 text-left px-3 py-2 rounded-md text-sm min-w-0',
-                    board === b.board ? 'bg-ink text-paper' : 'hover:bg-secondary',
-                  )}
-                >
-                  <div className="font-medium">{b.board}</div>
-                  <div
+              <div key={b.board} className="space-y-0.5">
+                <div className="flex items-stretch gap-0.5 group">
+                  <button
+                    type="button"
+                    onClick={() => selectBoard(b.board)}
                     className={cn(
-                      'text-[10px]',
-                      board === b.board ? 'text-paper/60' : 'text-muted-foreground',
+                      'flex-1 text-left px-3 py-2 rounded-md text-sm min-w-0',
+                      board === b.board ? 'bg-ink text-paper' : 'hover:bg-secondary',
                     )}
                   >
-                    {b.grades.length} grades ·{' '}
-                    {b.grades.reduce((a, g) => a + g.subjects.length, 0)} subjects
-                  </div>
-                </button>
-                {canManage && (
-                  <DeleteButton
-                    label={b.board}
-                    className="self-center opacity-60 group-hover:opacity-100"
-                    onDelete={() =>
-                      void confirmDelete(
-                        `Delete board "${b.board}" and all its grades, subjects, and topics?`,
-                        async () => {
-                          await removeBoard(b.board)
-                          if (board === b.board) {
-                            setSelectedTopic(null)
-                            setSelectedBatchId(null)
-                          }
-                        },
-                        `Board "${b.board}" deleted`,
-                      )
+                    <div className="font-medium">{b.board}</div>
+                    <div
+                      className={cn(
+                        'text-[10px]',
+                        board === b.board ? 'text-paper/60' : 'text-muted-foreground',
+                      )}
+                    >
+                      {b.grades.length} grades ·{' '}
+                      {b.grades.reduce((a, g) => a + g.subjects.length, 0)} subjects
+                    </div>
+                  </button>
+                  {canManage && (
+                    <>
+                      <EditButton
+                        label={b.board}
+                        className="self-center opacity-60 group-hover:opacity-100"
+                        onEdit={() => setEditTarget({ kind: 'board', name: b.board })}
+                      />
+                      <DeleteButton
+                        label={b.board}
+                        className="self-center opacity-60 group-hover:opacity-100"
+                        onDelete={() =>
+                          void confirmDelete(
+                            `Delete board "${b.board}" and all its grades, subjects, and topics?`,
+                            async () => {
+                              await removeBoard(b.board)
+                              if (board === b.board) {
+                                setSelectedTopic(null)
+                                setSelectedBatchId(null)
+                              }
+                            },
+                            `Board "${b.board}" deleted`,
+                          )
+                        }
+                      />
+                    </>
+                  )}
+                </div>
+                {editTarget?.kind === 'board' && editTarget.name === b.board && (
+                  <InlineEditForm
+                    label="Rename board"
+                    currentValue={b.board}
+                    existingItems={existingBoardNames.filter((n) => n !== b.board)}
+                    saving={saving}
+                    onSubmit={(v) =>
+                      runAction(async () => {
+                        await renameBoard(b.board, v)
+                        if (board === b.board) setBoard(v)
+                        setEditTarget(null)
+                      }, `Board renamed to "${v}"`).then((r) => r.success)
                     }
+                    onCancel={() => setEditTarget(null)}
                   />
                 )}
               </div>
@@ -668,43 +805,68 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               <p className="text-xs text-muted-foreground py-4 text-center">No grades yet</p>
             ) : (
               boardData.grades.map((g) => (
-              <div key={g.grade} className="flex items-stretch gap-0.5 group">
-                <button
-                  type="button"
-                  onClick={() => selectGrade(g.grade)}
-                  className={cn(
-                    'flex-1 text-left px-3 py-2 rounded-md text-sm min-w-0',
-                    grade === g.grade ? 'bg-ink text-paper' : 'hover:bg-secondary',
-                  )}
-                >
-                  <div className="font-medium">{g.grade}</div>
-                  <div
+              <div key={g.grade} className="space-y-0.5">
+                <div className="flex items-stretch gap-0.5 group">
+                  <button
+                    type="button"
+                    onClick={() => selectGrade(g.grade)}
                     className={cn(
-                      'text-[10px]',
-                      grade === g.grade ? 'text-paper/60' : 'text-muted-foreground',
+                      'flex-1 text-left px-3 py-2 rounded-md text-sm min-w-0',
+                      grade === g.grade ? 'bg-ink text-paper' : 'hover:bg-secondary',
                     )}
                   >
-                    {g.subjects.length} subjects ·{' '}
-                    {g.subjects.reduce((a, s) => a + s.topics.length, 0)} topics
-                  </div>
-                </button>
-                {canManage && (
-                  <DeleteButton
-                    label={g.grade}
-                    className="self-center opacity-60 group-hover:opacity-100"
-                    onDelete={() =>
-                      void confirmDelete(
-                        `Delete grade "${g.grade}" and all its subjects and topics?`,
-                        async () => {
-                          await removeGrade(board, g.grade)
-                          if (grade === g.grade) {
-                            setSelectedTopic(null)
-                            setSelectedBatchId(null)
-                          }
-                        },
-                        `Grade "${g.grade}" deleted`,
-                      )
+                    <div className="font-medium">{g.grade}</div>
+                    <div
+                      className={cn(
+                        'text-[10px]',
+                        grade === g.grade ? 'text-paper/60' : 'text-muted-foreground',
+                      )}
+                    >
+                      {g.subjects.length} subjects ·{' '}
+                      {g.subjects.reduce((a, s) => a + s.topics.length, 0)} topics
+                    </div>
+                  </button>
+                  {canManage && (
+                    <>
+                      <EditButton
+                        label={g.grade}
+                        className="self-center opacity-60 group-hover:opacity-100"
+                        onEdit={() => setEditTarget({ kind: 'grade', name: g.grade })}
+                      />
+                      <DeleteButton
+                        label={g.grade}
+                        className="self-center opacity-60 group-hover:opacity-100"
+                        onDelete={() =>
+                          void confirmDelete(
+                            `Delete grade "${g.grade}" and all its subjects and topics?`,
+                            async () => {
+                              await removeGrade(board, g.grade)
+                              if (grade === g.grade) {
+                                setSelectedTopic(null)
+                                setSelectedBatchId(null)
+                              }
+                            },
+                            `Grade "${g.grade}" deleted`,
+                          )
+                        }
+                      />
+                    </>
+                  )}
+                </div>
+                {editTarget?.kind === 'grade' && editTarget.name === g.grade && (
+                  <InlineEditForm
+                    label="Rename grade"
+                    currentValue={g.grade}
+                    existingItems={existingGradeNames.filter((n) => n !== g.grade)}
+                    saving={saving}
+                    onSubmit={(v) =>
+                      runAction(async () => {
+                        await renameGrade(board, g.grade, v)
+                        if (grade === g.grade) setGrade(v)
+                        setEditTarget(null)
+                      }, `Grade renamed to "${v}"`).then((r) => r.success)
                     }
+                    onCancel={() => setEditTarget(null)}
                   />
                 )}
               </div>
@@ -757,41 +919,66 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               <p className="text-xs text-muted-foreground py-4 text-center">No subjects yet</p>
             ) : (
               gradeData.subjects.map((s) => (
-              <div key={s.name} className="flex items-stretch gap-0.5 group">
-                <button
-                  type="button"
-                  onClick={() => selectSubject(s.name)}
-                  className={cn(
-                    'flex-1 text-left px-3 py-2 rounded-md text-sm min-w-0',
-                    subject === s.name ? 'bg-ink text-paper' : 'hover:bg-secondary',
-                  )}
-                >
-                  <div className="font-medium">{s.name}</div>
-                  <div
+              <div key={s.name} className="space-y-0.5">
+                <div className="flex items-stretch gap-0.5 group">
+                  <button
+                    type="button"
+                    onClick={() => selectSubject(s.name)}
                     className={cn(
-                      'text-[10px]',
-                      subject === s.name ? 'text-paper/60' : 'text-muted-foreground',
+                      'flex-1 text-left px-3 py-2 rounded-md text-sm min-w-0',
+                      subject === s.name ? 'bg-ink text-paper' : 'hover:bg-secondary',
                     )}
                   >
-                    {s.topics.length} topics · {s.topics.reduce((a, t) => a + t.questions, 0)} qs
-                  </div>
-                </button>
-                {canManage && (
-                  <DeleteButton
-                    label={s.name}
-                    className="self-center opacity-60 group-hover:opacity-100"
-                    onDelete={() =>
-                      void confirmDelete(
-                        `Delete subject "${s.name}" and all its topics? Linked questions in the bank will also be removed.`,
-                        async () => {
-                          await removeSubject(board, grade, s.name)
-                          if (subject === s.name) setSelectedTopic(null)
-                        },
-                        `Subject "${s.name}" deleted`,
-                      )
-                    }
-                  />
-                )}
+                    <div className="font-medium">{s.name}</div>
+                    <div
+                      className={cn(
+                        'text-[10px]',
+                        subject === s.name ? 'text-paper/60' : 'text-muted-foreground',
+                      )}
+                    >
+                      {s.topics.length} topics · {s.topics.reduce((a, t) => a + t.questions, 0)} qs
+                    </div>
+                  </button>
+                  {canManage && (
+                    <>
+                      <EditButton
+                        label={s.name}
+                        className="self-center opacity-60 group-hover:opacity-100"
+                        onEdit={() => setEditTarget({ kind: 'subject', name: s.name })}
+                      />
+                      <DeleteButton
+                        label={s.name}
+                        className="self-center opacity-60 group-hover:opacity-100"
+                        onDelete={() =>
+                          void confirmDelete(
+                            `Delete subject "${s.name}" and all its topics? Linked questions in the bank will also be removed.`,
+                            async () => {
+                              await removeSubject(board, grade, s.name)
+                              if (subject === s.name) setSelectedTopic(null)
+                            },
+                            `Subject "${s.name}" deleted`,
+                          )
+                        }
+                      />
+                    </>
+                  )}
+                </div>
+                {editTarget?.kind === 'subject' && editTarget.name === s.name && (
+                <InlineEditForm
+                  label="Rename subject"
+                  currentValue={s.name}
+                  existingItems={existingSubjectNames.filter((n) => n !== s.name)}
+                  saving={saving}
+                  onSubmit={(v) =>
+                    runAction(async () => {
+                      await renameSubject(board, grade, s.name, v)
+                      if (subject === s.name) setSubject(v)
+                      setEditTarget(null)
+                    }, `Subject renamed to "${v}"`).then((r) => r.success)
+                  }
+                  onCancel={() => setEditTarget(null)}
+                />
+              )}
               </div>
             ))
             )}
@@ -849,44 +1036,69 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             ) : subjectData.topics.map((t) => {
               const active = selectedTopic === t.name
               return (
-                <div key={t.name} className="flex items-stretch gap-0.5 group">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedTopic(active ? null : t.name)}
-                    className={cn(
-                      'flex-1 text-left px-3 py-2 rounded-md text-sm transition-colors min-w-0',
-                      active ? 'bg-accent/15 border border-accent/40' : 'hover:bg-secondary',
+                <div key={t.name} className="space-y-0.5">
+                  <div className="flex items-stretch gap-0.5 group">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTopic(active ? null : t.name)}
+                      className={cn(
+                        'flex-1 text-left px-3 py-2 rounded-md text-sm transition-colors min-w-0',
+                        active ? 'bg-accent/15 border border-accent/40' : 'hover:bg-secondary',
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Check className="w-3 h-3 text-leaf shrink-0" />
+                        <span className="flex-1 font-medium truncate">{t.name}</span>
+                        <ChevronRight
+                          className={cn(
+                            'w-3 h-3 text-muted-foreground transition-transform',
+                            active && 'rotate-90 text-accent',
+                          )}
+                        />
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5 pl-5 flex items-center gap-3">
+                        <span className="font-mono-data">{t.questions} in bank</span>
+                        <span className="font-mono-data">{t.mastery}% mastery</span>
+                      </div>
+                    </button>
+                    {canManage && (
+                      <>
+                        <EditButton
+                          label={t.name}
+                          className="self-center opacity-60 group-hover:opacity-100"
+                          onEdit={() => setEditTarget({ kind: 'topic', name: t.name })}
+                        />
+                        <DeleteButton
+                          label={t.name}
+                          className="self-center opacity-60 group-hover:opacity-100"
+                          onDelete={() =>
+                            void confirmDelete(
+                              `Delete topic "${t.name}"? Questions tagged to this topic will also be removed.`,
+                              async () => {
+                                await removeTopic(board, grade, subject, t.name)
+                                if (selectedTopic === t.name) setSelectedTopic(null)
+                              },
+                              `Topic "${t.name}" deleted`,
+                            )
+                          }
+                        />
+                      </>
                     )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Check className="w-3 h-3 text-leaf shrink-0" />
-                      <span className="flex-1 font-medium truncate">{t.name}</span>
-                      <ChevronRight
-                        className={cn(
-                          'w-3 h-3 text-muted-foreground transition-transform',
-                          active && 'rotate-90 text-accent',
-                        )}
-                      />
-                    </div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5 pl-5 flex items-center gap-3">
-                      <span className="font-mono-data">{t.questions} in bank</span>
-                      <span className="font-mono-data">{t.mastery}% mastery</span>
-                    </div>
-                  </button>
-                  {canManage && (
-                    <DeleteButton
-                      label={t.name}
-                      className="self-center opacity-60 group-hover:opacity-100"
-                      onDelete={() =>
-                        void confirmDelete(
-                          `Delete topic "${t.name}"? Questions tagged to this topic will also be removed.`,
-                          async () => {
-                            await removeTopic(board, grade, subject, t.name)
-                            if (selectedTopic === t.name) setSelectedTopic(null)
-                          },
-                          `Topic "${t.name}" deleted`,
-                        )
+                  </div>
+                  {editTarget?.kind === 'topic' && editTarget.name === t.name && (
+                    <InlineEditForm
+                      label="Rename topic"
+                      currentValue={t.name}
+                      existingItems={existingTopicNames.filter((n) => n !== t.name)}
+                      saving={saving}
+                      onSubmit={(v) =>
+                        runAction(async () => {
+                          await renameTopic(board, grade, subject, t.name, v)
+                          if (selectedTopic === t.name) setSelectedTopic(v)
+                          setEditTarget(null)
+                        }, `Topic renamed to "${v}"`).then((r) => r.success)
                       }
+                      onCancel={() => setEditTarget(null)}
                     />
                   )}
                 </div>
@@ -1111,46 +1323,121 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                     <th className="pb-3 font-medium" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody>
                   {scopedBatches.map((b) => {
                     const active = selectedBatchId === b.id
                     const count = b.studentIds.length
+                    const isEditing = editTarget?.kind === 'batch' && editTarget.id === b.id
                     return (
-                      <tr
-                        key={b.id}
-                        className={cn('hover:bg-secondary/30', active && 'bg-accent/5')}
-                      >
-                        <td className="py-3 font-medium">{b.name}</td>
-                        <td className="py-3 text-muted-foreground">{b.subject ?? '—'}</td>
-                        <td className="py-3 text-muted-foreground text-xs">{b.scheduleTiming ?? '—'}</td>
-                        <td className="py-3 font-mono-data">{count}</td>
-                        <td className="py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedBatchId(active ? null : b.id)}
-                              className="text-xs text-accent hover:underline"
-                            >
-                              {active ? 'Close' : 'Manage students'}
-                            </button>
-                            {canManage && (
-                              <DeleteButton
-                                label={b.name}
-                                onDelete={() =>
-                                  void confirmDelete(
-                                    `Delete batch "${b.name}"? Students will be unassigned from this batch.`,
-                                    async () => {
-                                      await removeBatch(b.id)
-                                      if (selectedBatchId === b.id) setSelectedBatchId(null)
-                                    },
-                                    `Batch "${b.name}" deleted`,
-                                  )
-                                }
-                              />
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                      <>
+                        <tr
+                          key={b.id}
+                          className={cn('hover:bg-secondary/30', active && 'bg-accent/5')}
+                        >
+                          <td className="py-3 font-medium">{b.name}</td>
+                          <td className="py-3 text-muted-foreground">{b.subject ?? '—'}</td>
+                          <td className="py-3 text-muted-foreground text-xs">{b.scheduleTiming ?? '—'}</td>
+                          <td className="py-3 font-mono-data">{count}</td>
+                          <td className="py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedBatchId(active ? null : b.id)}
+                                className="text-xs text-accent hover:underline"
+                              >
+                                {active ? 'Close' : 'Manage students'}
+                              </button>
+                              {canManage && (
+                                <>
+                                  <EditButton
+                                    label={b.name}
+                                    onEdit={() =>
+                                      setEditTarget({
+                                        kind: 'batch',
+                                        id: b.id,
+                                        name: b.name,
+                                        subject: b.subject ?? '',
+                                        scheduleTiming: b.scheduleTiming ?? '',
+                                      })
+                                    }
+                                  />
+                                  <DeleteButton
+                                    label={b.name}
+                                    onDelete={() =>
+                                      void confirmDelete(
+                                        `Delete batch "${b.name}"? Students will be unassigned from this batch.`,
+                                        async () => {
+                                          await removeBatch(b.id)
+                                          if (selectedBatchId === b.id) setSelectedBatchId(null)
+                                        },
+                                        `Batch "${b.name}" deleted`,
+                                      )
+                                    }
+                                  />
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {isEditing && editTarget.kind === 'batch' && (
+                          <tr key={`${b.id}-edit`}>
+                            <td colSpan={5} className="pb-3">
+                              <form
+                                className="p-3 rounded-md border border-accent/30 bg-accent/5 space-y-3"
+                                onSubmit={(e) => {
+                                  e.preventDefault()
+                                  void runAction(async () => {
+                                    await updateBatch(b.id, {
+                                      name: editTarget.name.trim() || undefined,
+                                      subject: editTarget.subject.trim() || undefined,
+                                      scheduleTiming: editTarget.scheduleTiming.trim() || undefined,
+                                    })
+                                    setEditTarget(null)
+                                  }, `Batch "${editTarget.name}" updated`)
+                                }}
+                              >
+                                <div className="grid sm:grid-cols-3 gap-3">
+                                  <label className="block">
+                                    <span className="text-xs text-muted-foreground">Batch name</span>
+                                    <input
+                                      autoFocus
+                                      value={editTarget.name}
+                                      onChange={(e) => setEditTarget({ ...editTarget, name: e.target.value })}
+                                      className="mt-1 w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+                                    />
+                                  </label>
+                                  <label className="block">
+                                    <span className="text-xs text-muted-foreground">Subject (optional)</span>
+                                    <input
+                                      value={editTarget.subject}
+                                      onChange={(e) => setEditTarget({ ...editTarget, subject: e.target.value })}
+                                      placeholder="e.g. Mathematics"
+                                      className="mt-1 w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+                                    />
+                                  </label>
+                                  <label className="block">
+                                    <span className="text-xs text-muted-foreground">Class timing (optional)</span>
+                                    <input
+                                      value={editTarget.scheduleTiming}
+                                      onChange={(e) => setEditTarget({ ...editTarget, scheduleTiming: e.target.value })}
+                                      placeholder="e.g. Mon/Wed 4–6 PM"
+                                      className="mt-1 w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+                                    />
+                                  </label>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button type="submit" disabled={saving} className="text-xs btn btn-primary px-3 py-1.5 disabled:opacity-50">
+                                    {saving ? 'Saving…' : 'Save changes'}
+                                  </button>
+                                  <button type="button" onClick={() => setEditTarget(null)} className="text-xs text-muted-foreground px-2 py-1">
+                                    Cancel
+                                  </button>
+                                </div>
+                              </form>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     )
                   })}
                 </tbody>

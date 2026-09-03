@@ -43,9 +43,10 @@ function centerName(id: string | null | undefined, centers: InstitutionCenter[])
 
 function batchLabels(student: StudentMasterProfile, batches: { id: string; name: string }[]) {
   if (student.batchIds?.length) {
-    return student.batchIds
-      .map((id) => batches.find((b) => b.id === id)?.name ?? id)
-      .join(', ')
+    const resolved = student.batchIds
+      .map((id) => batches.find((b) => b.id === id)?.name)
+      .filter(Boolean) as string[]
+    if (resolved.length) return resolved.join(', ')
   }
   return student.batch || '—'
 }
