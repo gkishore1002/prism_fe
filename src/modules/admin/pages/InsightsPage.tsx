@@ -3,7 +3,7 @@ import { LearningGenomeCohortReport } from '@/modules/tutor/components/learningG
 export function AdminInsightsPage() {
   return (
     <LearningGenomeCohortReport
-      variant="full"
+      variant="class-insights"
       studentReportPathPrefix="/admin/students"
       allStudentReportsHref="/admin/reports/students"
     />

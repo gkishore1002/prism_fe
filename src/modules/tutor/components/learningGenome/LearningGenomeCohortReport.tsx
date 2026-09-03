@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { APP_NAME } from '@/lib/constants'
 import { AppDropdown } from '@/components/ui/AppDropdown'
 import { ReportLoader } from '@/components/ui/PrismLoader'
@@ -43,6 +43,23 @@ function normalizeStudentName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+function ClassInsightsEmpty({
+  title,
+  description,
+}: {
+  title: string
+  description: string
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-[#f9f5eb] px-6 py-14 text-center">
+      <p className="font-display text-xl text-foreground">{title}</p>
+      <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
+        {description}
+      </p>
+    </div>
+  )
+}
+
 export function LearningGenomeCohortReport({
   data: dataProp,
   variant = 'full',
@@ -51,10 +68,13 @@ export function LearningGenomeCohortReport({
   initialBatchId,
 }: LearningGenomeCohortReportProps) {
   const navigate = useNavigate()
-  const { students: curriculumStudents, batches, ensureLoaded } = useCurriculum()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { students: curriculumStudents, batches, loading: curriculumLoading, ensureLoaded } =
+    useCurriculum()
   const [activeCluster, setActiveCluster] = useState<string | null>(null)
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
-  const [batchId, setBatchId] = useState(initialBatchId ?? '')
+  const urlBatch = searchParams.get('batch') || ''
+  const [batchId, setBatchId] = useState(initialBatchId || urlBatch)
   const [liveData, setLiveData] = useState<LearningGenomeDataset | null>(null)
   const [concepts, setConcepts] = useState<ConceptNotMastered[]>([])
   const [topicMastery, setTopicMastery] = useState<ConceptNotMastered[]>([])
@@ -66,23 +86,46 @@ export function LearningGenomeCohortReport({
     savedMarksCount?: number
     batchStudentCount?: number
     scoredStudentCount?: number
+    batchName?: string | null
   }>({})
-  const [loading, setLoading] = useState(cohortReportApiAvailable())
+  const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [batchesReady, setBatchesReady] = useState(batches.length > 0)
 
   useEffect(() => {
-    void ensureLoaded()
+    void ensureLoaded().finally(() => setBatchesReady(true))
   }, [ensureLoaded])
 
+  function selectBatch(nextId: string) {
+    setBatchId(nextId)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (nextId) next.set('batch', nextId)
+        else next.delete('batch')
+        return next
+      },
+      { replace: true },
+    )
+  }
+
   useEffect(() => {
-    if (!batchId && batches.length > 0) {
-      setBatchId(batches[0].id)
-    }
-  }, [batchId, batches])
+    if (!batches.length) return
+    const valid = (id?: string) => Boolean(id && batches.some((b) => b.id === id))
+    const next = valid(urlBatch)
+      ? urlBatch
+      : valid(initialBatchId)
+        ? initialBatchId!
+        : valid(batchId)
+          ? batchId
+          : batches[0].id
+    if (next !== batchId) setBatchId(next)
+  }, [batches, urlBatch, initialBatchId, batchId])
 
   useEffect(() => {
     if (dataProp) {
       setLoading(false)
+      setBatchesReady(true)
       return
     }
     if (!cohortReportApiAvailable()) {
@@ -90,7 +133,13 @@ export function LearningGenomeCohortReport({
       setLoadError('Connect to the Prism API to load class insights from your institution data.')
       return
     }
-    if (!batchId) return
+    if (!batchesReady) return
+    if (!batchId) {
+      setLoading(false)
+      setLiveData(null)
+      setDataSource('empty')
+      return
+    }
 
     let cancelled = false
     setLoading(true)
@@ -108,6 +157,7 @@ export function LearningGenomeCohortReport({
           savedMarksCount: report.meta.savedMarksCount,
           batchStudentCount: report.meta.batchStudentCount,
           scoredStudentCount: report.meta.scoredStudentCount,
+          batchName: report.batchName,
         })
         const idMap = new Map<string, string>()
         for (const [name, profile] of Object.entries(report.students)) {
@@ -119,6 +169,7 @@ export function LearningGenomeCohortReport({
         if (cancelled) return
         setLoadError(err instanceof Error ? err.message : 'Failed to load class insights.')
         setLiveData(null)
+        setDataSource('empty')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -127,7 +178,7 @@ export function LearningGenomeCohortReport({
     return () => {
       cancelled = true
     }
-  }, [batchId, dataProp])
+  }, [batchId, dataProp, batchesReady])
 
   const data = dataProp ?? liveData ?? EMPTY_GENOME_DATASET
   const apiUnavailable = !dataProp && !cohortReportApiAvailable()
@@ -196,7 +247,7 @@ export function LearningGenomeCohortReport({
 
   const batchOptions = useMemo(
     () => [
-      { value: '', label: 'Select batch…' },
+      ...(batches.length === 0 ? [{ value: '', label: 'Select batch…' }] : []),
       ...batches.map((b) => ({
         value: b.id,
         label: `${b.name} · ${b.board} · ${b.grade}`,
@@ -204,6 +255,44 @@ export function LearningGenomeCohortReport({
     ],
     [batches],
   )
+
+  const waitingForBatches = !dataProp && (!batchesReady || curriculumLoading)
+  const hasReportData = dataSource === 'live' && names.length > 0
+  const selectedBatch = batches.find((b) => b.id === batchId)
+  const batchLabel = selectedBatch
+    ? `${selectedBatch.name} · ${selectedBatch.board} · ${selectedBatch.grade}`
+    : reportMeta.batchName || 'this batch'
+
+  const batchToolbar =
+    !dataProp && cohortReportApiAvailable() ? (
+      <div className="mb-4 rounded-xl border border-border bg-[#efe7d3]/60 px-4 py-3 sm:px-6 print:hidden">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-full sm:w-72">
+            <AppDropdown
+              label="Batch"
+              value={batchId}
+              onChange={selectBatch}
+              options={batchOptions}
+            />
+          </div>
+          <p className="pb-2 text-xs text-muted-foreground">
+            {hasReportData ? (
+              <>
+                Reports from <strong>{reportMeta.assessmentResultCount ?? 0}</strong> assessment
+                result{reportMeta.assessmentResultCount === 1 ? '' : 's'} and{' '}
+                <strong>{reportMeta.savedMarksCount ?? 0}</strong> saved mark
+                {reportMeta.savedMarksCount === 1 ? '' : 's'} ·{' '}
+                {reportMeta.scoredStudentCount ?? 0} of {reportMeta.batchStudentCount ?? 0}{' '}
+                students scored
+              </>
+            ) : (
+              <>Class insights are shown for one batch at a time.</>
+            )}
+          </p>
+        </div>
+        {loadError ? <p className="mt-2 text-xs text-rose-700">{loadError}</p> : null}
+      </div>
+    ) : null
 
   if (apiUnavailable) {
     return (
@@ -216,9 +305,52 @@ export function LearningGenomeCohortReport({
     )
   }
 
+  if (waitingForBatches || (!batchId && batches.length > 0)) {
+    return (
+      <>
+        {batchToolbar}
+        <ReportLoader label={batchId ? 'Loading class insights for this batch…' : 'Loading batches…'} />
+      </>
+    )
+  }
+
+  if (!dataProp && batches.length === 0) {
+    return (
+      <>
+        {batchToolbar}
+        <ClassInsightsEmpty
+          title="No data available"
+          description="No batches found. Create a batch and add students, then enter marks or run assessments to generate class insights."
+        />
+      </>
+    )
+  }
+
   if (loading) {
     return (
-      <ReportLoader label="Loading class insights from your institution data…" />
+      <>
+        {batchToolbar}
+        <ReportLoader label="Loading class insights for this batch…" />
+      </>
+    )
+  }
+
+  if (!hasReportData) {
+    const studentCount = reportMeta.batchStudentCount ?? 0
+    return (
+      <>
+        {batchToolbar}
+        <ClassInsightsEmpty
+          title="No data available"
+          description={
+            loadError
+              ? loadError
+              : studentCount > 0
+                ? `${batchLabel} has ${studentCount} student${studentCount === 1 ? '' : 's'}, but there are no assessment results or saved marks yet. Enter marks or run an assessment to generate class insights.`
+                : `No assessment results or saved marks for ${batchLabel} yet. Choose another batch, or enter marks to generate class insights.`
+          }
+        />
+      </>
     )
   }
 
@@ -234,35 +366,7 @@ export function LearningGenomeCohortReport({
         { href: '#knowledge-layer', label: 'Knowledge Layer ★' },
       ]}
     >
-      {!dataProp && cohortReportApiAvailable() && (
-        <div className="border-b border-[var(--lg-line)] bg-[var(--lg-parchment-2)]/60 px-4 py-3 sm:px-6 print:hidden">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="w-full sm:w-64">
-              <AppDropdown
-                label="Batch"
-                value={batchId}
-                onChange={setBatchId}
-                options={batchOptions}
-              />
-            </div>
-            <p className="pb-2 text-xs text-[color:var(--lg-text-muted)]">
-              {dataSource === 'live' ? (
-                <>
-                  Reports from <strong>{reportMeta.assessmentResultCount ?? 0}</strong> assessment
-                  result{reportMeta.assessmentResultCount === 1 ? '' : 's'} and{' '}
-                  <strong>{reportMeta.savedMarksCount ?? 0}</strong> saved mark
-                  {reportMeta.savedMarksCount === 1 ? '' : 's'} ·{' '}
-                  {reportMeta.scoredStudentCount ?? 0} of {reportMeta.batchStudentCount ?? 0}{' '}
-                  students scored
-                </>
-              ) : (
-                <>No assessment results or saved marks yet for this batch. Enter marks or run assessments first.</>
-              )}
-            </p>
-          </div>
-          {loadError && <p className="mt-2 text-xs text-[var(--lg-terracotta)]">{loadError}</p>}
-        </div>
-      )}
+      {batchToolbar}
 
       <LgHero
         reportKind="AI Academic Profiling Engine"

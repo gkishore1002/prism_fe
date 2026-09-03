@@ -237,8 +237,13 @@ export const analyticsApi = {
       `/analytics/tutor/batch-heatmap${qs ? `?${qs}` : ''}`,
     )
   },
-  classInsights: (centerId?: string) =>
-    apiFetch<ClassInsight[]>(withCenterQuery('/analytics/tutor/class-insights', centerId)),
+  classInsights: (centerId?: string, batchId?: string) => {
+    const params = new URLSearchParams()
+    if (centerId) params.set('center_id', centerId)
+    if (batchId) params.set('batch_id', batchId)
+    const qs = params.toString()
+    return apiFetch<ClassInsight[]>(`/analytics/tutor/class-insights${qs ? `?${qs}` : ''}`)
+  },
   tutorCopilot: (batchName?: string, centerId?: string) => {
     const params = new URLSearchParams()
     if (batchName) params.set('batch_name', batchName)

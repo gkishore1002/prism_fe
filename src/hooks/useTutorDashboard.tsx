@@ -269,3 +269,7 @@ export function useTutorDashboard() {
   }
   return ctx
 }
+
+export function useTutorDashboardOptional() {
+  return useContext(TutorDashboardContext)
+}

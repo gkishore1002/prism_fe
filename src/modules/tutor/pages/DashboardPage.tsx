@@ -39,7 +39,11 @@ export function TutorDashboardPage() {
   const batchClassInsights = useMemo(
     () =>
       activeBatch
-        ? classInsights.filter((insight) => insight.title.startsWith(`${activeBatch.name}:`))
+        ? classInsights.filter(
+            (insight) =>
+              insight.batchId === activeBatch.id ||
+              insight.title.startsWith(`${activeBatch.name}:`),
+          )
         : classInsights,
     [activeBatch, classInsights],
   )

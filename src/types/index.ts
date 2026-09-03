@@ -497,6 +497,7 @@ export interface StudentMasterProfile {
 
 export interface ClassInsight {
   id: string
+  batchId?: string
   title: string
   description: string
   affectedStudents: number
