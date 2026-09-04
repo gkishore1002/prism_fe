@@ -28,7 +28,7 @@ interface AssessmentBuilderProps {
 export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/tutor/question-bank' }: AssessmentBuilderProps) {
   const { user } = useAuth()
   const {
-    papersForAssessment,
+    getPapersForScope,
     getPaper,
     questions,
     loading: papersLoading,
@@ -110,13 +110,8 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     [boardData, grade],
   )
   const scopedBatches = getBatchesForScope(board, grade)
-  const availablePapers = papersForAssessment(board, grade, subject)
-  const scopedPapers = availablePapers.filter(
-    (p) =>
-      boardsMatch(p.board, board) &&
-      gradesMatch(p.grade, grade) &&
-      p.subject.trim().toLowerCase() === subject.trim().toLowerCase(),
-  )
+  const scopeReady = Boolean(board && grade && subject)
+  const availablePapers = scopeReady ? getPapersForScope(board, grade, subject) : []
   const selectedPaper = selectedPaperId ? getPaper(selectedPaperId) : undefined
 
   const boardOptions = useMemo(
@@ -151,20 +146,13 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     () =>
       availablePapers.map((paper) => {
         const counts = topicCounts(paper, questions)
-        const matchesScope =
-          boardsMatch(paper.board, board) &&
-          gradesMatch(paper.grade, grade) &&
-          paper.subject.trim().toLowerCase() === subject.trim().toLowerCase()
-        const scopeNote = matchesScope
-          ? ''
-          : ` · ${scopeLabel({ board: paper.board, grade: paper.grade })} · ${paper.subject}`
         return {
           value: paper.id,
           label: paper.name,
-          description: `${paper.questionIds.length} questions · ${paper.totalMarks} marks${scopeNote}${counts.length ? ` · ${counts.map((c) => c.topic).join(', ')}` : ''}`,
+          description: `${paper.questionIds.length} questions · ${paper.totalMarks} marks${counts.length ? ` · ${counts.map((c) => c.topic).join(', ')}` : ''}`,
         }
       }),
-    [availablePapers, questions, board, grade, subject],
+    [availablePapers, questions],
   )
 
   const modeOptions = useMemo(
@@ -582,20 +570,34 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                   options={paperOptions}
                   searchable
                   searchPlaceholder="Search papers by name or topic…"
-                  placeholder={papersLoading ? 'Loading question papers…' : 'Select question paper'}
-                  disabled={papersLoading}
-                  emptyMessage="No question papers in your bank yet — create one under Question Bank"
+                  placeholder={
+                    papersLoading
+                      ? 'Loading question papers…'
+                      : !scopeReady
+                        ? 'Select board, grade, and subject first'
+                        : 'Select question paper'
+                  }
+                  disabled={papersLoading || !scopeReady}
+                  emptyMessage={
+                    !scopeReady
+                      ? 'Select board, grade, and subject to see matching papers'
+                      : `No question papers for ${scopeLabel({ board, grade })} · ${subject}`
+                  }
                   searchEmptyMessage="No papers match your search"
                 />
                 {papersLoading ? (
                   <InlineLoader label="Loading question papers…" size="xs" className="mt-1" />
+                ) : !scopeReady ? (
+                  <p className="text-xs text-muted-foreground">
+                    Choose board, grade, and subject — only papers for that subject are listed.
+                  </p>
                 ) : paperOptions.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    Publish a paper in{' '}
+                    No papers for {scopeLabel({ board, grade })} · {subject}. Publish one in{' '}
                     <Link to={questionBankPath} className="text-accent hover:underline">
                       Question Bank
                     </Link>{' '}
-                    (manual entry or upload), then return here — papers appear in this list.
+                    for this subject, then return here.
                   </p>
                 ) : selectedPaper ? (
                   <p className="text-xs text-muted-foreground">
@@ -604,13 +606,8 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    {availablePapers.length} paper{availablePapers.length !== 1 ? 's' : ''} available
-                    {scopedPapers.length > 0
-                      ? ` (${scopedPapers.length} match ${scopeLabel({ board, grade })} · ${subject})`
-                      : scopedPapers.length === 0
-                        ? ' — includes papers from other boards, grades, or subjects'
-                        : ''}
-                    .
+                    {availablePapers.length} paper{availablePapers.length !== 1 ? 's' : ''} for{' '}
+                    {scopeLabel({ board, grade })} · {subject}.
                   </p>
                 )}
 
