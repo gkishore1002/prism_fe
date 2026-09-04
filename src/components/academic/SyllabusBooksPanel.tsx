@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, Loader2, Trash2, Upload, CheckCircle2, AlertCircle, Download, Eye } from 'lucide-react'
+import { BookOpen, Loader2, Trash2, Upload, CheckCircle2, AlertCircle, Download, Eye, GitMerge } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
 import { AppDropdown } from '@/components/ui/AppDropdown'
 import { useCurriculum } from '@/hooks/useCurriculum'
@@ -9,6 +9,7 @@ import {
   downloadSyllabusBookJson,
   fetchSyllabusBook,
   fetchSyllabusBooks,
+  importBookTopics,
   uploadSyllabusBook,
   type SyllabusBook,
 } from '@/lib/api/syllabusBooksApi'
@@ -17,13 +18,15 @@ import { cn } from '@/lib/cn'
 import { boardsMatch, gradesMatch } from '@/lib/academicScope'
 
 export function SyllabusBooksPanel() {
-  const { curriculum, ensureLoaded } = useCurriculum()
+  const { curriculum, ensureLoaded, refresh: refreshCurriculum } = useCurriculum()
   const { confirm } = useConfirmModal()
   const fileRef = useRef<HTMLInputElement>(null)
   const [books, setBooks] = useState<SyllabusBook[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [importingId, setImportingId] = useState<string | null>(null)
+  const [importMessage, setImportMessage] = useState<{ id: string; text: string } | null>(null)
   const [viewingBook, setViewingBook] = useState<SyllabusBook | null>(null)
   const [viewingId, setViewingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -93,13 +96,41 @@ export function SyllabusBooksPanel() {
             }
           }),
         )
-        setBooks((prev) =>
-          prev.map((book) => updates.find((item) => item && item.id === book.id) ?? book),
-        )
+        let anyJustAnalyzed = false
+        setBooks((prev) => {
+          const next = prev.map((book) => {
+            const updated = updates.find((item) => item && item.id === book.id)
+            if (updated && updated.status === 'analyzed' && book.status === 'analyzing') {
+              anyJustAnalyzed = true
+            }
+            return updated ?? book
+          })
+          return next
+        })
+        // Refresh curriculum sidebar when a book finishes — topics are auto-added by backend
+        if (anyJustAnalyzed) {
+          void refreshCurriculum()
+        }
       })()
     }, 3000)
     return () => window.clearInterval(timer)
-  }, [analyzingIds.join(',')])
+  }, [analyzingIds.join(','), refreshCurriculum])
+
+  async function handleImportTopics(book: SyllabusBook) {
+    if (importingId) return
+    setImportingId(book.id)
+    setImportMessage(null)
+    setError(null)
+    try {
+      const result = await importBookTopics(book.id)
+      setImportMessage({ id: book.id, text: `✓ ${result.topicsAdded} topics synced to curriculum` })
+      void refreshCurriculum()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Import failed')
+    } finally {
+      setImportingId(null)
+    }
+  }
 
   async function handleUpload() {
     if (!selectedFile || !board || !grade || !subject || uploading) return
@@ -257,6 +288,11 @@ export function SyllabusBooksPanel() {
                         ? 'Vertex AI is summarizing this book…'
                         : book.errorMessage || 'Summarization failed'}
                   </p>
+                  {importMessage?.id === book.id && (
+                    <p className="text-xs text-leaf mt-1.5 font-medium">
+                      {importMessage.text}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span
@@ -291,6 +327,22 @@ export function SyllabusBooksPanel() {
                     <button
                       type="button"
                       className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/70 disabled:opacity-40"
+                      aria-label={`Import topics to curriculum`}
+                      disabled={importingId === book.id || downloadingId === book.id || viewingId === book.id}
+                      onClick={() => void handleImportTopics(book)}
+                      title="Import topics to curriculum"
+                    >
+                      {importingId === book.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <GitMerge className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                  {book.status === 'analyzed' && (
+                    <button
+                      type="button"
+                      className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/70 disabled:opacity-40"
                       aria-label={`Download JSON for ${book.title}`}
                       disabled={downloadingId === book.id}
                       onClick={() => {
@@ -305,6 +357,7 @@ export function SyllabusBooksPanel() {
                           })
                           .finally(() => setDownloadingId(null))
                       }}
+                      title="Download JSON"
                     >
                       {downloadingId === book.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />

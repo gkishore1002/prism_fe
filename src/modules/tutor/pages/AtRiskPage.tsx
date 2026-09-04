@@ -32,7 +32,7 @@ export function TutorAtRiskPage({ embedded = false }: { embedded?: boolean }) {
     }
   }, [activeBatchId, bootstrapAtRisk])
 
-  if (loading) {
+  if (loading && atRisk.length === 0 && bootstrapAtRisk.length === 0) {
     return <PageLoader />
   }
 

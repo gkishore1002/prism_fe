@@ -16,7 +16,7 @@ export function StudentAlertsPage() {
   useAnalyticsPage('studentAlerts')
   const { loading, progressAlerts } = useAnalytics()
 
-  if (loading) {
+  if (loading && progressAlerts.length === 0) {
     return <PageLoader />
   }
 

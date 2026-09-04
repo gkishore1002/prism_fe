@@ -49,7 +49,8 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated) return
-    setLoading(true)
+    const isInitialLoad = !loaded
+    if (isInitialLoad) setLoading(true)
     setError(null)
     try {
       const [qs, papers] = await Promise.all([
@@ -62,9 +63,9 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load questions')
     } finally {
-      setLoading(false)
+      if (isInitialLoad) setLoading(false)
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, loaded])
 
   const ensureLoaded = useCallback(async () => {
     if (loaded || loading) return

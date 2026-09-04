@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
-import { PageLoader } from '@/components/ui/PrismLoader'
 import { StudentManagementPanel } from '@/components/academic/StudentManagementPanel'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { useCenters } from '@/hooks/useCenters'
@@ -10,19 +9,23 @@ export function TutorStudentsPage() {
   const { batches } = useCurriculum()
   const { activeCenterId, isAllBranches } = useCenters()
   const [stats, setStats] = useState<StudentMasterStats | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [statsLoading, setStatsLoading] = useState(true)
   const branchCenterId = isAllBranches ? undefined : activeCenterId
 
   useEffect(() => {
-    setLoading(true)
+    let cancelled = false
+    setStatsLoading(true)
     void fetchStudentsMasterStats(branchCenterId)
-      .then(setStats)
-      .finally(() => setLoading(false))
+      .then((next) => {
+        if (!cancelled) setStats(next)
+      })
+      .finally(() => {
+        if (!cancelled) setStatsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [branchCenterId])
-
-  if (loading) {
-    return <PageLoader />
-  }
 
   return (
     <>
@@ -32,7 +35,7 @@ export function TutorStudentsPage() {
         sub="Add and manage students anchored to board, grade, batch, branch, and academic year."
       />
 
-      <div className="flex flex-wrap items-start gap-2 mb-5">
+      <div className={`flex flex-wrap items-start gap-2 mb-5${statsLoading && !stats ? ' opacity-60' : ''}`}>
         <AppStat compact label="My Students" value={stats?.total ?? 0} />
         <AppStat compact label="Active" value={stats?.active ?? 0} tone="leaf" />
         <AppStat compact label="Batches" value={batches.length} />

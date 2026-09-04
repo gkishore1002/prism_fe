@@ -9,7 +9,7 @@ export function StudentReadinessPage() {
   useAnalyticsPage('studentReadiness')
   const { loading, readiness, studentProfile } = useAnalytics()
 
-  if (loading) {
+  if (loading && readiness.length === 0) {
     return <PageLoader />
   }
 

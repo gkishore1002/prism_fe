@@ -11,7 +11,7 @@ export function StudentReportDetailPage() {
   const { loading, monthlyReports } = useAnalytics()
   const entry = period ? findMonthBySlug(period, monthlyReports) : undefined
 
-  if (loading) {
+  if (loading && monthlyReports.length === 0) {
     return <ReportLoader label="Building monthly progress report…" />
   }
 

@@ -18,7 +18,7 @@ export function StudentGapsPage() {
   const { loading, learningGaps } = useAnalytics()
   const totalImpact = learningGaps.reduce((sum, g) => sum + g.impactOnScore, 0)
 
-  if (loading) {
+  if (loading && learningGaps.length === 0) {
     return <PageLoader />
   }
 

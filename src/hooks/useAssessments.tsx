@@ -50,10 +50,12 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
 
   const loadedBranchRef = useRef<string | 'all' | null>(null)
   const loadedRoleRef = useRef<string | null>(null)
+  const hasLoadedOnceRef = useRef(false)
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated) return
-    setLoading(true)
+    const isInitialLoad = !hasLoadedOnceRef.current
+    if (isInitialLoad) setLoading(true)
     setError(null)
     try {
       const data =
@@ -64,10 +66,11 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
       attendanceCacheRef.current.clear()
       loadedBranchRef.current = role === 'student' ? 'all' : (branchCenterId ?? 'all')
       loadedRoleRef.current = role
+      hasLoadedOnceRef.current = true
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load assessments')
     } finally {
-      setLoading(false)
+      if (isInitialLoad) setLoading(false)
     }
   }, [isAuthenticated, role, user.id, branchCenterId])
 
@@ -94,6 +97,7 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
       setAssessments([])
       loadedBranchRef.current = null
       loadedRoleRef.current = null
+      hasLoadedOnceRef.current = false
       return
     }
     const key = role === 'student' ? 'all' : (branchCenterId ?? 'all')

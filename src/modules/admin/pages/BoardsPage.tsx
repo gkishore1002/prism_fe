@@ -12,7 +12,7 @@ export function AdminBoardsPage() {
   const { loading, boardReport } = useAnalytics()
   const [board, setBoard] = useState<string>('')
 
-  if (loading) {
+  if (loading && boardReport.length === 0) {
     return <PageLoader />
   }
 

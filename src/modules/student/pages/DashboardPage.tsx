@@ -21,7 +21,7 @@ export function StudentDashboardPage() {
     ? Math.round((completedSteps / recoveryPlan.length) * 100)
     : 0
 
-  if (loading) {
+  if (loading && !studentHealth) {
     return <PageLoader />
   }
 

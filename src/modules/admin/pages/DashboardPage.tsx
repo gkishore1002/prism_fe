@@ -74,7 +74,7 @@ export function AdminDashboardPage() {
         ? formatCenterLabel(activeCenter)
         : 'Current branch view'
 
-  if (loading) {
+  if (loading && !inst) {
     return <PageLoader />
   }
 

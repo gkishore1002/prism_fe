@@ -10,7 +10,8 @@ export function AdminInstitutionPage() {
   const { loading: analyticsLoading, overview } = useAnalytics()
   const { curriculum, loading: curriculumLoading } = useCurriculum()
 
-  const loading = analyticsLoading || curriculumLoading
+  const loading =
+    (analyticsLoading && !overview) || (curriculumLoading && curriculum.length === 0)
   const institution = overview?.institution
   const gradeCount = curriculum.reduce((n, b) => n + b.grades.length, 0)
 

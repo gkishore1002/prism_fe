@@ -39,7 +39,7 @@ export function StudentAssessmentSummaryPage({
     }
   }, [assessmentId])
 
-  if (loading) {
+  if (loading && !report) {
     return <ReportLoader label="Loading assessment summary…" />
   }
 

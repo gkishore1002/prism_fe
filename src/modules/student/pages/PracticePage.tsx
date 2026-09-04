@@ -16,7 +16,7 @@ export function StudentPracticePage() {
     void ensureLoaded()
   }, [ensureLoaded])
 
-  if (loading) {
+  if (loading && questions.length === 0) {
     return <PageLoader />
   }
 

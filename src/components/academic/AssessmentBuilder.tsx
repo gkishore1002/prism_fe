@@ -34,7 +34,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     loading: papersLoading,
     ensureLoaded,
   } = useQuestionPapers()
-  const { curriculum, batches, students, getBatchesForScope, ensureLoaded: ensureCurriculumLoaded } =
+  const { curriculum, students, getBatchesForScope, ensureLoaded: ensureCurriculumLoaded } =
     useCurriculum()
   const { centers: institutionCenters, activeCenterId, isAllBranches } = useCenters({ enabled: open })
   const branchCenterId = isAllBranches ? undefined : activeCenterId
@@ -43,7 +43,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
   const [board, setBoard] = useState('')
   const [grade, setGrade] = useState('')
   const [subject, setSubject] = useState('')
-  const [mode, setMode] = useState<'practice' | 'assessment'>('assessment')
+  const [mode, setMode] = useState<'practice' | 'assessment' | ''>('')
   const [batchName, setBatchName] = useState('')
   const [durationMinutes, setDurationMinutes] = useState(0)
   const [scheduledAt, setScheduledAt] = useState('')
@@ -60,7 +60,6 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
   const [publishError, setPublishError] = useState<string | null>(null)
   const [publishing, setPublishing] = useState(false)
   const [topicSearch, setTopicSearch] = useState('')
-  const [scopeInitialized, setScopeInitialized] = useState(false)
   const [showPaperPreview, setShowPaperPreview] = useState(false)
   const [shuffleQuestions, setShuffleQuestions] = useState(false)
 
@@ -70,7 +69,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     setBoard('')
     setGrade('')
     setSubject('')
-    setMode('assessment')
+    setMode('')
     setBatchName('')
     setDurationMinutes(0)
     setScheduledAt('')
@@ -87,7 +86,6 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     setPublishError(null)
     setPublishing(false)
     setTopicSearch('')
-    setScopeInitialized(false)
     setShowPaperPreview(false)
     setShuffleQuestions(false)
   }
@@ -102,47 +100,6 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     // Only re-run when the modal opens — not when loader callbacks change identity
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
-
-  function pickScopeWithBatches() {
-    for (const boardEntry of curriculum) {
-      for (const gradeEntry of boardEntry.grades) {
-        const scoped = batches.filter(
-          (b) => boardsMatch(b.board, boardEntry.board) && gradesMatch(b.grade, gradeEntry.grade),
-        )
-        if (scoped.length > 0) {
-          return {
-            board: boardEntry.board,
-            grade: gradeEntry.grade,
-            subject: gradeEntry.subjects[0]?.name ?? '',
-            batchName: scoped[0].name,
-          }
-        }
-      }
-    }
-    const firstBoard = curriculum[0]
-    const firstGrade = firstBoard?.grades[0]
-    const fallbackBatches = firstBoard
-      ? getBatchesForScope(firstBoard.board, firstGrade?.grade ?? '')
-      : []
-    return {
-      board: firstBoard?.board ?? '',
-      grade: firstGrade?.grade ?? '',
-      subject: firstGrade?.subjects[0]?.name ?? '',
-      batchName: fallbackBatches[0]?.name ?? '',
-    }
-  }
-
-  // Initialize board/grade once when the modal opens — do not re-force after user edits
-  useEffect(() => {
-    if (!open || scopeInitialized || curriculum.length === 0) return
-    const scope = pickScopeWithBatches()
-    setBoard(scope.board)
-    setGrade(scope.grade)
-    setSubject(scope.subject)
-    setBatchName(scope.batchName)
-    setScopeInitialized(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, scopeInitialized, curriculum.length])
 
   const boardData = useMemo(
     () => curriculum.find((b) => boardsMatch(b.board, board)),
@@ -266,24 +223,20 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
       : selectedPaper?.totalMarks ?? 0
 
   useEffect(() => {
-    if (!scopeInitialized) return
     setSelectedPaperId(null)
     setPaperCoverage('full')
     setSelectedTopics([])
     setTopicSearch('')
     setShowPaperPreview(false)
-  }, [board, grade, subject, scopeInitialized])
+  }, [board, grade, subject])
 
-  // Keep batch name valid for the selected board+grade — never force grade back
+  // Clear batch if it no longer belongs to the selected board+grade
   useEffect(() => {
-    if (!scopeInitialized) return
-    if (scopedBatches.length > 0 && !scopedBatches.some((b) => b.name === batchName)) {
-      setBatchName(scopedBatches[0].name)
-    }
-    if (scopedBatches.length === 0 && batchName) {
+    if (!batchName) return
+    if (scopedBatches.length === 0 || !scopedBatches.some((b) => b.name === batchName)) {
       setBatchName('')
     }
-  }, [scopedBatches, batchName, scopeInitialized])
+  }, [scopedBatches, batchName])
 
   const selectedBatch = scopedBatches.find((b) => b.name === batchName)
 
@@ -366,20 +319,17 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     const data = curriculum.find((b) => boardsMatch(b.board, next))
     if (!data) return
     setBoard(data.board)
-    const nextGrade = data.grades[0]?.grade ?? ''
-    setGrade(nextGrade)
-    setSubject(data.grades[0]?.subjects[0]?.name ?? '')
-    const nextBatches = getBatchesForScope(data.board, nextGrade)
-    setBatchName(nextBatches[0]?.name ?? '')
+    setGrade('')
+    setSubject('')
+    setBatchName('')
   }
 
   function onGradeChange(next: string) {
     const data = boardData?.grades.find((g) => gradesMatch(g.grade, next))
     if (!data) return
     setGrade(data.grade)
-    setSubject(data.subjects[0]?.name ?? '')
-    const nextBatches = getBatchesForScope(board, data.grade)
-    setBatchName(nextBatches[0]?.name ?? '')
+    setSubject('')
+    setBatchName('')
   }
 
   function onSubjectChange(next: string) {
@@ -434,8 +384,16 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
   }
 
   async function handlePublish() {
+    if (!board.trim() || !grade.trim() || !subject.trim()) {
+      setPublishError('Select board, grade, and subject before scheduling.')
+      return
+    }
     if (!batchName.trim()) {
       setPublishError('Select a batch before scheduling.')
+      return
+    }
+    if (mode !== 'practice' && mode !== 'assessment') {
+      setPublishError('Select a mode before scheduling.')
       return
     }
     setPublishing(true)
@@ -500,7 +458,11 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
             disabled={
               publishing ||
               (step === 1 &&
-                (!batchName ||
+                (!board ||
+                  !grade ||
+                  !subject ||
+                  !batchName ||
+                  !mode ||
                   scopedBatches.length === 0 ||
                   !selectedPaperId ||
                   selectedQuestions.length === 0 ||
@@ -531,8 +493,15 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
           {step === 1 && (
             <div className="space-y-6">
               <div className="rounded-md bg-secondary/40 border border-border px-3 py-2 text-xs text-muted-foreground">
-                Scoped to <span className="font-medium text-foreground">{scopeLabel({ board, grade })}</span>
-                {' '}— students only see exams matching their board and grade.
+                {board && grade ? (
+                  <>
+                    Scoped to{' '}
+                    <span className="font-medium text-foreground">{scopeLabel({ board, grade })}</span>
+                    {' '}— students only see exams matching their board and grade.
+                  </>
+                ) : (
+                  <>Select board and grade — students only see exams matching their board and grade.</>
+                )}
               </div>
 
               <section className="space-y-3">
@@ -551,42 +520,50 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                   </label>
                   <AppDropdown
                     label="Board"
-                    value={board}
+                    value={board || null}
                     onChange={onBoardChange}
                     options={boardOptions}
                     placeholder="Select board"
                   />
                   <AppDropdown
                     label="Grade"
-                    value={grade}
+                    value={grade || null}
                     onChange={onGradeChange}
                     options={gradeOptions}
-                    placeholder="Select grade"
+                    placeholder={board ? 'Select grade' : 'Select board first'}
+                    emptyMessage="Select a board to see grades"
                   />
                   <AppDropdown
                     label="Subject"
-                    value={subject}
+                    value={subject || null}
                     onChange={onSubjectChange}
                     options={subjectOptions}
-                    placeholder="Select subject"
+                    placeholder={grade ? 'Select subject' : 'Select grade first'}
+                    emptyMessage="Select a grade to see subjects"
                   />
                   <AppDropdown
                     label="Batch"
                     value={batchName || null}
                     onChange={setBatchName}
                     options={batchOptions}
-                    placeholder={scopedBatches.length === 0 ? 'No batches — create in Curriculum Setup' : 'Select batch'}
+                    placeholder={
+                      !board || !grade
+                        ? 'Select board and grade first'
+                        : scopedBatches.length === 0
+                          ? 'No batches — create in Curriculum Setup'
+                          : 'Select batch'
+                    }
                     emptyMessage="No batches for this board and grade — add one in Curriculum Setup"
                   />
                   <AppDropdown
                     label="Mode"
-                    value={mode}
+                    value={mode || null}
                     onChange={(v) => setMode(v as typeof mode)}
                     options={modeOptions}
                     placeholder="Select mode"
                   />
                 </div>
-                {scopedBatches.length === 0 && (
+                {board && grade && scopedBatches.length === 0 && (
                   <p className="text-xs text-muted-foreground">
                     Create batches under Curriculum Setup for {scopeLabel({ board, grade })} — they appear here
                     for assessments.

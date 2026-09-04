@@ -48,7 +48,7 @@ export function StudentTodayPage() {
   const recoveryTotal = recoveryPlan.length
   const recoveryPct = recoveryTotal ? Math.round((recoveryDone / recoveryTotal) * 100) : 0
 
-  if (loading) {
+  if (loading && !profile) {
     return <PageLoader label="Loading your dashboard…" />
   }
 

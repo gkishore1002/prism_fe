@@ -12,7 +12,7 @@ export function StudentHealthPage() {
   useAnalyticsPage('studentHealth')
   const { loading, studentHealth } = useAnalytics()
 
-  if (loading) {
+  if (loading && !studentHealth) {
     return <PageLoader />
   }
 

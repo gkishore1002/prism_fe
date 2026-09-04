@@ -9,7 +9,9 @@ export function TutorBatchesPage() {
   useAnalyticsPage('tutorBatches')
   const { batches, loading: curriculumLoading } = useCurriculum()
   const { batchHeatmap, loading: analyticsLoading } = useAnalytics()
-  const loading = curriculumLoading || analyticsLoading
+  const loading =
+    (curriculumLoading && batches.length === 0) ||
+    (analyticsLoading && batchHeatmap.length === 0 && batches.length === 0)
 
   if (loading) {
     return <PageLoader />

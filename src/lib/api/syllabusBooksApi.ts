@@ -45,6 +45,10 @@ export async function deleteSyllabusBook(bookId: string): Promise<void> {
   await apiFetch(`/syllabus-books/${encodeURIComponent(bookId)}`, { method: 'DELETE' })
 }
 
+export async function importBookTopics(bookId: string): Promise<{ status: string; topicsAdded: number }> {
+  return apiFetch(`/syllabus-books/${encodeURIComponent(bookId)}/import-topics`, { method: 'POST' })
+}
+
 export async function downloadSyllabusBookJson(book: SyllabusBook): Promise<void> {
   const detail =
     book.status === 'analyzed' && book.analysisJson?.chapters

@@ -53,7 +53,7 @@ export function StudentReportsHubPage() {
     }
   }, [])
 
-  if (loading) {
+  if (loading && summaries.length === 0) {
     return <ReportLoader label="Loading your reports…" />
   }
 

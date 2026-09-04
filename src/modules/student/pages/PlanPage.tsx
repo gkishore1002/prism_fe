@@ -19,7 +19,7 @@ export function StudentPlanPage() {
     ? Math.round((completed.length / recoveryPlan.length) * 100)
     : 0
 
-  if (loading) {
+  if (loading && recoveryPlan.length === 0 && learningGaps.length === 0) {
     return <PageLoader />
   }
 

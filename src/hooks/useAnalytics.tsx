@@ -360,7 +360,9 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       const pending = force ? list : list.filter((k) => !loadedRef.current.has(k))
       if (pending.length === 0) return
 
-      setLoading(true)
+      // Only block the UI on first fetch for these keys; soft-refresh in the background after that.
+      const isInitialFetch = pending.some((k) => !loadedRef.current.has(k))
+      if (isInitialFetch) setLoading(true)
       setError(null)
       try {
         await Promise.all(pending.map((key) => runKey(key)))
@@ -368,7 +370,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load analytics')
       } finally {
-        setLoading(false)
+        if (isInitialFetch) setLoading(false)
       }
     },
     [isAuthenticated, runKey],
@@ -392,6 +394,12 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
   const loadStudentReport = useCallback(async (studentId: string) => {
     return analyticsApi.studentReport(studentId)
   }, [])
+
+  useEffect(() => {
+    if (isAuthenticated) return
+    loadedRef.current.clear()
+    setLoading(false)
+  }, [isAuthenticated])
 
   const value = useMemo(
     () => ({
@@ -480,13 +488,18 @@ export function useAnalyticsPage(key: AnalyticsLoadKey | AnalyticsLoadKey[]) {
   const { load, loading, error } = useAnalytics()
   const { activeCenterId, isAllBranches } = useCenters()
   const branchCenterId = isAllBranches ? undefined : activeCenterId
+  const branchKey = branchCenterId ?? 'all'
   const keys = useMemo(() => (Array.isArray(key) ? key : [key]), [key])
   const keysKey = keys.join(',')
+  const lastBranchRef = useRef<string | null>(null)
 
   useEffect(() => {
-    void load(keys, true)
+    const branchChanged = lastBranchRef.current !== null && lastBranchRef.current !== branchKey
+    lastBranchRef.current = branchKey
+    // Revisit same branch: use cache. Branch switch: soft-refresh without blanking the page.
+    void load(keys, branchChanged)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [load, keysKey, branchCenterId])
+  }, [load, keysKey, branchKey])
 
   return { loading, error }
 }

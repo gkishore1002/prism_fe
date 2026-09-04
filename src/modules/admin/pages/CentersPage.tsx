@@ -73,7 +73,7 @@ export function AdminCentersPage({ embedded = false }: { embedded?: boolean }) {
     }
   }
 
-  if (centersLoading) {
+  if (centersLoading && centerAnalytics.length === 0) {
     return <PageLoader />
   }
 
@@ -81,7 +81,7 @@ export function AdminCentersPage({ embedded = false }: { embedded?: boolean }) {
     return <Navigate to={embedded ? '/admin/manage/students' : '/admin'} replace />
   }
 
-  if (loading) {
+  if (loading && centerAnalytics.length === 0) {
     return <PageLoader />
   }
 

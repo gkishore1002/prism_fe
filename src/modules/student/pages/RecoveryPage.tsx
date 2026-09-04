@@ -16,7 +16,7 @@ export function StudentRecoveryPage() {
   const totalHours = pending.reduce((sum, s) => sum + s.estimatedHours, 0)
   const progress = recoveryPlan.length ? (completed.length / recoveryPlan.length) * 100 : 0
 
-  if (loading) {
+  if (loading && recoveryPlan.length === 0) {
     return <PageLoader />
   }
 

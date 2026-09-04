@@ -15,7 +15,7 @@ export function AdminAnalyticsPage() {
   useAnalyticsPage('adminAnalytics')
   const { loading, monthlyTrend, subjectHealth } = useAnalytics()
 
-  if (loading) {
+  if (loading && monthlyTrend.length === 0 && subjectHealth.length === 0) {
     return <PageLoader />
   }
 

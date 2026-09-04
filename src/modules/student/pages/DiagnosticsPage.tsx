@@ -37,7 +37,7 @@ export function StudentDiagnosticsPage() {
     readiness: r.currentReadiness,
   }))
 
-  if (loading) {
+  if (loading && topicBreakdown.length === 0 && readiness.length === 0) {
     return <PageLoader />
   }
 

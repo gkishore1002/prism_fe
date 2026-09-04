@@ -9,14 +9,18 @@ import {
   FileJson,
   ClipboardCheck,
   BookMarked,
+  Sparkles,
 } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
 import {
+  applyMappedTopics,
   downloadQuestionExcelTemplate,
   downloadQuestionJsonTemplate,
   parseQuestionUploadFile,
   QUESTION_UPLOAD_COLUMNS,
 } from '@/lib/questionUploadParse'
+import { mapQuestionTopics } from '@/lib/api/syllabusBooksApi'
+import { ApiError, isApiEnabled } from '@/lib/apiClient'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
 import type { QuestionUploadRow } from '@/types'
 import { cn } from '@/lib/cn'
@@ -47,9 +51,13 @@ export function QuestionUploadWorkflow({
   const [fileLabel, setFileLabel] = useState<string | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [mappingTopics, setMappingTopics] = useState(false)
+  const [mapError, setMapError] = useState<string | null>(null)
+  const [mapNote, setMapNote] = useState<string | null>(null)
 
   const validRows = rows.filter((r) => r.valid)
   const invalidRows = rows.filter((r) => !r.valid)
+  const blankTopicRows = rows.filter((r) => r.valid && !r.topic.trim())
   const activeStep = uploaded ? 3 : fileLabel ? 2 : 1
 
   async function handleFile(file: File | undefined) {
@@ -57,6 +65,8 @@ export function QuestionUploadWorkflow({
     setParsing(true)
     setParseError(null)
     setSaveError(null)
+    setMapError(null)
+    setMapNote(null)
     try {
       const result = await parseQuestionUploadFile(file)
       if (!result.ok) {
@@ -87,11 +97,55 @@ export function QuestionUploadWorkflow({
     setPaperName('')
     setParseError(null)
     setSaveError(null)
+    setMapError(null)
+    setMapNote(null)
+    setMappingTopics(false)
+  }
+
+  async function handleUpdateTopics() {
+    if (mappingTopics || saving || blankTopicRows.length === 0) return
+    if (!isApiEnabled()) {
+      setMapError('Connect to the Prism API to map topics from syllabus books.')
+      return
+    }
+    setMappingTopics(true)
+    setMapError(null)
+    setMapNote(null)
+    try {
+      const payload = blankTopicRows.map((row) => ({
+        row: row.row,
+        board: row.board,
+        grade: row.grade,
+        subject: row.subject,
+        chapter: row.chapter,
+        text: row.text,
+        topic: row.topic,
+      }))
+      const { mappings } = await mapQuestionTopics(payload)
+      const next = applyMappedTopics(rows, mappings)
+      const filled = next.filter((row) => row.topic.trim()).length - rows.filter((r) => r.topic.trim()).length
+      setRows(next)
+      setMapNote(
+        filled > 0
+          ? `Mapped topics onto ${filled} question${filled === 1 ? '' : 's'} from the syllabus book outline.`
+          : 'No topics were mapped. Upload an analyzed syllabus book for this board / grade / subject, then try again.',
+      )
+    } catch (err) {
+      setMapError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Topic mapping failed',
+      )
+    } finally {
+      setMappingTopics(false)
+    }
   }
 
   async function handleCommit(e: React.FormEvent) {
     e.preventDefault()
-    if (!paperName.trim() || validRows.length === 0 || saving) return
+    if (!paperName.trim() || validRows.length === 0 || saving || mappingTopics) return
     setSaving(true)
     setSaveError(null)
     try {
@@ -238,7 +292,19 @@ export function QuestionUploadWorkflow({
             <span className={invalidRows.length ? 'text-rose font-medium' : ''}>
               {invalidRows.length} need fixes
             </span>
+            {blankTopicRows.length > 0 ? (
+              <>
+                {' · '}
+                <span className="text-amber-700 font-medium">
+                  {blankTopicRows.length} missing topic
+                </span>
+              </>
+            ) : null}
             {fileLabel ? ` · ${fileLabel}` : ''}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Chapter is required. Topic is optional in the file — use Update topics to map from an
+            analyzed syllabus book before publish.
           </p>
         </div>
 
@@ -254,7 +320,7 @@ export function QuestionUploadWorkflow({
                 className="h-10 w-full border border-border rounded-md px-3 text-sm bg-background"
               />
             </label>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={resetPreview}
@@ -263,8 +329,26 @@ export function QuestionUploadWorkflow({
                 Cancel
               </button>
               <button
+                type="button"
+                onClick={() => void handleUpdateTopics()}
+                disabled={blankTopicRows.length === 0 || mappingTopics || saving}
+                className="h-10 px-4 rounded-md text-sm border border-accent/40 bg-accent/10 text-foreground hover:bg-accent/15 disabled:opacity-40 inline-flex items-center gap-1.5"
+                title={
+                  blankTopicRows.length === 0
+                    ? 'All ready rows already have a topic'
+                    : 'Map blank topics from analyzed syllabus books'
+                }
+              >
+                {mappingTopics ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-accent" />
+                )}
+                {mappingTopics ? 'Updating topics…' : 'Update topics'}
+              </button>
+              <button
                 type="submit"
-                disabled={validRows.length === 0 || saving}
+                disabled={validRows.length === 0 || saving || mappingTopics}
                 className="h-10 px-4 rounded-md text-sm font-medium bg-ink text-paper disabled:opacity-40"
               >
                 {saving ? 'Publishing…' : `Publish ${validRows.length} Qs`}
@@ -274,6 +358,8 @@ export function QuestionUploadWorkflow({
         </form>
       </div>
 
+      {mapError && <p className="text-sm text-rose px-4 sm:px-5 pt-3">{mapError}</p>}
+      {mapNote && !mapError && <p className="text-sm text-leaf px-4 sm:px-5 pt-3">{mapNote}</p>}
       {saveError && <p className="text-sm text-rose px-4 sm:px-5 pt-3">{saveError}</p>}
 
       <div className="overflow-x-auto max-h-[420px]">
@@ -297,7 +383,12 @@ export function QuestionUploadWorkflow({
                 <td className="px-4 py-2.5 text-xs text-muted-foreground">
                   {row.board || '—'} · G{row.grade || '—'}
                   <br />
-                  {row.subject || '—'} / {row.chapter || '—'} / {row.topic || '—'}
+                  {row.subject || '—'} / {row.chapter || '—'} /{' '}
+                  {row.topic ? (
+                    row.topic
+                  ) : (
+                    <span className="text-amber-700">topic pending</span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5 text-xs text-muted-foreground">
                   {row.difficulty || '—'} · {Number.isFinite(row.marks) ? `${row.marks}m` : '—'} ·{' '}
@@ -311,6 +402,10 @@ export function QuestionUploadWorkflow({
                       </span>
                       <p className="text-[10px] text-rose mt-0.5">{row.errors.join(', ')}</p>
                     </div>
+                  ) : !row.topic.trim() ? (
+                    <span className="inline-flex items-center gap-1 text-amber-700 text-xs font-medium">
+                      <Sparkles className="w-3.5 h-3.5" /> Needs topic
+                    </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-leaf text-xs font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Ready
@@ -367,8 +462,9 @@ export function QuestionUploadWorkflow({
       <AppCard className="p-4 sm:p-5">
         <h3 className="text-sm font-semibold text-foreground mb-1">Required schema</h3>
         <p className="text-xs text-muted-foreground mb-3">
-          Board → Grade → Subject → Chapter → Topic, plus difficulty, marks, type, and text. JSON
-          may use {'{ "name": "…", "questions": […] }'}.
+          Board → Grade → Subject → Chapter (required) → Topic (optional; use Update topics), plus
+          difficulty, marks, type, and text. JSON may use{' '}
+          {'{ "name": "…", "questions": […] }'}.
         </p>
         <div className="flex flex-wrap gap-1.5">
           {QUESTION_UPLOAD_COLUMNS.map((col) => (
