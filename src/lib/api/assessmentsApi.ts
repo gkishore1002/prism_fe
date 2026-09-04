@@ -112,6 +112,7 @@ export async function submitAssessment(
   assessmentId: string,
   answers: { questionId: string; selectedOption: string }[],
   timeSpentMin: number,
+  deviceId?: string,
 ): Promise<void> {
   await apiFetch(`/assessments/${assessmentId}/submit`, {
     method: 'POST',
@@ -121,6 +122,7 @@ export async function submitAssessment(
         selectedOption: a.selectedOption,
       })),
       timeSpentMin,
+      deviceId: deviceId || undefined,
     }),
   })
 }
@@ -182,6 +184,7 @@ export async function saveExamAttempt(
     currentIndex: number
     flaggedIds: string[]
     remainingSeconds: number | null
+    deviceId?: string
   },
 ): Promise<void> {
   await apiFetch(`/assessments/${assessmentId}/attempt`, {
@@ -191,8 +194,86 @@ export async function saveExamAttempt(
       currentIndex: body.currentIndex,
       flaggedIds: body.flaggedIds,
       remainingSeconds: body.remainingSeconds,
+      deviceId: body.deviceId,
     }),
   })
+}
+
+export interface ExamSessionInfo {
+  id: string
+  assessmentId: string
+  deviceId: string
+  status: 'active' | 'ended' | 'terminated'
+  startedAt: string
+  lastHeartbeatAt: string
+  violationCount: number
+  maxViolations: number
+}
+
+export async function claimExamSession(
+  assessmentId: string,
+  deviceId: string,
+): Promise<ExamSessionInfo> {
+  return apiFetch<ExamSessionInfo>(`/assessments/${encodeURIComponent(assessmentId)}/session`, {
+    method: 'POST',
+    body: JSON.stringify({ deviceId }),
+  })
+}
+
+export async function examSessionHeartbeat(
+  assessmentId: string,
+  deviceId: string,
+  lastActivityAt?: string,
+): Promise<ExamSessionInfo> {
+  return apiFetch<ExamSessionInfo>(
+    `/assessments/${encodeURIComponent(assessmentId)}/session/heartbeat`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ deviceId, lastActivityAt }),
+    },
+  )
+}
+
+export type ExamViolationType =
+  | 'FULLSCREEN_EXIT'
+  | 'TAB_SWITCH'
+  | 'WINDOW_BLUR'
+  | 'DEVTOOLS_ATTEMPT'
+
+export interface ExamViolationRecordResult {
+  terminated: boolean
+  violationCount: number
+  maxViolations: number
+  submission?: {
+    id: string
+    assessmentId: string
+    studentId: string
+    score: number
+    maxScore: number
+    timeSpentMin: number
+    submittedAt: string
+    status: string
+    terminationReason?: string | null
+  } | null
+}
+
+export async function recordExamViolation(
+  assessmentId: string,
+  type: ExamViolationType,
+  deviceId: string,
+  timestamp?: string,
+): Promise<ExamViolationRecordResult> {
+  return apiFetch<ExamViolationRecordResult>(
+    `/assessments/${encodeURIComponent(assessmentId)}/violations`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        type,
+        deviceId,
+        timestamp: timestamp ?? new Date().toISOString(),
+      }),
+    },
+  )
 }
 
 export async function createAccessRequest(

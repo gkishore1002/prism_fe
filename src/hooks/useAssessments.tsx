@@ -77,19 +77,22 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
   const ensureLoaded = useCallback(async () => {
     if (!isAuthenticated) return
     const key = role === 'student' ? 'all' : (branchCenterId ?? 'all')
-    if (
+    const alreadyLoaded =
       loadedRoleRef.current === role &&
-      assessments.length > 0 &&
-      loadedBranchRef.current === key
-    ) {
-      return
-    }
+      loadedBranchRef.current === key &&
+      hasLoadedOnceRef.current
+
     if (!loadPromiseRef.current) {
+      // Soft-refresh when already loaded so newly scheduled assessments appear
+      // without requiring a full remount / logout.
       loadPromiseRef.current = refresh().finally(() => {
         loadPromiseRef.current = null
       })
     }
-    await loadPromiseRef.current
+    // First visit: wait. Revisit: kick refresh but don't block UI on cached data.
+    if (!alreadyLoaded || assessments.length === 0) {
+      await loadPromiseRef.current
+    }
   }, [isAuthenticated, role, assessments.length, branchCenterId, refresh])
 
   useEffect(() => {

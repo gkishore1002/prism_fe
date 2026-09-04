@@ -23,7 +23,7 @@ import {
 export function StudentAssessmentsPage() {
   const { user } = useAuth()
   useAnalyticsPage('studentAssessments')
-  const { getAssessmentsForStudent, canStudentAttend, loading: assessmentsLoading, error, refresh, ensureLoaded } =
+  const { getAssessmentsForStudent, canStudentAttend, loading: assessmentsLoading, error, refresh } =
     useAssessments()
   const { loading: analyticsLoading, recentAssessments, studentProfile } = useAnalytics()
   const [reassignTarget, setReassignTarget] = useState<{ id: string; title: string } | null>(null)
@@ -31,8 +31,8 @@ export function StudentAssessmentsPage() {
   const { refresh: refreshNotifications } = useNotifications()
 
   useEffect(() => {
-    void ensureLoaded()
-  }, [ensureLoaded])
+    void refresh()
+  }, [refresh])
   const profile = resolveStudentProfile(studentProfile, user)
 
   if (!profile && (analyticsLoading || assessmentsLoading)) {

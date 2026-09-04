@@ -38,11 +38,11 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
   useAnalyticsPage(['tutorNames', 'adminStudents'])
   const canManage = role === 'tutor' || role === 'admin'
   const portalBase = `/${role}`
-  const { assessments, addAssessment, removeAssessment, patchAssessment, ensureLoaded } = useAssessments()
+  const { assessments, addAssessment, removeAssessment, patchAssessment, refresh } = useAssessments()
 
   useEffect(() => {
-    void ensureLoaded()
-  }, [ensureLoaded])
+    void refresh()
+  }, [refresh])
   const { confirm } = useConfirmModal()
   const { user } = useAuth()
   const { studentMaster } = useAnalytics()

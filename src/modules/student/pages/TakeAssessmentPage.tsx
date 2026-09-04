@@ -23,12 +23,9 @@ import { useAnalytics } from '@/hooks/useAnalytics'
 import { useAuth } from '@/hooks/useAuth'
 import { shuffleQuestionsForStudent, mcqOptionsForDisplay } from '@/lib/shufflePaper'
 import { clearExamProgress, loadExamProgress, saveExamProgress } from '@/lib/examProgress'
-import {
-  enterExamFullscreen,
-  exitExamFullscreen,
-  isExamFullscreen,
-  isFullscreenApiAvailable,
-} from '@/lib/examFullscreen'
+import { exitExamFullscreen } from '@/lib/examFullscreen'
+import { getExamDeviceId } from '@/lib/examDevice'
+import { useExamProctoring } from '@/modules/student/hooks/useExamProctoring'
 import { cn } from '@/lib/cn'
 import {
   AccessRequestStatusBadge,
@@ -52,10 +49,12 @@ function ThanksCard({
   title,
   submitting,
   error,
+  terminated,
 }: {
   title: string
   submitting?: boolean
   error?: boolean
+  terminated?: boolean
 }) {
   return (
     <div className="min-h-dvh flex items-center justify-center p-4 app-page-bg">
@@ -65,13 +64,14 @@ function ThanksCard({
         </div>
         <div>
           <p className="text-[11px] uppercase tracking-[0.2em] text-accent font-medium mb-2">
-            Exam submitted
+            {terminated ? 'Exam ended' : 'Exam submitted'}
           </p>
           <h1 className="font-display text-2xl sm:text-3xl text-foreground">{title}</h1>
         </div>
         <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-md mx-auto">
-          Thanks for attending the exam. Please wait for your results — your tutor will share them
-          when ready.
+          {terminated
+            ? 'This exam was closed after repeated proctoring violations (leaving fullscreen, switching tabs, or losing focus). Your answers up to that point were submitted.'
+            : 'Thanks for attending the exam. Please wait for your results — your tutor will share them when ready.'}
         </p>
         {submitting && (
           <p className="text-xs text-muted-foreground">Saving your answers…</p>
@@ -121,6 +121,7 @@ export function StudentTakeAssessmentPage() {
   const indexRef = useRef(0)
   const flaggedRef = useRef<Set<string>>(new Set())
   const [examSecureLock, setExamSecureLock] = useState(false)
+  const [terminatedByProctor, setTerminatedByProctor] = useState(false)
 
   const assessmentFromStore = assessments.find((a) => a.id === assessmentId)
   const [lockedAssessment, setLockedAssessment] = useState(assessmentFromStore)
@@ -389,6 +390,7 @@ export function StudentTakeAssessmentPage() {
               selectedOption: selections[question.id] ?? '',
             })),
             spentMin,
+            isPractice ? undefined : getExamDeviceId(),
           )
             .then(async () => {
               setSubmitState('success')
@@ -475,8 +477,29 @@ export function StudentTakeAssessmentPage() {
       currentIndex: indexRef.current,
       flaggedIds: [...flaggedRef.current],
       remainingSeconds: secondsLeftRef.current,
+      deviceId: getExamDeviceId(),
     }).catch(() => undefined)
   }, [assessmentId, isPractice])
+
+  const handleProctorTerminated = useCallback(() => {
+    setTerminatedByProctor(true)
+    finishExam({ skipConfirm: true })
+  }, [finishExam])
+
+  const {
+    sessionReady,
+    sessionError,
+    violationCount,
+    maxViolations,
+    requireFullscreen,
+    resumeExamFocus,
+  } = useExamProctoring({
+    enabled: examLocked,
+    assessmentId,
+    onFlushAttempt: flushAttempt,
+    onTerminated: handleProctorTerminated,
+    onSecureLock: setExamSecureLock,
+  })
 
   useEffect(() => {
     if (
@@ -519,7 +542,8 @@ export function StudentTakeAssessmentPage() {
       isPractice ||
       finished ||
       alreadySubmitted ||
-      questions.length === 0
+      questions.length === 0 ||
+      !sessionReady
     ) {
       return
     }
@@ -533,6 +557,7 @@ export function StudentTakeAssessmentPage() {
         currentIndex: index,
         flaggedIds: [...flagged],
         remainingSeconds: secondsLeftRef.current,
+        deviceId: getExamDeviceId(),
       })
         .then(() => setSaveLabel('Saved'))
         .catch(() => setSaveLabel('Saved on this device'))
@@ -548,6 +573,7 @@ export function StudentTakeAssessmentPage() {
     progressReady,
     questions.length,
     selections,
+    sessionReady,
   ])
 
   useEffect(() => {
@@ -558,7 +584,8 @@ export function StudentTakeAssessmentPage() {
       isPractice ||
       finished ||
       alreadySubmitted ||
-      questions.length === 0
+      questions.length === 0 ||
+      !sessionReady
     ) {
       return
     }
@@ -571,10 +598,11 @@ export function StudentTakeAssessmentPage() {
         currentIndex: indexRef.current,
         flaggedIds: [...flaggedRef.current],
         remainingSeconds: secondsLeftRef.current,
+        deviceId: getExamDeviceId(),
       }).catch(() => undefined)
     }, 15000)
     return () => window.clearInterval(timer)
-  }, [alreadySubmitted, assessmentId, finished, isPractice, progressReady, questions.length])
+  }, [alreadySubmitted, assessmentId, finished, isPractice, progressReady, questions.length, sessionReady])
 
   const requestExit = useCallback(async () => {
     if (allowLeaveRef.current) {
@@ -634,72 +662,11 @@ export function StudentTakeAssessmentPage() {
     }
   }, [blocker, confirm, flushAttempt])
 
-  const requireFullscreen = isFullscreenApiAvailable()
-  const leftExamRef = useRef(false)
-
-  const resumeExamFocus = useCallback(async () => {
-    if (requireFullscreen && !isExamFullscreen()) {
-      const ok = await enterExamFullscreen()
-      if (!ok && !isExamFullscreen()) {
-        leftExamRef.current = false
-        if (!document.hidden) setExamSecureLock(false)
-        return
-      }
-    }
-    leftExamRef.current = false
-    if (!document.hidden && (!requireFullscreen || isExamFullscreen())) {
-      setExamSecureLock(false)
-    }
-  }, [requireFullscreen])
-
   useEffect(() => {
     if (finished || alreadySubmitted) {
       void exitExamFullscreen()
     }
   }, [alreadySubmitted, finished])
-
-  useEffect(() => {
-    if (!examLocked) {
-      leftExamRef.current = false
-      setExamSecureLock(false)
-      return
-    }
-    if (requireFullscreen && !isExamFullscreen()) {
-      setExamSecureLock(true)
-    }
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    const onVisibility = () => {
-      if (document.hidden) {
-        leftExamRef.current = true
-        setExamSecureLock(true)
-        void flushAttempt()
-      }
-    }
-    const onFullscreen = () => {
-      if (!isExamFullscreen()) {
-        leftExamRef.current = true
-        setExamSecureLock(true)
-        void flushAttempt()
-        return
-      }
-      if (!leftExamRef.current && !document.hidden) {
-        setExamSecureLock(false)
-      }
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    document.addEventListener('visibilitychange', onVisibility)
-    document.addEventListener('fullscreenchange', onFullscreen)
-    document.addEventListener('webkitfullscreenchange', onFullscreen)
-    return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload)
-      document.removeEventListener('visibilitychange', onVisibility)
-      document.removeEventListener('fullscreenchange', onFullscreen)
-      document.removeEventListener('webkitfullscreenchange', onFullscreen)
-    }
-  }, [examLocked, flushAttempt, requireFullscreen])
 
   useEffect(() => {
     return () => {
@@ -770,6 +737,7 @@ export function StudentTakeAssessmentPage() {
         title={assessment.title}
         submitting={submitState === 'submitting'}
         error={submitState === 'error'}
+        terminated={terminatedByProctor}
       />
     )
   }
@@ -878,6 +846,33 @@ export function StudentTakeAssessmentPage() {
     )
   }
 
+  if (!isPractice && sessionError) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center p-4 app-page-bg">
+        <AppCard className="text-center py-12 max-w-md w-full space-y-4">
+          <p className="font-display text-lg text-foreground">{assessment.title}</p>
+          <p className="text-sm text-muted-foreground">{sessionError}</p>
+          <p className="text-xs text-muted-foreground">
+            Close the exam on the other device, or ask your tutor if you need help.
+          </p>
+          <Link to="/student/assessments" className="text-sm text-accent inline-block">
+            Back to assessments
+          </Link>
+        </AppCard>
+      </div>
+    )
+  }
+
+  if (!isPractice && !sessionReady && isApiEnabled() && !finished && !alreadySubmitted) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center p-4 app-page-bg">
+        <AppCard className="text-center py-12 max-w-md w-full">
+          <PageLoader label="Securing exam session…" minHeight={false} className="py-4" />
+        </AppCard>
+      </div>
+    )
+  }
+
   if (finished && isPractice) {
     const correct = answers.filter((a) => a.correct).length
     const pct = answers.length ? Math.round((correct / answers.length) * 100) : 0
@@ -963,10 +958,18 @@ export function StudentTakeAssessmentPage() {
       secureGate={
         examLocked && examSecureLock
           ? {
-              title: requireFullscreen ? 'Fullscreen required' : 'Return to the exam',
-              message: requireFullscreen
-                ? 'This exam must stay in fullscreen. Switching tabs or leaving fullscreen pauses answering until you return. The timer keeps running.'
-                : 'You left the exam. Stay on this tab until you submit. The timer keeps running and your answers stay saved.',
+              title:
+                violationCount > 0
+                  ? `Proctoring warning ${violationCount} of ${maxViolations}`
+                  : requireFullscreen
+                    ? 'Fullscreen required'
+                    : 'Return to the exam',
+              message:
+                violationCount > 0
+                  ? `Leaving the exam tab, window, or fullscreen counts as a violation. After ${maxViolations} violations the exam is submitted automatically. Return to fullscreen to continue — the timer keeps running.`
+                  : requireFullscreen
+                    ? 'This exam must stay in fullscreen. Switching tabs or leaving fullscreen pauses answering until you return. The timer keeps running.'
+                    : 'You left the exam. Stay on this tab until you submit. The timer keeps running and your answers stay saved.',
               resumeLabel: requireFullscreen ? 'Enter fullscreen' : 'Continue exam',
               onResume: () => void resumeExamFocus(),
             }
