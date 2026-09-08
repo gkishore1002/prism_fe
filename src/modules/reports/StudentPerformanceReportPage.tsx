@@ -36,7 +36,9 @@ export function StudentPerformanceReportPage({
   const previewId = searchParams.get('preview')
 
   const [loading, setLoading] = useState(true)
+  const [overallLoading, setOverallLoading] = useState(true)
   const [overall, setOverall] = useState<OverallPerformanceReport | null>(null)
+  const [overallError, setOverallError] = useState<string | null>(null)
   const [assessmentReports, setAssessmentReports] = useState<AssessmentReport[]>([])
   const [previewReport, setPreviewReport] = useState<AssessmentReport | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -44,18 +46,39 @@ export function StudentPerformanceReportPage({
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    void Promise.all([
-      analyticsApi.overallReport(studentId).catch(() => null),
-      analyticsApi.assessmentReports(studentId).catch(() => [] as AssessmentReport[]),
-    ])
-      .then(([overallData, assessments]) => {
-        if (cancelled) return
-        setOverall(overallData)
-        setAssessmentReports(assessments)
+    setOverallLoading(true)
+    setOverallError(null)
+
+    void analyticsApi
+      .assessmentReports(studentId)
+      .then((assessments) => {
+        if (!cancelled) setAssessmentReports(assessments)
+      })
+      .catch(() => {
+        if (!cancelled) setAssessmentReports([])
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+
+    void analyticsApi
+      .overallReport(studentId)
+      .then((overallData) => {
+        if (!cancelled) {
+          setOverall(overallData)
+          setOverallError(null)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setOverall(null)
+          setOverallError(err instanceof Error ? err.message : 'Overall report unavailable')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOverallLoading(false)
+      })
+
     return () => {
       cancelled = true
     }
@@ -121,7 +144,7 @@ export function StudentPerformanceReportPage({
     [assessmentReports, avgScore],
   )
 
-  if (loading) {
+  if (loading && assessmentReports.length === 0 && overallLoading) {
     return <ReportLoader label="Loading student report…" />
   }
 
@@ -161,7 +184,11 @@ export function StudentPerformanceReportPage({
               value={assessmentReports.length || '—'}
               label={L.assessments}
             />
-            <StatCell icon={TrendingUp} value={`${avgScore}%`} label={L.overallScore} />
+            <StatCell
+              icon={TrendingUp}
+              value={overallLoading && !overall ? '…' : `${avgScore}%`}
+              label={L.overallScore}
+            />
             <StatCell icon={Award} value={`${topScore}%`} label={L.yourScore} />
           </div>
         </div>
@@ -201,7 +228,9 @@ export function StudentPerformanceReportPage({
             <p className="mt-1.5 text-sm text-muted-foreground">{L.descOverallSection}</p>
           </section>
 
-          {overall ? (
+          {overallLoading && !overall ? (
+            <ReportLoader label="Building overall performance report…" />
+          ) : overall ? (
             <LgReportLayout
               bilingual
               printTitle={`${studentName} — Overall performance report`}
@@ -223,8 +252,9 @@ export function StudentPerformanceReportPage({
               />
             </LgReportLayout>
           ) : (
-            <section className="rounded-xl border border-border bg-background p-6 text-sm text-muted-foreground">
-              {L.reportUnavailable}
+            <section className="rounded-xl border border-border bg-background p-6 text-sm text-muted-foreground space-y-2">
+              <p>{L.reportUnavailable}</p>
+              {overallError ? <p className="text-xs text-rose">{overallError}</p> : null}
             </section>
           )}
         </div>

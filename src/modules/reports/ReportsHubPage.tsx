@@ -182,24 +182,34 @@ export function ReportsHubPage({
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    void Promise.all([
-      analyticsApi.overallReport(studentId).catch(() => null),
-      analyticsApi.assessmentReports(studentId).catch(() => [] as AssessmentReport[]),
-    ])
-      .then(([overallData, assessmentData]) => {
-        if (cancelled) return
-        setOverall(overallData)
-        setAssessmentReports(assessmentData)
+    // Load independently so a slow/failed overall report does not blank the hub.
+    void analyticsApi
+      .assessmentReports(studentId)
+      .then((assessmentData) => {
+        if (!cancelled) setAssessmentReports(assessmentData)
+      })
+      .catch(() => {
+        if (!cancelled) setAssessmentReports([])
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+
+    void analyticsApi
+      .overallReport(studentId)
+      .then((overallData) => {
+        if (!cancelled) setOverall(overallData)
+      })
+      .catch(() => {
+        if (!cancelled) setOverall(null)
+      })
+
     return () => {
       cancelled = true
     }
   }, [studentId])
 
-  if (loading) {
+  if (loading && assessmentReports.length === 0 && !overall) {
     return <ReportLoader label="Loading reports…" />
   }
 

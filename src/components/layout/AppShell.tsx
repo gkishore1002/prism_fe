@@ -37,6 +37,7 @@ import { useNotifications } from '@/hooks/useNotifications'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 import { BranchSwitcher } from '@/components/layout/BranchSwitcher'
+import { AcademicYearSwitcher } from '@/components/layout/AcademicYearSwitcher'
 import { OrgSwitcher } from '@/components/layout/OrgSwitcher'
 import { StudentPendingAssessmentReminder } from '@/components/student/StudentPendingAssessmentReminder'
 import { PrismLogo } from '@/components/brand/PrismLogo'
@@ -245,7 +246,10 @@ export function AppShell({ module }: AppShellProps) {
               <>
                 {role === 'super_user' && <OrgSwitcher />}
                 {((moduleId === 'admin' && role !== 'super_user') || moduleId === 'tutor') && (
-                  <BranchSwitcher />
+                  <div className="inline-flex items-center gap-0.5">
+                    <AcademicYearSwitcher />
+                    <BranchSwitcher />
+                  </div>
                 )}
               </>
             )}
@@ -470,7 +474,7 @@ export function PageHeader({
           <p className="text-muted-foreground mt-2.5 max-w-2xl text-[15px] leading-relaxed font-sans">{sub}</p>
         )}
       </div>
-      {actions && <div className="page-actions shrink-0">{actions}</div>}
+      {actions && <div className="page-actions sm:shrink-0">{actions}</div>}
     </motion.div>
   )
 }

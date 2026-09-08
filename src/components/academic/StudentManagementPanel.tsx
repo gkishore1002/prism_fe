@@ -10,7 +10,9 @@ import { Pagination } from '@/components/ui/Pagination'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useCenters } from '@/hooks/useCenters'
+import { useAcademicYears } from '@/hooks/useAcademicYears'
 import { createStudent, deleteStudent, updateStudentApi } from '@/lib/api/curriculumApi'
+import { academicYearsApi, type StudentEnrollment } from '@/lib/api/academicYearsApi'
 import { PhoneCredentialFields } from '@/components/auth/PhoneCredentialFields'
 import { isValidPhone, phoneToLoginEmail, resolvePassword } from '@/lib/phoneAuth'
 import { fetchStudentsMasterPaginated } from '@/lib/api/studentsApi'
@@ -57,6 +59,7 @@ interface StudentRowActionsProps {
   scope: 'tutor' | 'admin'
   onView: () => void
   onEdit?: () => void
+  onPromote?: () => void
   onDelete?: () => void
 }
 
@@ -66,6 +69,7 @@ function StudentRowActions({
   scope,
   onView,
   onEdit,
+  onPromote,
   onDelete,
 }: StudentRowActionsProps) {
   return (
@@ -78,6 +82,12 @@ function StudentRowActions({
         <ActionMenuItem onSelect={onEdit}>
           <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
           Edit
+        </ActionMenuItem>
+      )}
+      {onPromote && (
+        <ActionMenuItem onSelect={onPromote}>
+          <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+          Promote
         </ActionMenuItem>
       )}
       {scope === 'admin' && (
@@ -101,6 +111,7 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
     useCurriculum()
   const { confirm } = useConfirmModal()
   const { centers, activeCenterId, isAllBranches, ensureLoaded: ensureCentersLoaded } = useCenters()
+  const { years, activeYearId, activeYear, setActiveYearId } = useAcademicYears()
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -108,6 +119,15 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
   const [studentTracking, setStudentTracking] = useState<StudentTracking | null>(null)
   const [trackingLoading, setTrackingLoading] = useState(false)
   const [trackingError, setTrackingError] = useState<string | null>(null)
+  const [enrollments, setEnrollments] = useState<StudentEnrollment[]>([])
+  const [promotingStudent, setPromotingStudent] = useState<StudentMasterProfile | null>(null)
+  const [promoteYearId, setPromoteYearId] = useState('')
+  const [promoteBoard, setPromoteBoard] = useState('')
+  const [promoteGrade, setPromoteGrade] = useState('')
+  const [promoteBatchId, setPromoteBatchId] = useState('')
+  const [promoteCenterId, setPromoteCenterId] = useState('')
+  const [promotePriorStatus, setPromotePriorStatus] = useState<'completed' | 'detained' | 'transferred' | 'dropped' | 'graduated'>('completed')
+  const [promoteBusy, setPromoteBusy] = useState(false)
   const [reviewRequest, setReviewRequest] = useState<AssessmentAccessRequest | null>(null)
   const [exporting, setExporting] = useState(false)
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
@@ -152,7 +172,7 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, effectiveCenter])
+  }, [debouncedSearch, effectiveCenter, activeYearId])
 
   const loadStudents = useCallback(async () => {
     setLoading(true)
@@ -163,6 +183,7 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
         limit,
         search: debouncedSearch || undefined,
         center: effectiveCenter,
+        academicYearId: activeYearId,
       })
       setList(data.items)
       setTotal(data.total)
@@ -178,7 +199,7 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
     } finally {
       setLoading(false)
     }
-  }, [page, limit, debouncedSearch, effectiveCenter])
+  }, [page, limit, debouncedSearch, effectiveCenter, activeYearId])
 
   useEffect(() => {
     void loadStudents()
@@ -189,14 +210,21 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
       setStudentTracking(null)
       setTrackingLoading(false)
       setTrackingError(null)
+      setEnrollments([])
       return
     }
     let cancelled = false
     setTrackingLoading(true)
     setTrackingError(null)
-    void fetchStudentTracking(viewingStudent.id)
-      .then((data) => {
-        if (!cancelled) setStudentTracking(data)
+    void Promise.all([
+      fetchStudentTracking(viewingStudent.id),
+      academicYearsApi.listEnrollments(viewingStudent.id),
+    ])
+      .then(([tracking, history]) => {
+        if (!cancelled) {
+          setStudentTracking(tracking)
+          setEnrollments(history)
+        }
       })
       .catch((e) => {
         if (!cancelled) {
@@ -232,6 +260,7 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
         limit,
         search: debouncedSearch || undefined,
         center: effectiveCenter,
+        academicYearId: activeYearId,
       }),
     ])
     setStudentTracking(tracking)
@@ -266,7 +295,8 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
         grade: `Grade ${String(form.get('grade') || '8')}`,
         batchId: String(form.get('batchId') || formBatch),
         centerId: String(form.get('centerId') || formCenter),
-        academicYear: String(form.get('academicYear') || '2025-26'),
+        academicYear: activeYear?.name || '2025-26',
+        academicYearId: activeYearId,
         phone: formPhone.trim(),
         password: formPassword.trim() || undefined,
         schoolName: String(form.get('schoolName') || '') || undefined,
@@ -443,10 +473,20 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
               }))}
               placeholder="Select branch"
             />
-            <label className="block">
-              <span className="text-xs text-muted-foreground">Academic year *</span>
-              <input name="academicYear" defaultValue="2025-26" className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background" />
-            </label>
+            <AppDropdown
+              label="Academic year *"
+              value={activeYearId ?? years[0]?.id ?? ''}
+              onChange={(id) => {
+                // Keep create form aligned with header year selection.
+                if (id) setActiveYearId(id)
+              }}
+              options={years.map((y) => ({
+                value: y.id,
+                label: y.name,
+                description: y.isCurrent ? 'Current year' : undefined,
+              }))}
+              placeholder="Select academic year"
+            />
             <label className="block md:col-span-2">
               <span className="text-xs text-muted-foreground">School name</span>
               <input name="schoolName" className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background" />
@@ -537,6 +577,19 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
                           scope={scope}
                           onView={() => setViewingStudent(s)}
                           onEdit={scope === 'admin' ? () => startEdit(s) : undefined}
+                          onPromote={() => {
+                            setPromotingStudent(s)
+                            const nextYear =
+                              years.find((y) => !y.isCurrent && y.name > (s.academicYear || '')) ??
+                              years.find((y) => y.id !== activeYearId) ??
+                              years[0]
+                            setPromoteYearId(nextYear?.id ?? '')
+                            setPromoteBoard(s.board)
+                            setPromoteGrade(s.grade)
+                            setPromoteBatchId(s.batchIds?.[0] ?? '')
+                            setPromoteCenterId(s.centerId || '')
+                            setPromotePriorStatus('completed')
+                          }}
                           onDelete={
                             scope === 'admin'
                               ? () => void handleDeleteStudent(s.id, s.name)
@@ -607,6 +660,7 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
             batchLabel={batchLabels(viewingStudent, tutorBatches)}
             centerLabel={centerName(viewingStudent.centerId, centers)}
             scope={scope}
+            enrollments={enrollments}
             onReviewRequest={(req) =>
               setReviewRequest({
                 id: req.id,
@@ -766,6 +820,131 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
         onImport={bulkImportStudents}
         onComplete={() => void loadStudents()}
       />
+
+      <AppModal
+        open={promotingStudent != null}
+        onClose={() => setPromotingStudent(null)}
+        title="Promote student"
+        description={
+          promotingStudent
+            ? `${promotingStudent.name} · ${promotingStudent.academicYear} · ${promotingStudent.grade}`
+            : undefined
+        }
+        footer={
+          <div className="flex justify-end gap-2 w-full">
+            <button
+              type="button"
+              className="text-sm px-4 py-2 rounded-md border border-border"
+              onClick={() => setPromotingStudent(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={promoteBusy || !promoteYearId || !promoteBoard || !promoteGrade}
+              className="text-sm px-4 py-2 rounded-md bg-accent text-accent-foreground disabled:opacity-50"
+              onClick={() => {
+                if (!promotingStudent) return
+                void (async () => {
+                  setPromoteBusy(true)
+                  try {
+                    await academicYearsApi.promote(promotingStudent.id, {
+                      academicYearId: promoteYearId,
+                      board: promoteBoard,
+                      grade: promoteGrade.startsWith('Grade')
+                        ? promoteGrade
+                        : `Grade ${promoteGrade}`,
+                      batchId: promoteBatchId || null,
+                      centerId: promoteCenterId || null,
+                      priorStatus: promotePriorStatus,
+                    })
+                    setPromotingStudent(null)
+                    await refreshAfterMutation()
+                  } catch (e) {
+                    setFetchError(e instanceof Error ? e.message : 'Promotion failed')
+                  } finally {
+                    setPromoteBusy(false)
+                  }
+                })()
+              }}
+            >
+              {promoteBusy ? 'Promoting…' : 'Promote'}
+            </button>
+          </div>
+        }
+      >
+        {promotingStudent && (
+          <div className="space-y-3">
+            <AppDropdown
+              label="New academic year"
+              value={promoteYearId}
+              onChange={setPromoteYearId}
+              options={years.map((y) => ({
+                value: y.id,
+                label: `${y.name}${y.isCurrent ? ' (current)' : ''}`,
+              }))}
+              placeholder="Select year"
+            />
+            <AppDropdown
+              label="Board"
+              value={promoteBoard}
+              onChange={setPromoteBoard}
+              options={boards.map((b) => ({ value: b, label: b }))}
+            />
+            <AppDropdown
+              label="Grade"
+              value={promoteGrade.replace(/^Grade\s+/i, '') || promoteGrade}
+              onChange={setPromoteGrade}
+              options={[
+                { value: '8', label: 'Grade 8' },
+                { value: '9', label: 'Grade 9' },
+                { value: '10', label: 'Grade 10' },
+                { value: '11', label: 'Grade 11' },
+                { value: '12', label: 'Grade 12' },
+              ]}
+              placeholder="Select grade"
+            />
+            <AppDropdown
+              label="Batch"
+              value={promoteBatchId}
+              onChange={setPromoteBatchId}
+              options={[
+                { value: '', label: 'No batch' },
+                ...tutorBatches.map((b) => ({
+                  value: b.id,
+                  label: b.name,
+                  description: `${b.board} · ${b.grade}`,
+                })),
+              ]}
+            />
+            <AppDropdown
+              label="Center"
+              value={promoteCenterId}
+              onChange={setPromoteCenterId}
+              options={centers.map((c) => ({
+                value: c.id,
+                label: formatCenterLabel(c),
+              }))}
+            />
+            <AppDropdown
+              label="Close prior enrollment as"
+              value={promotePriorStatus}
+              onChange={(v) =>
+                setPromotePriorStatus(
+                  v as 'completed' | 'detained' | 'transferred' | 'dropped' | 'graduated',
+                )
+              }
+              options={[
+                { value: 'completed', label: 'Completed (promoted)' },
+                { value: 'detained', label: 'Detained' },
+                { value: 'transferred', label: 'Transferred' },
+                { value: 'dropped', label: 'Dropped' },
+                { value: 'graduated', label: 'Graduated' },
+              ]}
+            />
+          </div>
+        )}
+      </AppModal>
     </div>
   )
 }

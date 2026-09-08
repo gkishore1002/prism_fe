@@ -32,6 +32,8 @@ export interface UseExamProctoringResult {
   maxViolations: number
   requireFullscreen: boolean
   resumeExamFocus: () => Promise<void>
+  /** Call before intentional leave / submit so exiting fullscreen is not counted as a violation. */
+  disarmProctoring: () => void
 }
 
 export function useExamProctoring({
@@ -49,6 +51,7 @@ export function useExamProctoring({
   const requireFullscreen = isFullscreenApiAvailable()
 
   const leftExamRef = useRef(false)
+  const disarmedRef = useRef(false)
   const lastViolationAtRef = useRef(0)
   const lastViolationTypeRef = useRef<ExamViolationType | null>(null)
   const reportingRef = useRef(false)
@@ -66,9 +69,23 @@ export function useExamProctoring({
     lastActivityRef.current = Date.now()
   }, [])
 
+  const disarmProctoring = useCallback(() => {
+    disarmedRef.current = true
+    leftExamRef.current = false
+    onSecureLockRef.current(false)
+  }, [])
+
   const reportViolation = useCallback(
     async (type: ExamViolationType) => {
-      if (!enabled || !assessmentId || !isApiEnabled() || terminatedRef.current) return
+      if (
+        !enabled ||
+        disarmedRef.current ||
+        !assessmentId ||
+        !isApiEnabled() ||
+        terminatedRef.current
+      ) {
+        return
+      }
       const now = Date.now()
       const focusTypes = type === 'WINDOW_BLUR' || type === 'TAB_SWITCH'
       const lastFocus =
@@ -124,6 +141,8 @@ export function useExamProctoring({
       setSessionError(null)
       return
     }
+    disarmedRef.current = false
+    terminatedRef.current = false
     if (!isApiEnabled()) {
       setSessionReady(true)
       setSessionError(null)
@@ -279,5 +298,6 @@ export function useExamProctoring({
     maxViolations,
     requireFullscreen,
     resumeExamFocus,
+    disarmProctoring,
   }
 }

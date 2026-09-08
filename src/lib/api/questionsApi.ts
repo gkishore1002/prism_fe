@@ -51,6 +51,11 @@ export type ManualQuestionInput = {
   optionC?: string
   optionD?: string
   correctAnswer?: string
+  textImageKey?: string
+  optionAImageKey?: string
+  optionBImageKey?: string
+  optionCImageKey?: string
+  optionDImageKey?: string
 }
 
 function manualInputToCreateBody(input: ManualQuestionInput) {
@@ -70,6 +75,11 @@ function manualInputToCreateBody(input: ManualQuestionInput) {
     optionC: isMcq ? input.optionC : undefined,
     optionD: isMcq ? input.optionD : undefined,
     correctAnswer: isMcq ? input.correctAnswer : undefined,
+    textImageKey: input.textImageKey,
+    optionAImageKey: isMcq ? input.optionAImageKey : undefined,
+    optionBImageKey: isMcq ? input.optionBImageKey : undefined,
+    optionCImageKey: isMcq ? input.optionCImageKey : undefined,
+    optionDImageKey: isMcq ? input.optionDImageKey : undefined,
   }
 }
 
@@ -85,6 +95,8 @@ function mapUploadQuestionType(
 function uploadRowToCreateBody(row: QuestionUploadRow) {
   const questionType = mapUploadQuestionType(row.questionType)
   const isMcq = questionType === 'mcq'
+  const hasA = Boolean(row.optionA?.trim() || row.optionAImageKey)
+  const hasB = Boolean(row.optionB?.trim() || row.optionBImageKey)
   return {
     board: row.board,
     grade: normalizeGrade(row.grade),
@@ -95,11 +107,17 @@ function uploadRowToCreateBody(row: QuestionUploadRow) {
     difficulty: normalizeDifficulty(row.difficulty),
     marks: row.marks,
     questionType,
-    optionA: row.optionA ?? (isMcq ? 'Option A' : undefined),
-    optionB: row.optionB ?? (isMcq ? 'Option B' : undefined),
-    optionC: row.optionC ?? (isMcq ? 'Option C' : undefined),
-    optionD: row.optionD ?? (isMcq ? 'Option D' : undefined),
+    optionA: row.optionA ?? (isMcq && !row.optionAImageKey ? 'Option A' : undefined),
+    optionB: row.optionB ?? (isMcq && !row.optionBImageKey ? 'Option B' : undefined),
+    optionC: row.optionC ?? undefined,
+    optionD: row.optionD ?? undefined,
     correctAnswer: row.correctAnswer ?? (isMcq ? 'A' : undefined),
+    textImageKey: row.textImageKey,
+    optionAImageKey: isMcq ? row.optionAImageKey : undefined,
+    optionBImageKey: isMcq ? row.optionBImageKey : undefined,
+    optionCImageKey: isMcq ? row.optionCImageKey : undefined,
+    optionDImageKey: isMcq ? row.optionDImageKey : undefined,
+    ...(isMcq && (!hasA || !hasB) ? {} : {}),
   }
 }
 
@@ -198,9 +216,32 @@ export async function createPaperFromUpload(
   if (valid.length === 0) {
     throw new Error('No valid questions to save. Fix errors and re-upload.')
   }
+
+  const { uploadQuestionMediaBlob } = await import('@/lib/api/questionMediaApi')
+
+  const prepared: QuestionUploadRow[] = []
+  for (const row of valid) {
+    const next = { ...row }
+    const pairs: Array<[keyof QuestionUploadRow, keyof QuestionUploadRow, string]> = [
+      ['textImageBlob', 'textImageKey', 'stem.jpg'],
+      ['optionAImageBlob', 'optionAImageKey', 'option-a.jpg'],
+      ['optionBImageBlob', 'optionBImageKey', 'option-b.jpg'],
+      ['optionCImageBlob', 'optionCImageKey', 'option-c.jpg'],
+      ['optionDImageBlob', 'optionDImageKey', 'option-d.jpg'],
+    ]
+    for (const [blobKey, keyField, filename] of pairs) {
+      const blob = next[blobKey] as Blob | undefined
+      if (blob && !next[keyField]) {
+        const uploaded = await uploadQuestionMediaBlob(blob, filename)
+        ;(next as Record<string, unknown>)[keyField] = uploaded.key
+      }
+    }
+    prepared.push(next)
+  }
+
   return createPaperBulk(
     name,
-    valid.map((row) => uploadRowToCreateBody(row)),
+    prepared.map((row) => uploadRowToCreateBody(row)),
     'upload',
   )
 }

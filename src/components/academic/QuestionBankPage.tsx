@@ -15,8 +15,10 @@ import { QuestionUploadWorkflow } from '@/components/academic/QuestionUploadWork
 import { SyllabusBooksPanel } from '@/components/academic/SyllabusBooksPanel'
 import { ManualQuestionEntry } from '@/components/academic/ManualQuestionEntry'
 import { EmptyState } from '@/components/design/InsightCard'
+import { Pagination } from '@/components/ui/Pagination'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
 import { useAuth } from '@/hooks/useAuth'
+import { DEFAULT_PAGE_LIMIT } from '@/lib/pagination'
 import { topicCounts, totalMarksForQuestions } from '@/lib/questionPaperUtils'
 import { cn } from '@/lib/cn'
 import { useConfirmModal } from '@/components/ui/AppModal'
@@ -50,9 +52,21 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
   const [customName, setCustomName] = useState('')
   const [customSelectedTopics, setCustomSelectedTopics] = useState<string[]>([])
   const [customQuestionIds, setCustomQuestionIds] = useState<string[]>([])
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT)
 
   const paperPreviewBase =
     role === 'tutor' ? '/tutor/question-bank/papers' : '/admin/question-bank/papers'
+
+  const libraryPages = Math.max(1, Math.ceil(questionPapers.length / limit))
+  const pagedPapers = useMemo(() => {
+    const start = (page - 1) * limit
+    return questionPapers.slice(start, start + limit)
+  }, [questionPapers, page, limit])
+
+  useEffect(() => {
+    if (page > libraryPages) setPage(libraryPages)
+  }, [page, libraryPages])
 
   const customParent = customPaperId ? questionPapers.find((p) => p.id === customPaperId) : undefined
 
@@ -208,11 +222,19 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
               description="Create manually or import Excel / JSON to publish your first assessment-ready paper."
               action={
                 !readOnly ? (
-                  <div className="flex gap-2">
-                    <button type="button" className="btn btn-secondary text-sm" onClick={() => setTab('create')}>
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      className="btn btn-secondary shrink-0"
+                      onClick={() => setTab('create')}
+                    >
                       Create
                     </button>
-                    <button type="button" className="btn btn-primary text-sm" onClick={() => setTab('import')}>
+                    <button
+                      type="button"
+                      className="btn btn-primary shrink-0"
+                      onClick={() => setTab('import')}
+                    >
                       Import
                     </button>
                   </div>
@@ -235,7 +257,7 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {questionPapers.map((paper) => {
+                    {pagedPapers.map((paper) => {
                       const counts = topicCounts(paper, questions)
                       const showCustom = customPaperId === paper.id
                       return (
@@ -395,7 +417,7 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                                   <button
                                     type="submit"
                                     disabled={customQuestionIds.length === 0}
-                                    className="btn btn-primary text-sm disabled:opacity-40"
+                                    className="btn btn-primary disabled:opacity-40"
                                   >
                                     Publish custom paper
                                   </button>
@@ -408,6 +430,20 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                     })}
                   </tbody>
                 </table>
+              </div>
+              <div className="px-4 sm:px-5 pb-4">
+                <Pagination
+                  page={page}
+                  pages={libraryPages}
+                  total={questionPapers.length}
+                  limit={limit}
+                  itemLabel="papers"
+                  onPageChange={setPage}
+                  onLimitChange={(next) => {
+                    setLimit(next)
+                    setPage(1)
+                  }}
+                />
               </div>
             </AppCard>
           )}

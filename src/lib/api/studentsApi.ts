@@ -26,6 +26,7 @@ export interface StudentMasterQuery {
   board?: string
   grade?: string
   batch?: string
+  academicYearId?: string
 }
 
 export interface StudentSummaryQuery {
@@ -36,6 +37,7 @@ export interface StudentSummaryQuery {
   board?: string
   grade?: string
   batch?: string
+  academicYearId?: string
 }
 
 function buildQuery(params: Record<string, string | number | undefined>): string {
@@ -79,6 +81,7 @@ export async function fetchStudentsMasterPaginated(
       board: query.board,
       grade: query.grade,
       batch: query.batch,
+      academic_year_id: query.academicYearId,
     })}`,
   )
   return { ...data, items: data.items.map(mapMasterRow) }
@@ -89,9 +92,12 @@ export async function fetchStudentMaster(studentId: string): Promise<StudentMast
   return mapMasterRow(row)
 }
 
-export async function fetchStudentsMasterStats(center?: string): Promise<StudentMasterStats> {
+export async function fetchStudentsMasterStats(
+  center?: string,
+  academicYearId?: string,
+): Promise<StudentMasterStats> {
   return apiFetch<StudentMasterStats>(
-    `/students/master/stats${buildQuery({ center })}`,
+    `/students/master/stats${buildQuery({ center, academic_year_id: academicYearId })}`,
   )
 }
 
@@ -107,6 +113,7 @@ export async function fetchStudentsPaginated(
       board: query.board,
       grade: query.grade,
       batch: query.batch,
+      academic_year_id: query.academicYearId,
     })}`,
   )
   return { ...data, items: data.items.map(mapStudent) }

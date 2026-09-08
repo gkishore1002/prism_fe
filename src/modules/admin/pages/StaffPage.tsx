@@ -11,12 +11,16 @@ import { useCenters } from '@/hooks/useCenters'
 import { useAuth } from '@/hooks/useAuth'
 import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
+import { useAcademicYears } from '@/hooks/useAcademicYears'
 import type { TeacherRow } from '@/lib/api/analyticsApi'
 import {
   createStaff,
   fetchStaff,
   updateStaff,
+  listStaffAssignments,
+  upsertStaffAssignment,
   type StaffMember,
+  type StaffAssignment,
 } from '@/lib/api/staffApi'
 import { formatCenterLabel } from '@/lib/centerLabel'
 import { isValidPhone, phoneToLoginEmail, resolvePassword } from '@/lib/phoneAuth'
@@ -62,6 +66,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const { user, refreshAuth } = useAuth()
   const { organizationScoped } = useAdminPortalContext()
   const { centers, isPlatformSuperUser, ensureLoaded, refresh: refreshCenters, activeCenterId, isAllBranches } = useCenters()
+  const { activeYearId, activeYear } = useAcademicYears()
   const { teachers, loading: analyticsLoading, refresh } = useAnalytics()
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -77,6 +82,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const [isBranchAdmin, setIsBranchAdmin] = useState(false)
   const [isTutor, setIsTutor] = useState(true)
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
+  const [assignmentCenterId, setAssignmentCenterId] = useState('')
 
   const [editOpen, setEditOpen] = useState(false)
   const [editMember, setEditMember] = useState<StaffMember | null>(null)
@@ -86,10 +92,14 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const [editIsBranchAdmin, setEditIsBranchAdmin] = useState(false)
   const [editIsTutor, setEditIsTutor] = useState(false)
   const [editBranches, setEditBranches] = useState<string[]>([])
+  const [editAssignmentCenterId, setEditAssignmentCenterId] = useState('')
+  const [editAssignmentStatus, setEditAssignmentStatus] = useState('active')
   const [editError, setEditError] = useState<string | null>(null)
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [viewingProfile, setViewingProfile] = useState<StaffMember | null>(null)
+  const [assignmentHistory, setAssignmentHistory] = useState<StaffAssignment[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   const branchCenterId = isAllBranches ? undefined : activeCenterId
 
@@ -97,20 +107,41 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
     setLoading(true)
     setError(null)
     try {
-      setStaff(await fetchStaff(branchCenterId))
+      setStaff(await fetchStaff(branchCenterId, activeYearId))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load staff')
       setStaff([])
     } finally {
       setLoading(false)
     }
-  }, [branchCenterId])
+  }, [branchCenterId, activeYearId])
 
   useEffect(() => {
     void ensureLoaded()
     void load()
   }, [ensureLoaded, load])
 
+  useEffect(() => {
+    if (!viewingProfile) {
+      setAssignmentHistory([])
+      return
+    }
+    let cancelled = false
+    setHistoryLoading(true)
+    void listStaffAssignments(viewingProfile.id)
+      .then((rows) => {
+        if (!cancelled) setAssignmentHistory(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setAssignmentHistory([])
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [viewingProfile])
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 300)
     return () => window.clearTimeout(timer)
@@ -145,6 +176,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
     setIsBranchAdmin(false)
     setIsTutor(true)
     setSelectedBranches([])
+    setAssignmentCenterId('')
   }
 
   async function handleCreate(e: FormEvent) {
@@ -152,6 +184,13 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
     if (!name.trim() || !isValidPhone(phone)) return
     if (!isTutor && !isBranchAdmin && !isOwner) {
       setError('Select at least one role.')
+      return
+    }
+    const yearCenter =
+      assignmentCenterId ||
+      (showBranchPicker && selectedBranches.length > 0 ? selectedBranches[0] : '')
+    if (!yearCenter) {
+      setError('Select a center for this academic year’s assignment.')
       return
     }
     setSaving(true)
@@ -164,7 +203,9 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
         isOwner: canPromoteOrgOwner ? isOwner : false,
         isBranchAdmin: isBranchAdmin || (canPromoteOrgOwner && isOwner),
         isTutor,
-        centerIds: showBranchPicker ? selectedBranches : undefined,
+        centerIds: showBranchPicker ? selectedBranches : [yearCenter],
+        academicYearId: activeYearId,
+        assignmentCenterId: yearCenter,
       })
       resetCreateForm()
       setShowAddForm(false)
@@ -184,6 +225,8 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
     setEditIsBranchAdmin(member.roles.includes('admin'))
     setEditIsTutor(member.roles.includes('tutor'))
     setEditBranches(member.centerIds)
+    setEditAssignmentCenterId(member.assignmentCenterId ?? member.centerIds[0] ?? '')
+    setEditAssignmentStatus(member.assignmentStatus ?? 'active')
     setEditError(null)
     setEditOpen(true)
   }
@@ -192,6 +235,10 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
     if (!editMember) return
     if (!editIsTutor && !editIsBranchAdmin && !editIsOwner) {
       setEditError('Select at least one role.')
+      return
+    }
+    if (!editAssignmentCenterId) {
+      setEditError('Select a center for this academic year’s assignment.')
       return
     }
     setSaving(true)
@@ -212,6 +259,12 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
             }),
         ...(canAssignBranches && editShowBranchPicker ? { centerIds: editBranches } : {}),
       })
+      if (activeYearId && editAssignmentCenterId) {
+        await upsertStaffAssignment(editMember.id, activeYearId, {
+          centerId: editAssignmentCenterId,
+          status: editAssignmentStatus || 'active',
+        })
+      }
       const editedSelf = editMember.id === user.id
       setEditOpen(false)
       setEditMember(null)
@@ -242,8 +295,8 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
             isPlatformSuperUser
               ? 'Manage organization owners, branch admins, and tutors in one place.'
               : organizationScoped
-                ? 'Manage organization owners, branch admins, and tutors. Assign roles and branch access across the organization.'
-                : 'Add tutors and branch admins within your assigned branches. Switch to Organization Admin to manage organization owners.'
+                ? `Manage staff accounts and portal access. Academic placement follows the header year${activeYear ? ` (${activeYear.name})` : ''}.`
+                : `Add tutors and branch admins within your assigned branches. List is filtered by academic year${activeYear ? ` (${activeYear.name})` : ''}.`
           }
         />
       )}
@@ -356,9 +409,9 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
 
             {showBranchPicker && (
               <fieldset className="sm:col-span-2">
-                <legend className="text-xs text-muted-foreground mb-2">Branch access</legend>
+                <legend className="text-xs text-muted-foreground mb-2">Portal branch access</legend>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Scopes admin and tutor work. Organization owners ignore this when using the Organization Admin portal.
+                  Which centers this login can open. Separate from academic placement for the year.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {centers.map((c) => (
@@ -382,6 +435,28 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
               </fieldset>
             )}
 
+            <label className="block sm:col-span-2">
+              <span className="text-xs text-muted-foreground">
+                Academic placement{activeYear ? ` · ${activeYear.name}` : ''}
+              </span>
+              <select
+                value={assignmentCenterId}
+                onChange={(e) => setAssignmentCenterId(e.target.value)}
+                required
+                className={inputClass}
+              >
+                <option value="">Select center for this year</option>
+                {centers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {formatCenterLabel(c)}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Where this staff member is assigned academically for the selected year. Portal access can include more
+                centers.
+              </p>
+            </label>
             {isValidPhone(phone) && (
               <p className="sm:col-span-2 text-xs text-muted-foreground">
                 Login: <span className="font-medium text-foreground">{phoneToLoginEmail(phone)}</span> · Password:{' '}
@@ -412,15 +487,24 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
         )}
 
         {filteredStaff.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">{debouncedSearch ? 'No staff found.' : 'No staff yet.'}</p>
+          <p className="text-sm text-muted-foreground py-4">
+            {debouncedSearch
+              ? 'No staff found.'
+              : activeYear
+                ? `No staff assigned for ${activeYear.name} yet. Add staff or set this year’s placement.`
+                : 'No staff yet.'}
+          </p>
         ) : (
-          <ResponsiveTable minWidth={520}>
+          <ResponsiveTable minWidth={620}>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground border-b border-border">
                   <th className="pb-3 font-medium">Staff</th>
                   <th className="pb-3 font-medium">Role</th>
-                  <th className="pb-3 font-medium">Branches</th>
+                  <th className="pb-3 font-medium">
+                    {activeYear ? `${activeYear.name} center` : 'Year center'}
+                  </th>
+                  <th className="pb-3 font-medium">Portal branches</th>
                   <th className="pb-3 font-medium text-right w-16">Actions</th>
                 </tr>
               </thead>
@@ -435,6 +519,21 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
                       </p>
                     </td>
                     <td className="py-3 text-muted-foreground text-xs">{staffRoleSummary(member)}</td>
+                    <td className="py-3 text-muted-foreground text-xs">
+                      {member.assignmentCenterId
+                        ? formatCenterLabel(
+                            centers.find((c) => c.id === member.assignmentCenterId) ?? {
+                              name: member.assignmentCenterId,
+                              city: '',
+                            },
+                          )
+                        : '—'}
+                      {member.assignmentStatus && member.assignmentStatus !== 'active' ? (
+                        <span className="ml-1 text-[10px] uppercase tracking-wide">
+                          ({member.assignmentStatus})
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="py-3 text-muted-foreground text-xs">
                       {member.isOwner
                         ? 'All (owner)'
@@ -567,7 +666,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
               {/* Branches */}
               {!viewingProfile.isOwner && viewingProfile.centerIds.length > 0 && (
                 <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Branch access</p>
+                  <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Portal branch access</p>
                   <div className="flex flex-wrap gap-2">
                     {viewingProfile.centerIds.map((id) => {
                       const center = centers.find((c) => c.id === id)
@@ -581,6 +680,38 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
                 </div>
               )}
 
+              <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">
+                  Academic year placements
+                </p>
+                {historyLoading ? (
+                  <p className="text-xs text-muted-foreground">Loading history…</p>
+                ) : assignmentHistory.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No year assignments yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {assignmentHistory.map((row) => (
+                      <li
+                        key={row.id}
+                        className="flex flex-wrap items-center justify-between gap-2 text-sm border-b border-border/60 last:border-0 pb-2 last:pb-0"
+                      >
+                        <span className="font-medium text-foreground">
+                          {row.academicYearName || row.academicYearId}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatCenterLabel(
+                            centers.find((c) => c.id === row.centerId) ?? {
+                              name: row.centerId,
+                              city: '',
+                            },
+                          )}{' '}
+                          · {row.status}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               {/* Tutor analytics if available */}
               {tutorStats && (
                 <>
@@ -702,7 +833,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
 
               {editShowBranchPicker && (
                 <fieldset>
-                  <legend className="text-xs text-muted-foreground mb-2">Branch access</legend>
+                  <legend className="text-xs text-muted-foreground mb-2">Portal branch access</legend>
                   <p className="text-xs text-muted-foreground mb-2">
                     Used when signing in as Branch Admin or Tutor. Organization Admin portal always sees all branches.
                   </p>
@@ -729,7 +860,6 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
               )}
             </>
           )}
-
           {!canManageStaffRoles && (
             <fieldset>
               <legend className="text-xs text-muted-foreground mb-2">Roles</legend>
@@ -752,7 +882,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
 
           {!canManageStaffRoles && !editIsOwner && (
             <fieldset>
-              <legend className="text-xs text-muted-foreground mb-2">Branch access</legend>
+              <legend className="text-xs text-muted-foreground mb-2">Portal branch access</legend>
               <div className="flex flex-wrap gap-2">
                 {centers.map((c) => (
                   <label
@@ -774,6 +904,44 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
               </div>
             </fieldset>
           )}
+
+          <fieldset>
+            <legend className="text-xs text-muted-foreground mb-2">
+              Academic placement{activeYear ? ` · ${activeYear.name}` : ''}
+            </legend>
+            <p className="text-xs text-muted-foreground mb-2">
+              Center for the selected academic year only. Does not change prior years or portal access.
+            </p>
+            <label className="block mb-3">
+              <span className="text-xs text-muted-foreground">Center</span>
+              <select
+                value={editAssignmentCenterId}
+                onChange={(e) => setEditAssignmentCenterId(e.target.value)}
+                required
+                className={inputClass}
+              >
+                <option value="">Select center</option>
+                {centers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {formatCenterLabel(c)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs text-muted-foreground">Status</span>
+              <select
+                value={editAssignmentStatus}
+                onChange={(e) => setEditAssignmentStatus(e.target.value)}
+                className={inputClass}
+              >
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="transferred">Transferred</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </label>
+          </fieldset>
 
         </form>
       </AppModal>

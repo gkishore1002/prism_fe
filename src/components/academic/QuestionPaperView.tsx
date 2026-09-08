@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Download, Printer, Trash2 } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
+import { AuthImage } from '@/components/ui/AuthImage'
 import { useAssessments } from '@/hooks/useAssessments'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
 import { fetchAssessment } from '@/lib/api/assessmentsApi'
@@ -9,11 +10,27 @@ import type { QuestionBankEntry, TutorAssessmentSchedule } from '@/types'
 
 function renderOptions(q: QuestionBankEntry) {
   const opts = [
-    q.optionA && { key: 'A', label: q.optionA },
-    q.optionB && { key: 'B', label: q.optionB },
-    q.optionC && { key: 'C', label: q.optionC },
-    q.optionD && { key: 'D', label: q.optionD },
-  ].filter(Boolean) as { key: string; label: string }[]
+    (q.optionA || q.optionAImageUrl) && {
+      key: 'A',
+      label: q.optionA,
+      imageUrl: q.optionAImageUrl,
+    },
+    (q.optionB || q.optionBImageUrl) && {
+      key: 'B',
+      label: q.optionB,
+      imageUrl: q.optionBImageUrl,
+    },
+    (q.optionC || q.optionCImageUrl) && {
+      key: 'C',
+      label: q.optionC,
+      imageUrl: q.optionCImageUrl,
+    },
+    (q.optionD || q.optionDImageUrl) && {
+      key: 'D',
+      label: q.optionD,
+      imageUrl: q.optionDImageUrl,
+    },
+  ].filter(Boolean) as { key: string; label?: string; imageUrl?: string }[]
 
   if (opts.length === 0) {
     return (
@@ -24,9 +41,10 @@ function renderOptions(q: QuestionBankEntry) {
   return (
     <div className="mt-3 grid sm:grid-cols-2 gap-2">
       {opts.map((opt) => (
-        <div key={opt.key} className="text-sm px-3 py-2 rounded-md border border-border">
+        <div key={opt.key} className="text-sm px-3 py-2 rounded-md border border-border space-y-2">
           <span className="font-mono-data text-xs text-muted-foreground mr-2">{opt.key}.</span>
           {opt.label}
+          {opt.imageUrl && <AuthImage mediaPath={opt.imageUrl} className="max-h-40 mt-1" />}
         </div>
       ))}
     </div>
@@ -177,8 +195,16 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
             {questions.map((q, idx) => (
               <div key={q.id} className="pb-6 border-b border-border last:border-0">
                 <div className="flex items-baseline justify-between gap-4 mb-2">
-                  <div className="text-sm font-medium">
-                    Q{idx + 1}. <span className="font-normal text-foreground">{q.text}</span>
+                  <div className="text-sm font-medium space-y-2">
+                    <div>
+                      Q{idx + 1}.{' '}
+                      {q.text && q.text !== '(image)' && (
+                        <span className="font-normal text-foreground">{q.text}</span>
+                      )}
+                    </div>
+                    {q.textImageUrl && (
+                      <AuthImage mediaPath={q.textImageUrl} className="max-h-64" alt={`Question ${idx + 1}`} />
+                    )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="font-mono-data text-xs text-muted-foreground">

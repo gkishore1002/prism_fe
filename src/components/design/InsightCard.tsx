@@ -114,7 +114,11 @@ export function EmptyState({
       <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
         {description}
       </p>
-      {action && <div className="mt-5 flex justify-center">{action}</div>}
+      {action && (
+        <div className="mt-5 flex flex-wrap justify-center items-center gap-3">
+          {action}
+        </div>
+      )}
     </motion.div>
   )
 }

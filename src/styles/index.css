@@ -666,8 +666,9 @@
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center font-display font-medium rounded-[8px];
+    @apply inline-flex items-center justify-center font-display font-medium rounded-[8px] px-4 py-2 gap-1.5 whitespace-nowrap;
     font-size: 12px;
+    min-height: 2.25rem;
     transition: all 0.15s ease;
     @apply focus-visible:outline-none disabled:opacity-40 disabled:pointer-events-none;
   }

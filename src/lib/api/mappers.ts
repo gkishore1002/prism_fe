@@ -122,6 +122,16 @@ export interface ApiQuestion {
   optionC?: string | null
   optionD?: string | null
   correctAnswer?: string | null
+  textImageKey?: string | null
+  optionAImageKey?: string | null
+  optionBImageKey?: string | null
+  optionCImageKey?: string | null
+  optionDImageKey?: string | null
+  textImageUrl?: string | null
+  optionAImageUrl?: string | null
+  optionBImageUrl?: string | null
+  optionCImageUrl?: string | null
+  optionDImageUrl?: string | null
 }
 
 export function mapQuestion(q: ApiQuestion): QuestionBankEntry {
@@ -142,6 +152,16 @@ export function mapQuestion(q: ApiQuestion): QuestionBankEntry {
     optionC: q.optionC ?? undefined,
     optionD: q.optionD ?? undefined,
     correctAnswer: q.correctAnswer ?? undefined,
+    textImageKey: q.textImageKey ?? undefined,
+    optionAImageKey: q.optionAImageKey ?? undefined,
+    optionBImageKey: q.optionBImageKey ?? undefined,
+    optionCImageKey: q.optionCImageKey ?? undefined,
+    optionDImageKey: q.optionDImageKey ?? undefined,
+    textImageUrl: q.textImageUrl ?? undefined,
+    optionAImageUrl: q.optionAImageUrl ?? undefined,
+    optionBImageUrl: q.optionBImageUrl ?? undefined,
+    optionCImageUrl: q.optionCImageUrl ?? undefined,
+    optionDImageUrl: q.optionDImageUrl ?? undefined,
   }
 }
 
@@ -209,6 +229,7 @@ export interface ApiAssessment {
   timingOver?: boolean
   accessRequestStatus?: TutorAssessmentSchedule['accessRequestStatus']
   canAttend?: boolean
+  createdAt?: string
 }
 
 export function mapAssessment(a: ApiAssessment): TutorAssessmentSchedule {
@@ -242,6 +263,7 @@ export function mapAssessment(a: ApiAssessment): TutorAssessmentSchedule {
     timingOver: Boolean(a.timingOver),
     accessRequestStatus: a.accessRequestStatus ?? undefined,
     canAttend: a.canAttend,
+    createdAt: a.createdAt || undefined,
   }
 }
 

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { Check, X, ArrowRight, FlaskConical, PartyPopper, Clock } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
-import { PageLoader } from '@/components/ui/PrismLoader'
+import { PageLoader, PrismLoader } from '@/components/ui/PrismLoader'
 import { btnClass } from '@/components/ui/Button'
 import { useConfirmModal } from '@/components/ui/AppModal'
 import {
@@ -19,6 +20,7 @@ import {
   saveExamAttempt,
 } from '@/lib/api/assessmentsApi'
 import { ApiError, isApiEnabled } from '@/lib/apiClient'
+import { AuthImage } from '@/components/ui/AuthImage'
 import { useAnalytics } from '@/hooks/useAnalytics'
 import { useAuth } from '@/hooks/useAuth'
 import { shuffleQuestionsForStudent, mcqOptionsForDisplay } from '@/lib/shufflePaper'
@@ -45,6 +47,13 @@ function formatTime(seconds: number) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+const SAVE_LOADER_STEPS = [
+  'Locking in your answers…',
+  'Syncing every response…',
+  'Sealing your attempt…',
+  'Almost there — hang tight…',
+]
+
 function ThanksCard({
   title,
   submitting,
@@ -56,39 +65,88 @@ function ThanksCard({
   error?: boolean
   terminated?: boolean
 }) {
+  if (submitting) {
+    return (
+      <div
+        className="min-h-dvh flex items-center justify-center p-4 app-page-bg"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <AppCard className="text-center py-12 max-w-lg w-full">
+          <motion.div
+            className="flex flex-col items-center gap-2 px-2"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <p className="text-[11px] uppercase tracking-[0.2em] text-accent font-medium">
+              Finishing up
+            </p>
+            <h1 className="font-display text-2xl sm:text-3xl text-foreground">{title}</h1>
+            <PrismLoader
+              size="lg"
+              layout="block"
+              label="Your assessment is being saved"
+              steps={SAVE_LOADER_STEPS}
+              className="py-6"
+              aria-label="Saving assessment answers"
+            />
+            <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
+              Please stay on this page until saving completes. Navigation will unlock when your
+              answers are safely stored.
+            </p>
+          </motion.div>
+        </AppCard>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-dvh flex items-center justify-center p-4 app-page-bg">
       <AppCard className="text-center py-12 max-w-lg w-full space-y-4">
-        <div className="w-14 h-14 rounded-full bg-accent/15 text-accent grid place-items-center mx-auto">
-          <PartyPopper className="w-7 h-7" />
-        </div>
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.2em] text-accent font-medium mb-2">
-            {terminated ? 'Exam ended' : 'Exam submitted'}
+        <motion.div
+          className="space-y-4"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <motion.div
+            className="w-14 h-14 rounded-full bg-accent/15 text-accent grid place-items-center mx-auto"
+            initial={{ scale: 0.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+          >
+            <PartyPopper className="w-7 h-7" />
+          </motion.div>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-accent font-medium mb-2">
+              {terminated ? 'Exam ended' : 'Exam submitted'}
+            </p>
+            <h1 className="font-display text-2xl sm:text-3xl text-foreground">{title}</h1>
+          </div>
+          <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-md mx-auto">
+            {terminated
+              ? 'This exam was closed after repeated proctoring violations (leaving fullscreen, switching tabs, or losing focus). Your answers up to that point were submitted.'
+              : 'Thanks for attending the exam. Please wait for your results — your tutor will share them when ready.'}
           </p>
-          <h1 className="font-display text-2xl sm:text-3xl text-foreground">{title}</h1>
-        </div>
-        <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-md mx-auto">
-          {terminated
-            ? 'This exam was closed after repeated proctoring violations (leaving fullscreen, switching tabs, or losing focus). Your answers up to that point were submitted.'
-            : 'Thanks for attending the exam. Please wait for your results — your tutor will share them when ready.'}
-        </p>
-        {submitting && (
-          <p className="text-xs text-muted-foreground">Saving your answers…</p>
-        )}
-        {error && (
-          <p className="text-xs text-rose">
-            Answers may not have synced. Contact your tutor if this persists.
-          </p>
-        )}
-        <div className="flex flex-wrap justify-center gap-3 pt-2">
-          <Link to="/student/assessments" className={`${btnClass.primary} gap-2 px-4 py-2 text-sm`}>
-            Back to assessments <ArrowRight className="w-4 h-4" />
-          </Link>
-          <Link to="/student" className={`${btnClass.secondary} text-sm px-4 py-2`}>
-            Go to Today
-          </Link>
-        </div>
+          {error && (
+            <p className="text-xs text-rose">
+              Answers may not have synced. Contact your tutor if this persists.
+            </p>
+          )}
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
+            <Link
+              to="/student/assessments"
+              className={`${btnClass.primary} gap-2 px-4 py-2 text-sm`}
+            >
+              Back to assessments <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link to="/student" className={`${btnClass.secondary} text-sm px-4 py-2`}>
+              Go to Today
+            </Link>
+          </div>
+        </motion.div>
       </AppCard>
     </div>
   )
@@ -100,6 +158,7 @@ export function StudentTakeAssessmentPage() {
   const {
     assessments,
     markAssessmentSubmitted,
+    markAssessmentInProgress,
     refresh: refreshAssessments,
   } = useAssessments()
   const { studentProfile, refresh: refreshAnalytics } = useAnalytics()
@@ -112,6 +171,7 @@ export function StudentTakeAssessmentPage() {
   const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
   const [saveLabel, setSaveLabel] = useState('Answers save automatically')
   const allowLeaveRef = useRef(false)
+  const disarmProctoringRef = useRef<() => void>(() => undefined)
   const [progressReady, setProgressReady] = useState(false)
   const autoAdvanceRef = useRef<number | null>(null)
   const finishingRef = useRef(false)
@@ -156,7 +216,9 @@ export function StudentTakeAssessmentPage() {
       try {
         const existing = await fetchMySubmission(assessmentId)
         if (cancelled) return
-        if (existing || assessmentFromStore?.studentSubmitted) {
+        // Only trust the server — stale local studentSubmitted after leave/login races
+        // previously blocked resume until a full logout.
+        if (existing) {
           setAlreadySubmitted(true)
           markAssessmentSubmitted(assessmentId)
           setQuestionsLoading(false)
@@ -241,7 +303,7 @@ export function StudentTakeAssessmentPage() {
     return () => {
       cancelled = true
     }
-  }, [assessmentId, assessmentFromStore?.studentSubmitted, markAssessmentSubmitted, user.id])
+  }, [assessmentId, markAssessmentSubmitted, user.id])
 
   const studentId = user.id
   const shuffleEnabled = Boolean(assessment?.shuffleQuestions)
@@ -361,6 +423,7 @@ export function StudentTakeAssessmentPage() {
           if (!ok) return
         }
         finishingRef.current = true
+        disarmProctoringRef.current()
         const records: AnswerRecord[] = displayQuestions.map((question) => {
           const choice = selections[question.id]
           const correct = question.correctAnswer
@@ -373,8 +436,19 @@ export function StudentTakeAssessmentPage() {
           }
         })
         setAnswers(records)
+        // Set submitting BEFORE finished so the thanks screen never paints with nav buttons first.
+        setSubmitState('submitting')
         setFinished(true)
-        allowLeaveRef.current = true
+        const saveStartedAt = Date.now()
+        const MIN_SAVE_UI_MS = 1400
+        const waitForSaveUi = async () => {
+          const elapsed = Date.now() - saveStartedAt
+          if (elapsed < MIN_SAVE_UI_MS) {
+            await new Promise<void>((resolve) => {
+              window.setTimeout(resolve, MIN_SAVE_UI_MS - elapsed)
+            })
+          }
+        }
 
         if (isApiEnabled() && assessment) {
           const durationMin = assessment.durationMinutes
@@ -382,7 +456,6 @@ export function StudentTakeAssessmentPage() {
             durationMin > 0
               ? Math.max(1, durationMin - Math.floor(secondsLeft / 60))
               : Math.max(1, Math.ceil((displayQuestions.length * 30) / 60))
-          setSubmitState('submitting')
           void submitAssessment(
             assessment.id,
             displayQuestions.map((question) => ({
@@ -393,24 +466,36 @@ export function StudentTakeAssessmentPage() {
             isPractice ? undefined : getExamDeviceId(),
           )
             .then(async () => {
+              await waitForSaveUi()
+              allowLeaveRef.current = true
               setSubmitState('success')
               clearExamProgress(assessment.id, studentId)
               markAssessmentSubmitted(assessment.id)
               void refreshAssessments()
               void refreshAnalytics('studentAssessments')
             })
-            .catch((e) => {
+            .catch(async (e) => {
+              await waitForSaveUi()
               if (e instanceof ApiError && e.status === 409) {
+                allowLeaveRef.current = true
                 setSubmitState('success')
                 clearExamProgress(assessment.id, studentId)
                 markAssessmentSubmitted(assessment.id)
                 return
               }
               finishingRef.current = false
+              allowLeaveRef.current = true
               setSubmitState('error')
             })
         } else if (assessmentId) {
+          await waitForSaveUi()
+          allowLeaveRef.current = true
+          setSubmitState('success')
           clearExamProgress(assessmentId, studentId)
+        } else {
+          await waitForSaveUi()
+          allowLeaveRef.current = true
+          setSubmitState('success')
         }
       })()
     },
@@ -493,6 +578,7 @@ export function StudentTakeAssessmentPage() {
     maxViolations,
     requireFullscreen,
     resumeExamFocus,
+    disarmProctoring,
   } = useExamProctoring({
     enabled: examLocked,
     assessmentId,
@@ -500,6 +586,16 @@ export function StudentTakeAssessmentPage() {
     onTerminated: handleProctorTerminated,
     onSecureLock: setExamSecureLock,
   })
+  disarmProctoringRef.current = disarmProctoring
+
+  const leaveExamForLater = useCallback(async () => {
+    await flushAttempt()
+    if (assessmentId) markAssessmentInProgress(assessmentId)
+    disarmProctoring()
+    allowLeaveRef.current = true
+    await exitExamFullscreen()
+    void refreshAssessments()
+  }, [assessmentId, disarmProctoring, flushAttempt, markAssessmentInProgress, refreshAssessments])
 
   useEffect(() => {
     if (
@@ -606,6 +702,7 @@ export function StudentTakeAssessmentPage() {
 
   const requestExit = useCallback(async () => {
     if (allowLeaveRef.current) {
+      disarmProctoring()
       await exitExamFullscreen()
       navigate('/student/assessments')
       return true
@@ -618,12 +715,10 @@ export function StudentTakeAssessmentPage() {
       cancelLabel: 'Stay in exam',
     })
     if (!ok) return false
-    await flushAttempt()
-    allowLeaveRef.current = true
-    await exitExamFullscreen()
+    await leaveExamForLater()
     navigate('/student/assessments')
     return true
-  }, [confirm, flushAttempt, navigate])
+  }, [confirm, disarmProctoring, leaveExamForLater, navigate])
 
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
@@ -649,9 +744,7 @@ export function StudentTakeAssessmentPage() {
       })
       if (!active) return
       if (ok) {
-        await flushAttempt()
-        allowLeaveRef.current = true
-        await exitExamFullscreen()
+        await leaveExamForLater()
         blocker.proceed()
       } else {
         blocker.reset()
@@ -660,13 +753,14 @@ export function StudentTakeAssessmentPage() {
     return () => {
       active = false
     }
-  }, [blocker, confirm, flushAttempt])
+  }, [blocker, confirm, leaveExamForLater])
 
   useEffect(() => {
     if (finished || alreadySubmitted) {
+      disarmProctoring()
       void exitExamFullscreen()
     }
-  }, [alreadySubmitted, finished])
+  }, [alreadySubmitted, disarmProctoring, finished])
 
   useEffect(() => {
     return () => {
@@ -727,7 +821,7 @@ export function StudentTakeAssessmentPage() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [examSecureLock, finished, goNext, options, picked, selectOption, showFeedback])
 
-  if (alreadySubmitted || assessment?.studentSubmitted) {
+  if (alreadySubmitted) {
     return <ThanksCard title={assessment?.title ?? 'Assessment'} />
   }
 
@@ -735,7 +829,7 @@ export function StudentTakeAssessmentPage() {
     return (
       <ThanksCard
         title={assessment.title}
-        submitting={submitState === 'submitting'}
+        submitting={submitState === 'submitting' || submitState === 'idle'}
         error={submitState === 'error'}
         terminated={terminatedByProctor}
       />
@@ -983,10 +1077,15 @@ export function StudentTakeAssessmentPage() {
         onToggleFlag={toggleFlag}
       >
         <p className="text-base sm:text-lg lg:text-xl text-foreground font-semibold leading-relaxed mb-5 sm:mb-7 text-left w-full">
-          {q.text}
+          {q.text && q.text !== '(image)' ? q.text : null}
         </p>
+        {q.textImageUrl && (
+          <div className="mb-5 sm:mb-6 w-full">
+            <AuthImage mediaPath={q.textImageUrl} className="max-h-[min(50vh,28rem)]" alt="Question" />
+          </div>
+        )}
 
-        {showScienceVisual && (
+        {showScienceVisual && !q.textImageUrl && (
           <div className="mb-5 sm:mb-6 rounded-xl overflow-hidden border border-border bg-gradient-to-br from-teal-50 to-cyan-100 aspect-[16/7] sm:aspect-[16/6] flex items-center justify-center">
             <div className="text-center px-4">
               <FlaskConical className="w-10 h-10 sm:w-12 sm:h-12 text-teal-600/70 mx-auto mb-2" />
@@ -1022,8 +1121,11 @@ export function StudentTakeAssessmentPage() {
                 >
                   {opt.displayKey}
                 </span>
-                <span className="text-sm sm:text-base text-foreground font-medium text-left flex-1">
+                <span className="text-sm sm:text-base text-foreground font-medium text-left flex-1 space-y-2">
                   {opt.label}
+                  {opt.imageUrl && (
+                    <AuthImage mediaPath={opt.imageUrl} className="max-h-40 mt-2" alt={`Option ${opt.displayKey}`} />
+                  )}
                 </span>
               </button>
             )

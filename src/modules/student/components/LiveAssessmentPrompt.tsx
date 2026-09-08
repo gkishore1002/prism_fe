@@ -25,10 +25,10 @@ export function useLiveStudentAssessments() {
 
   const liveAssessments = getAssessmentsForStudent(query).filter(
     (a) =>
-      a.status === 'live' &&
       !a.studentSubmitted &&
       !a.timingOver &&
-      (a.canAttend ?? canStudentAttend(query, a.id)),
+      (a.attemptInProgress ||
+        (a.status === 'live' && (a.canAttend ?? canStudentAttend(query, a.id)))),
   )
 
   return { liveAssessments, loading: false, profile, query, canStudentAttend }
@@ -41,13 +41,21 @@ interface LiveAssessmentPromptProps {
 /** Prominent call-to-action when a live assessment is waiting. */
 export function LiveAssessmentPrompt({ className }: LiveAssessmentPromptProps) {
   const { liveAssessments, loading } = useLiveStudentAssessments()
-  const { ensureLoaded } = useAssessments()
+  const { ensureLoaded, refresh } = useAssessments()
   const { load } = useAnalytics()
 
   useEffect(() => {
     void ensureLoaded()
     void load('studentAssessments')
   }, [ensureLoaded, load])
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [refresh])
 
   if (loading || liveAssessments.length === 0) return null
 

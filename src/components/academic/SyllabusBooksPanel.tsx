@@ -1,21 +1,46 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, Loader2, Trash2, Upload, CheckCircle2, AlertCircle, Download, Eye, GitMerge } from 'lucide-react'
+import {
+  BookOpen,
+  Loader2,
+  Trash2,
+  Upload,
+  CheckCircle2,
+  AlertCircle,
+  Download,
+  Eye,
+  GitMerge,
+  Plus,
+  X,
+} from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
 import { AppDropdown } from '@/components/ui/AppDropdown'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { AppModal, useConfirmModal } from '@/components/ui/AppModal'
 import {
+  approveSyllabusBook,
   deleteSyllabusBook,
   downloadSyllabusBookJson,
   fetchSyllabusBook,
   fetchSyllabusBooks,
   importBookTopics,
+  updateSyllabusBookOutline,
   uploadSyllabusBook,
   type SyllabusBook,
+  type SyllabusChapterDraft,
 } from '@/lib/api/syllabusBooksApi'
 import { ApiError, isApiEnabled } from '@/lib/apiClient'
 import { cn } from '@/lib/cn'
 import { boardsMatch, gradesMatch } from '@/lib/academicScope'
+
+type OutlineMode = 'approve' | 'edit'
+
+function chaptersFromBook(book: SyllabusBook): SyllabusChapterDraft[] {
+  const chapters = book.analysisJson?.chapters ?? []
+  return chapters.map((ch) => ({
+    title: ch.title ?? '',
+    topics: Array.isArray(ch.topics) ? [...ch.topics] : [],
+  }))
+}
 
 export function SyllabusBooksPanel() {
   const { curriculum, ensureLoaded, refresh: refreshCurriculum } = useCurriculum()
@@ -27,8 +52,11 @@ export function SyllabusBooksPanel() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [importingId, setImportingId] = useState<string | null>(null)
   const [importMessage, setImportMessage] = useState<{ id: string; text: string } | null>(null)
-  const [viewingBook, setViewingBook] = useState<SyllabusBook | null>(null)
-  const [viewingId, setViewingId] = useState<string | null>(null)
+  const [outlineBook, setOutlineBook] = useState<SyllabusBook | null>(null)
+  const [outlineMode, setOutlineMode] = useState<OutlineMode>('edit')
+  const [outlineDraft, setOutlineDraft] = useState<SyllabusChapterDraft[]>([])
+  const [outlineSaving, setOutlineSaving] = useState(false)
+  const [openingId, setOpeningId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [board, setBoard] = useState('')
   const [grade, setGrade] = useState('')
@@ -83,6 +111,12 @@ export function SyllabusBooksPanel() {
 
   const analyzingIds = books.filter((b) => b.status === 'analyzing').map((b) => b.id)
 
+  function openOutlineReview(book: SyllabusBook, mode: OutlineMode) {
+    setOutlineMode(mode)
+    setOutlineBook(book)
+    setOutlineDraft(chaptersFromBook(book))
+  }
+
   useEffect(() => {
     if (analyzingIds.length === 0) return
     const timer = window.setInterval(() => {
@@ -96,25 +130,25 @@ export function SyllabusBooksPanel() {
             }
           }),
         )
-        let anyJustAnalyzed = false
+        const justAnalyzed: SyllabusBook[] = []
         setBooks((prev) => {
           const next = prev.map((book) => {
             const updated = updates.find((item) => item && item.id === book.id)
             if (updated && updated.status === 'analyzed' && book.status === 'analyzing') {
-              anyJustAnalyzed = true
+              justAnalyzed.push(updated)
             }
             return updated ?? book
           })
           return next
         })
-        // Refresh curriculum sidebar when a book finishes — topics are auto-added by backend
-        if (anyJustAnalyzed) {
-          void refreshCurriculum()
+        // Ask the user to review/edit topics before syncing curriculum
+        if (justAnalyzed[0] && !outlineBook) {
+          openOutlineReview(justAnalyzed[0], 'approve')
         }
       })()
     }, 3000)
     return () => window.clearInterval(timer)
-  }, [analyzingIds.join(','), refreshCurriculum])
+  }, [analyzingIds.join(','), outlineBook])
 
   async function handleImportTopics(book: SyllabusBook) {
     if (importingId) return
@@ -156,25 +190,123 @@ export function SyllabusBooksPanel() {
     }
   }
 
-  async function openBookSummary(book: SyllabusBook) {
-    setViewingId(book.id)
+  async function openBookSummary(book: SyllabusBook, mode: OutlineMode = 'edit') {
+    setOpeningId(book.id)
     setError(null)
     try {
       const detail =
         book.analysisJson?.chapters?.length ? book : await fetchSyllabusBook(book.id)
-      setViewingBook(detail)
+      openOutlineReview(detail, mode)
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not load the summarized book',
       )
     } finally {
-      setViewingId(null)
+      setOpeningId(null)
     }
   }
 
-  const viewingChapters = viewingBook?.analysisJson?.chapters ?? []
-  const viewingTopicCount = viewingChapters.reduce(
-    (n, ch) => n + (Array.isArray(ch.topics) ? ch.topics.length : 0),
+  function updateChapterTitle(index: number, titleValue: string) {
+    setOutlineDraft((prev) =>
+      prev.map((ch, i) => (i === index ? { ...ch, title: titleValue } : ch)),
+    )
+  }
+
+  function updateTopic(chapterIndex: number, topicIndex: number, value: string) {
+    setOutlineDraft((prev) =>
+      prev.map((ch, i) => {
+        if (i !== chapterIndex) return ch
+        const topics = [...ch.topics]
+        topics[topicIndex] = value
+        return { ...ch, topics }
+      }),
+    )
+  }
+
+  function addTopic(chapterIndex: number) {
+    setOutlineDraft((prev) =>
+      prev.map((ch, i) => (i === chapterIndex ? { ...ch, topics: [...ch.topics, ''] } : ch)),
+    )
+  }
+
+  function removeTopic(chapterIndex: number, topicIndex: number) {
+    setOutlineDraft((prev) =>
+      prev.map((ch, i) =>
+        i === chapterIndex
+          ? { ...ch, topics: ch.topics.filter((_, ti) => ti !== topicIndex) }
+          : ch,
+      ),
+    )
+  }
+
+  function addChapter() {
+    setOutlineDraft((prev) => [...prev, { title: '', topics: [''] }])
+  }
+
+  function removeChapter(index: number) {
+    setOutlineDraft((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function cleanedOutline(): SyllabusChapterDraft[] {
+    return outlineDraft
+      .map((ch) => ({
+        title: ch.title.trim(),
+        topics: ch.topics.map((t) => t.trim()).filter(Boolean),
+      }))
+      .filter((ch) => ch.title)
+  }
+
+  async function handleSaveOutline() {
+    if (!outlineBook || outlineSaving) return
+    const chapters = cleanedOutline()
+    if (chapters.length === 0) {
+      setError('Add at least one chapter with a title before saving.')
+      return
+    }
+    setOutlineSaving(true)
+    setError(null)
+    try {
+      const updated = await updateSyllabusBookOutline(outlineBook.id, chapters)
+      setBooks((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)))
+      setOutlineBook(updated)
+      setOutlineDraft(chaptersFromBook(updated))
+      setImportMessage({ id: updated.id, text: '✓ Outline saved. Import topics when ready.' })
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setOutlineSaving(false)
+    }
+  }
+
+  async function handleApproveOutline() {
+    if (!outlineBook || outlineSaving) return
+    const chapters = cleanedOutline()
+    if (chapters.length === 0) {
+      setError('Add at least one chapter with a title before approving.')
+      return
+    }
+    setOutlineSaving(true)
+    setError(null)
+    try {
+      const updated = await approveSyllabusBook(outlineBook.id, chapters)
+      setBooks((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)))
+      setImportMessage({
+        id: updated.id,
+        text: `✓ Outline approved · topics synced to curriculum`,
+      })
+      void refreshCurriculum()
+      setOutlineBook(null)
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Approve failed',
+      )
+    } finally {
+      setOutlineSaving(false)
+    }
+  }
+
+  const topicCount = outlineDraft.reduce(
+    (n, ch) => n + ch.topics.filter((t) => t.trim()).length,
     0,
   )
 
@@ -194,7 +326,8 @@ export function SyllabusBooksPanel() {
           <h2 className="font-display text-lg">Syllabus books</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
-          Upload a textbook PDF. Vertex AI summarizes it into chapters and topics, stored as JSON.
+          Upload a textbook PDF. After Vertex AI summarizes chapters and topics, review and edit them
+          before approving into the curriculum.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
           <AppDropdown
@@ -274,7 +407,7 @@ export function SyllabusBooksPanel() {
         ) : (
           <ul className="divide-y divide-border">
             {books.map((book) => (
-              <li key={book.id} className="px-4 sm:px-5 py-4 flex items-start justify-between gap-3">
+              <li key={book.id} className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium text-foreground truncate">{book.title}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -283,7 +416,7 @@ export function SyllabusBooksPanel() {
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {book.status === 'analyzed'
-                      ? `${book.chapterCount} chapters · ${book.topicCount} topics stored as JSON`
+                      ? `${book.chapterCount} chapters · ${book.topicCount} topics — review & approve to sync curriculum`
                       : book.status === 'analyzing'
                         ? 'Vertex AI is summarizing this book…'
                         : book.errorMessage || 'Summarization failed'}
@@ -294,7 +427,7 @@ export function SyllabusBooksPanel() {
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
                   <span
                     className={cn(
                       'inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-1 rounded-md font-medium',
@@ -311,12 +444,22 @@ export function SyllabusBooksPanel() {
                   {book.status === 'analyzed' && (
                     <button
                       type="button"
+                      className="px-2.5 py-1.5 rounded-md text-xs border border-accent/40 bg-accent/10 text-foreground hover:bg-accent/15 disabled:opacity-40"
+                      disabled={openingId === book.id}
+                      onClick={() => void openBookSummary(book, 'approve')}
+                    >
+                      {openingId === book.id ? 'Opening…' : 'Review'}
+                    </button>
+                  )}
+                  {book.status === 'analyzed' && (
+                    <button
+                      type="button"
                       className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/70 disabled:opacity-40"
                       aria-label={`View summary of ${book.title}`}
-                      disabled={viewingId === book.id}
-                      onClick={() => void openBookSummary(book)}
+                      disabled={openingId === book.id}
+                      onClick={() => void openBookSummary(book, 'edit')}
                     >
-                      {viewingId === book.id ? (
+                      {openingId === book.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <Eye className="w-4 h-4" />
@@ -328,7 +471,7 @@ export function SyllabusBooksPanel() {
                       type="button"
                       className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/70 disabled:opacity-40"
                       aria-label={`Import topics to curriculum`}
-                      disabled={importingId === book.id || downloadingId === book.id || viewingId === book.id}
+                      disabled={importingId === book.id || downloadingId === book.id || openingId === book.id}
                       onClick={() => void handleImportTopics(book)}
                       title="Import topics to curriculum"
                     >
@@ -394,47 +537,142 @@ export function SyllabusBooksPanel() {
       </AppCard>
 
       <AppModal
-        open={Boolean(viewingBook)}
-        onClose={() => setViewingBook(null)}
-        title={viewingBook?.title ?? 'Summarized book'}
+        open={Boolean(outlineBook)}
+        onClose={() => {
+          if (outlineSaving) return
+          setOutlineBook(null)
+        }}
+        title={
+          outlineMode === 'approve'
+            ? 'Approve book topics'
+            : outlineBook?.title ?? 'Edit book outline'
+        }
         description={
-          viewingBook
-            ? `${viewingBook.board} · ${viewingBook.grade} · ${viewingBook.subject}${
-                viewingChapters.length
-                  ? ` · ${viewingChapters.length} chapters · ${viewingTopicCount} topics`
-                  : ''
-              }`
+          outlineBook
+            ? outlineMode === 'approve'
+              ? `${outlineBook.title} · ${outlineBook.board} · ${outlineBook.grade} · ${outlineBook.subject}. Edit chapters/topics if needed, then approve to sync curriculum.`
+              : `${outlineBook.board} · ${outlineBook.grade} · ${outlineBook.subject} · ${outlineDraft.length} chapters · ${topicCount} topics`
             : undefined
         }
         size="lg"
         bodyClassName="max-h-[70vh] overflow-y-auto"
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              className="h-10 px-4 rounded-md text-sm border border-border hover:bg-secondary/60 disabled:opacity-40"
+              disabled={outlineSaving}
+              onClick={() => setOutlineBook(null)}
+            >
+              {outlineMode === 'approve' ? 'Review later' : 'Close'}
+            </button>
+            <button
+              type="button"
+              className="h-10 px-4 rounded-md text-sm border border-border hover:bg-secondary/60 disabled:opacity-40 inline-flex items-center gap-1.5"
+              disabled={outlineSaving || outlineDraft.length === 0}
+              onClick={() => void handleSaveOutline()}
+            >
+              {outlineSaving && outlineMode === 'edit' ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : null}
+              Save outline
+            </button>
+            {outlineMode === 'approve' && (
+              <button
+                type="button"
+                className="h-10 px-4 rounded-md text-sm font-medium bg-ink text-paper disabled:opacity-40 inline-flex items-center gap-1.5"
+                disabled={outlineSaving || outlineDraft.length === 0}
+                onClick={() => void handleApproveOutline()}
+              >
+                {outlineSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                Approve & sync
+              </button>
+            )}
+          </div>
+        }
       >
-        {viewingChapters.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            No extracted chapters yet.
-          </p>
+        {outlineDraft.length === 0 ? (
+          <div className="py-6 space-y-3 text-center">
+            <p className="text-sm text-muted-foreground">No extracted chapters yet.</p>
+            <button
+              type="button"
+              onClick={addChapter}
+              className="inline-flex items-center gap-1.5 text-sm text-accent"
+            >
+              <Plus className="w-4 h-4" />
+              Add chapter
+            </button>
+          </div>
         ) : (
-          <ol className="space-y-4">
-            {viewingChapters.map((ch, idx) => (
-              <li key={`${ch.title}-${idx}`}>
-                <p className="text-sm font-semibold text-foreground">
-                  <span className="mr-2 font-mono text-xs text-muted-foreground">{idx + 1}.</span>
-                  {ch.title}
-                </p>
-                {ch.topics?.length ? (
-                  <ul className="mt-1.5 space-y-1 pl-7">
+          <div className="space-y-4">
+            {outlineMode === 'approve' && (
+              <p className="text-xs text-muted-foreground rounded-md border border-accent/30 bg-accent/5 px-3 py-2">
+                These topics were mapped from the uploaded book. Edit names, add or remove topics,
+                then approve to save them into the curriculum.
+              </p>
+            )}
+            <ol className="space-y-4">
+              {outlineDraft.map((ch, idx) => (
+                <li key={`ch-${idx}`} className="rounded-xl border border-border p-3 sm:p-4">
+                  <div className="flex items-start gap-2">
+                    <span className="mt-2 font-mono text-xs text-muted-foreground shrink-0">
+                      {idx + 1}.
+                    </span>
+                    <input
+                      value={ch.title}
+                      onChange={(e) => updateChapterTitle(idx, e.target.value)}
+                      className="flex-1 h-9 border border-border rounded-md px-3 text-sm font-medium bg-background"
+                      placeholder="Chapter title"
+                    />
+                    <button
+                      type="button"
+                      className="p-2 rounded-md text-muted-foreground hover:text-rose hover:bg-rose/10"
+                      aria-label="Remove chapter"
+                      onClick={() => removeChapter(idx)}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <ul className="mt-3 space-y-2 pl-6">
                     {ch.topics.map((topic, tIdx) => (
-                      <li key={`${topic}-${tIdx}`} className="text-sm text-muted-foreground">
-                        {topic}
+                      <li key={`t-${idx}-${tIdx}`} className="flex items-center gap-2">
+                        <input
+                          value={topic}
+                          onChange={(e) => updateTopic(idx, tIdx, e.target.value)}
+                          className="flex-1 h-8 border border-border rounded-md px-2.5 text-sm bg-background"
+                          placeholder="Topic name"
+                        />
+                        <button
+                          type="button"
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-rose"
+                          aria-label="Remove topic"
+                          onClick={() => removeTopic(idx, tIdx)}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
                       </li>
                     ))}
                   </ul>
-                ) : (
-                  <p className="mt-1 pl-7 text-xs text-muted-foreground">No topics extracted</p>
-                )}
-              </li>
-            ))}
-          </ol>
+                  <button
+                    type="button"
+                    onClick={() => addTopic(idx)}
+                    className="mt-2 ml-6 inline-flex items-center gap-1 text-xs text-accent"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add topic
+                  </button>
+                </li>
+              ))}
+            </ol>
+            <button
+              type="button"
+              onClick={addChapter}
+              className="inline-flex items-center gap-1.5 text-sm text-accent"
+            >
+              <Plus className="w-4 h-4" />
+              Add chapter
+            </button>
+          </div>
         )}
       </AppModal>
     </div>

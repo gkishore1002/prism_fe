@@ -107,12 +107,12 @@ export const R = {
   eyebrowExecutive: { en: 'Executive summary', ta: 'நிர்வாக சுருக்கம்' },
   titleAiNarrative: { en: 'AI narrative', ta: 'AI விளக்கம்' },
   descLiveSummary: {
-    en: 'Live summary generated from your full academic record — refreshes each view.',
-    ta: 'முழு கல்வி பதிவிலிருந்து நேரடி சுருக்கம் — ஒவ்வொரு பார்வையிலும் புதுப்பிக்கப்படும்.',
+    en: 'AI summary stored when an assessment was last updated — shown without regenerating.',
+    ta: 'தேர்வு கடைசியாக புதுப்பிக்கப்பட்டபோது சேமிக்கப்பட்ட AI சுருக்கம் — மீண்டும் உருவாக்காமல் காட்டப்படும்.',
   },
   descRuleSummary: {
-    en: 'Summary based on your latest academic metrics.',
-    ta: 'சமீபத்திய கல்வி அளவீடுகளின் அடிப்படையில் சுருக்கம்.',
+    en: 'Summary based on your latest academic metrics (AI refreshes when assessments update).',
+    ta: 'சமீபத்திய கல்வி அளவீடுகளின் அடிப்படையில் சுருக்கம் (தேர்வுகள் புதுப்பிக்கும்போது AI புதுப்பிக்கப்படும்).',
   },
   eyebrowKeySignals: { en: 'Key signals', ta: 'முக்கிய சமிக்ஞைகள்' },
   titleInsightFeed: { en: 'Insight feed', ta: 'நுண்ணறிவு ஊட்டம்' },
@@ -233,8 +233,8 @@ export const R = {
   loadingReports: { en: 'Loading reports…', ta: 'அறிக்கைகள் ஏற்றுகிறது…' },
 
   // Narrative source notes
-  noteEnglishLiveAi: { en: 'English · Live AI summary', ta: 'ஆங்கிலம் · நேரடி AI சுருக்கம்' },
-  noteTamilLiveAi: { en: 'Tamil · Live AI summary', ta: 'தமிழ் · நேரடி AI சுருக்கம்' },
+  noteEnglishLiveAi: { en: 'English · Stored AI summary', ta: 'ஆங்கிலம் · சேமிக்கப்பட்ட AI சுருக்கம்' },
+  noteTamilLiveAi: { en: 'Tamil · Stored AI summary', ta: 'தமிழ் · சேமிக்கப்பட்ட AI சுருக்கம்' },
   noteEnglishRule: { en: 'English · Rule-based', ta: 'ஆங்கிலம் · Rule-based' },
   noteTamilRule: { en: 'Tamil · Rule-based', ta: 'தமிழ் · Rule-based' },
   noteAiStored: { en: 'AI summary · stored in database', ta: 'AI சுருக்கம் · தரவுத்தளத்தில்' },

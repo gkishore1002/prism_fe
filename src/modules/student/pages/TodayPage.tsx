@@ -13,6 +13,7 @@ import { LiveAssessmentPrompt } from '../components/LiveAssessmentPrompt'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useAuth } from '@/hooks/useAuth'
 import { resolveStudentProfile } from '@/modules/student/lib/studentProfile'
+import { StudentEnrollmentYearBar } from '@/modules/student/components/StudentEnrollmentYearBar'
 import {
   LineChart,
   Line,
@@ -76,6 +77,8 @@ export function StudentTodayPage() {
           ) : undefined
         }
       />
+
+      <StudentEnrollmentYearBar className="mb-4 -mt-2" />
 
       <p className="text-sm text-muted-foreground mb-6 -mt-2">
         Your academic overview — health, focus topics, and what to study next.

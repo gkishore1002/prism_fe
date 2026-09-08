@@ -1,5 +1,4 @@
 import {
-  createContext,
   useCallback,
   useContext,
   useEffect,
@@ -11,32 +10,15 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { useCenters } from '@/hooks/useCenters'
 import * as assessmentsApi from '@/lib/api/assessmentsApi'
-import type { AssessmentAttendanceRecord, TutorAssessmentSchedule } from '@/types'
-import { assessmentMatchesScope, type AcademicScope } from '@/lib/academicScope'
+import type { TutorAssessmentSchedule } from '@/types'
+import { assessmentMatchesScope } from '@/lib/academicScope'
+import {
+  AssessmentContext,
+  type AssessmentContextValue,
+  type StudentAssessmentQuery,
+} from '@/hooks/assessmentContext'
 
-interface StudentAssessmentQuery extends AcademicScope {
-  studentId: string
-}
-
-interface AssessmentContextValue {
-  assessments: TutorAssessmentSchedule[]
-  loading: boolean
-  error: string | null
-  addAssessment: (assessment: TutorAssessmentSchedule) => Promise<void>
-  removeAssessment: (assessmentId: string) => Promise<void>
-  patchAssessment: (
-    assessmentId: string,
-    patch: Partial<Pick<TutorAssessmentSchedule, 'title' | 'status' | 'scheduledAt'>>,
-  ) => Promise<void>
-  getAssessmentsForStudent: (query: StudentAssessmentQuery) => TutorAssessmentSchedule[]
-  canStudentAttend: (query: StudentAssessmentQuery, assessmentId: string) => boolean
-  markAssessmentSubmitted: (assessmentId: string) => void
-  getAttendance: (assessmentId: string) => Promise<AssessmentAttendanceRecord[]>
-  refresh: () => Promise<void>
-  ensureLoaded: () => Promise<void>
-}
-
-const AssessmentContext = createContext<AssessmentContextValue | null>(null)
+export type { StudentAssessmentQuery, AssessmentContextValue }
 
 export function AssessmentProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, role, user } = useAuth()
@@ -46,7 +28,9 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const loadPromiseRef = useRef<Promise<void> | null>(null)
-  const attendanceCacheRef = useRef<Map<string, AssessmentAttendanceRecord[]>>(new Map())
+  const attendanceCacheRef = useRef<Map<string, Awaited<ReturnType<typeof assessmentsApi.fetchAttendance>>>>(
+    new Map(),
+  )
 
   const loadedBranchRef = useRef<string | 'all' | null>(null)
   const loadedRoleRef = useRef<string | null>(null)
@@ -103,6 +87,9 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
       hasLoadedOnceRef.current = false
       return
     }
+    // Admin shell: do not auto-fetch the full assessment list on every route.
+    // Pages that need it call ensureLoaded / refresh explicitly.
+    if (role === 'admin') return
     const key = role === 'student' ? 'all' : (branchCenterId ?? 'all')
     if (loadedRoleRef.current === role && loadedBranchRef.current === key) return
     void refresh()
@@ -151,9 +138,13 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
     (query: StudentAssessmentQuery, assessmentId: string) => {
       const assessment = assessments.find((a) => a.id === assessmentId)
       if (!assessment) return false
+      if (assessment.studentSubmitted) return false
       const allowed =
-        assessment.canAttend ??
-        (assessment.status === 'live' && !assessment.studentSubmitted && !assessment.timingOver)
+        assessment.attemptInProgress ||
+        assessment.canAttend ||
+        (assessment.canAttend == null &&
+          assessment.status === 'live' &&
+          !assessment.timingOver)
       if (!allowed) return false
       if (role === 'student') return true
       const ids = assessment.assignedStudentIds ?? []
@@ -164,7 +155,26 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
 
   const markAssessmentSubmitted = useCallback((assessmentId: string) => {
     setAssessments((prev) =>
-      prev.map((a) => (a.id === assessmentId ? { ...a, studentSubmitted: true } : a)),
+      prev.map((a) =>
+        a.id === assessmentId
+          ? { ...a, studentSubmitted: true, attemptInProgress: false, canAttend: false }
+          : a,
+      ),
+    )
+  }, [])
+
+  const markAssessmentInProgress = useCallback((assessmentId: string) => {
+    setAssessments((prev) =>
+      prev.map((a) =>
+        a.id === assessmentId
+          ? {
+              ...a,
+              attemptInProgress: true,
+              studentSubmitted: false,
+              canAttend: a.canAttend ?? true,
+            }
+          : a,
+      ),
     )
   }, [])
 
@@ -187,6 +197,7 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
       getAssessmentsForStudent,
       canStudentAttend,
       markAssessmentSubmitted,
+      markAssessmentInProgress,
       getAttendance,
       refresh,
       ensureLoaded,
@@ -201,6 +212,7 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
       getAssessmentsForStudent,
       canStudentAttend,
       markAssessmentSubmitted,
+      markAssessmentInProgress,
       getAttendance,
       refresh,
       ensureLoaded,

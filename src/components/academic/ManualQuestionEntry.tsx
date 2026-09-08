@@ -11,7 +11,7 @@ import {
   readManualPaperDraft,
   type ManualPaperDraftQuestion,
 } from '@/lib/manualPaperDraftStorage'
-import { cn } from '@/lib/cn'
+import { QuestionImagePicker } from '@/components/academic/QuestionImagePicker'
 
 type DraftQuestion = Omit<QuestionBankEntry, 'id' | 'status'>
 
@@ -42,18 +42,68 @@ function emptyQuestion(scope?: Partial<DraftQuestion>): ManualPaperDraftQuestion
 }
 
 function validateQuestion(q: ManualPaperDraftQuestion, index: number): string | null {
-  if (!q.text.trim() || !q.chapter.trim() || !q.topic.trim()) {
-    return `Question ${index + 1}: text, chapter, and topic are required.`
+  if (!q.chapter.trim() || !q.topic.trim()) {
+    return `Question ${index + 1}: chapter and topic are required.`
+  }
+  if (!q.text.trim() && !q.textImageKey) {
+    return `Question ${index + 1}: text or stem photo is required.`
   }
   if (q.questionType === 'mcq') {
-    if (!q.optionA?.trim() || !q.optionB?.trim()) {
-      return `Question ${index + 1}: MCQs need options A and B.`
+    const hasA = Boolean(q.optionA?.trim() || q.optionAImageKey)
+    const hasB = Boolean(q.optionB?.trim() || q.optionBImageKey)
+    if (!hasA || !hasB) {
+      return `Question ${index + 1}: MCQs need options A and B (text or photo).`
     }
     if (!q.correctAnswer?.trim()) {
       return `Question ${index + 1}: select the correct answer.`
     }
   }
   return null
+}
+
+function toManualInput(q: ManualPaperDraftQuestion): {
+  board: string
+  grade: string
+  subject: string
+  chapter: string
+  topic: string
+  text: string
+  difficulty: QuestionBankEntry['difficulty']
+  marks: number
+  questionType: QuestionBankEntry['questionType']
+  optionA?: string
+  optionB?: string
+  optionC?: string
+  optionD?: string
+  correctAnswer?: string
+  textImageKey?: string
+  optionAImageKey?: string
+  optionBImageKey?: string
+  optionCImageKey?: string
+  optionDImageKey?: string
+} {
+  const isMcq = q.questionType === 'mcq'
+  return {
+    board: q.board,
+    grade: q.grade,
+    subject: q.subject,
+    chapter: q.chapter.trim(),
+    topic: q.topic.trim(),
+    text: q.text.trim() || (q.textImageKey ? '(image)' : ''),
+    difficulty: q.difficulty,
+    marks: Number.isFinite(q.marks) && q.marks > 0 ? q.marks : 1,
+    questionType: q.questionType,
+    optionA: isMcq ? q.optionA?.trim() || undefined : undefined,
+    optionB: isMcq ? q.optionB?.trim() || undefined : undefined,
+    optionC: isMcq ? q.optionC?.trim() || undefined : undefined,
+    optionD: isMcq ? q.optionD?.trim() || undefined : undefined,
+    correctAnswer: isMcq ? q.correctAnswer : undefined,
+    textImageKey: q.textImageKey || undefined,
+    optionAImageKey: isMcq ? q.optionAImageKey || undefined : undefined,
+    optionBImageKey: isMcq ? q.optionBImageKey || undefined : undefined,
+    optionCImageKey: isMcq ? q.optionCImageKey || undefined : undefined,
+    optionDImageKey: isMcq ? q.optionDImageKey || undefined : undefined,
+  }
 }
 
 interface QuestionBlockProps {
@@ -167,29 +217,53 @@ function QuestionBlock({
           />
         </div>
         <label className="block md:col-span-2">
-          <span className="text-xs text-muted-foreground">Question text *</span>
+          <span className="text-xs text-muted-foreground">
+            Question text {question.textImageKey ? '(optional with photo)' : '*'}
+          </span>
           <textarea
             value={question.text}
             onChange={(e) => onChange({ text: e.target.value })}
             rows={3}
             className={inputClass}
-            placeholder="Enter the question..."
+            placeholder="Enter the question, or upload a photo of the formula…"
           />
         </label>
+        <div className="md:col-span-2">
+          <QuestionImagePicker
+            label="Stem photo (formulas / diagrams)"
+            imageKey={question.textImageKey}
+            imageUrl={question.textImageUrl}
+            onUploaded={(key, url) => onChange({ textImageKey: key, textImageUrl: url })}
+            onCleared={() => onChange({ textImageKey: undefined, textImageUrl: undefined })}
+          />
+        </div>
 
         {question.questionType === 'mcq' && (
           <>
-            {(['optionA', 'optionB', 'optionC', 'optionD'] as const).map((key, i) => (
-              <label key={key} className="block">
-                <span className="text-xs text-muted-foreground">
-                  Option {String.fromCharCode(65 + i)}
-                </span>
-                <input
-                  value={question[key] ?? ''}
-                  onChange={(e) => onChange({ [key]: e.target.value })}
-                  className={inputClass}
+            {([
+              ['optionA', 'optionAImageKey', 'optionAImageUrl', 'A'],
+              ['optionB', 'optionBImageKey', 'optionBImageUrl', 'B'],
+              ['optionC', 'optionCImageKey', 'optionCImageUrl', 'C'],
+              ['optionD', 'optionDImageKey', 'optionDImageUrl', 'D'],
+            ] as const).map(([textKey, imageKey, imageUrl, letter]) => (
+              <div key={textKey} className="space-y-2">
+                <label className="block">
+                  <span className="text-xs text-muted-foreground">Option {letter}</span>
+                  <input
+                    value={question[textKey] ?? ''}
+                    onChange={(e) => onChange({ [textKey]: e.target.value })}
+                    className={inputClass}
+                    placeholder={`Text or leave blank if using photo`}
+                  />
+                </label>
+                <QuestionImagePicker
+                  label={`Option ${letter} photo`}
+                  imageKey={question[imageKey]}
+                  imageUrl={question[imageUrl]}
+                  onUploaded={(key, url) => onChange({ [imageKey]: key, [imageUrl]: url })}
+                  onCleared={() => onChange({ [imageKey]: undefined, [imageUrl]: undefined })}
                 />
-              </label>
+              </div>
             ))}
             <AppDropdown
               label="Correct answer"
@@ -300,7 +374,7 @@ export function ManualQuestionEntry() {
     setSaving(true)
     setMessage(null)
     const savedName = paperName.trim()
-    const payload = questions.map(({ clientId: _id, ...q }) => q)
+    const payload = questions.map((q) => toManualInput(q))
     try {
       await addPaperFromManualQuestions(savedName, payload)
       clearManualPaperDraft()
@@ -325,8 +399,8 @@ export function ManualQuestionEntry() {
               Build question paper
             </h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-              Add as many questions as you need with <strong className="text-foreground font-medium">Add question</strong>.
-              Your work is auto-saved as a local draft — publish to the question bank when ready.
+              Add questions with text and/or photos (formulas, diagrams). For each stem or option,
+              upload a JPEG/PNG/WebP. Your work auto-saves as a local draft — publish when ready.
             </p>
           </div>
           {draftSavedAt && (
@@ -337,12 +411,13 @@ export function ManualQuestionEntry() {
         </div>
 
         <label className="block mb-4">
-          <span className="text-xs text-muted-foreground">Question paper name</span>
+          <span className="text-xs text-muted-foreground">Question paper name *</span>
           <input
             value={paperName}
             onChange={(e) => setPaperName(e.target.value)}
             placeholder="e.g. Algebra Unit Test — Batch A"
             className={inputClass}
+            required
           />
         </label>
 
@@ -376,7 +451,7 @@ export function ManualQuestionEntry() {
           <button
             type="button"
             onClick={handleSaveDraft}
-            className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2.5 rounded-md text-sm font-medium hover:bg-secondary/60"
+            className="btn btn-secondary w-full sm:w-auto"
           >
             <FileStack className="w-4 h-4" />
             Save draft locally
@@ -384,7 +459,7 @@ export function ManualQuestionEntry() {
           <button
             type="button"
             onClick={handleDiscardDraft}
-            className="inline-flex items-center justify-center gap-2 border border-border px-4 py-2.5 rounded-md text-sm text-muted-foreground hover:bg-secondary/60"
+            className="btn btn-secondary w-full sm:w-auto"
           >
             <RotateCcw className="w-4 h-4" />
             Discard draft
@@ -393,21 +468,30 @@ export function ManualQuestionEntry() {
             type="button"
             disabled={saving}
             onClick={(e) => void handleSavePaper(e)}
-            className={cn(
-              'inline-flex items-center justify-center gap-2 bg-accent text-accent-foreground px-5 py-2.5 rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-60 sm:ml-auto',
-            )}
+            className="btn btn-action w-full sm:w-auto sm:ml-auto disabled:opacity-60"
           >
             <Save className="w-4 h-4" />
             {saving ? 'Publishing…' : `Publish paper (${questions.length})`}
           </button>
         </div>
+        {message ? (
+          <p
+            className={
+              message.startsWith('Published') || message.startsWith('Draft')
+                ? 'mt-3 text-sm text-leaf'
+                : 'mt-3 text-sm text-rose font-medium'
+            }
+            role="alert"
+          >
+            {message}
+          </p>
+        ) : null}
         <p className="text-xs text-muted-foreground mt-3">
-          Draft stays on this device until you publish or discard. Publishing saves all {questions.length} question
-          {questions.length === 1 ? '' : 's'} to the question bank.
+          Draft stays on this device until you publish or discard. Every question needs a paper name,
+          chapter, and topic — plus text or a photo for the stem, and options A &amp; B (text or photo)
+          for MCQs.
         </p>
       </AppCard>
-
-      {message && <p className="text-sm text-muted-foreground px-1">{message}</p>}
     </div>
   )
 }

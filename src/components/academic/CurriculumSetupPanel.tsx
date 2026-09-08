@@ -433,6 +433,8 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   )
 
   const canManage = role === 'admin' || role === 'tutor'
+  /** Boards and grades are institute structure — admin / org admin only. */
+  const canManageBoardGrade = role === 'admin'
 
   function selectBoard(next: string) {
     const data = curriculum.find((b) => b.board === next)
@@ -582,7 +584,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
         sub={
           role === 'admin'
             ? 'Define the academic hierarchy, track syllabus completion, and manage batches. Reports and assessments derive from this structure.'
-            : 'Create batches for a board and grade, then add students to each batch. Subject and class timing are optional.'
+            : 'Select an existing board and grade, then add subjects, topics, and batches. Boards and grades are managed by your admin.'
         }
         actions={
           <>
@@ -590,15 +592,15 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               type="button"
               disabled
               title="Excel import coming soon"
-              className="text-xs px-3 py-1.5 rounded-md border border-border opacity-50 cursor-not-allowed flex items-center gap-1.5"
+              className="btn btn-secondary text-xs opacity-50 cursor-not-allowed"
             >
               <Upload className="w-3.5 h-3.5" /> Import Excel
             </button>
-            {canManage && (
+            {canManageBoardGrade && (
               <button
                 type="button"
                 onClick={() => setAddTarget(addTarget === 'board' ? null : 'board')}
-                className="text-xs px-3 py-1.5 rounded-md bg-ink text-paper flex items-center gap-1.5"
+                className="btn btn-primary text-xs"
               >
                 <Plus className="w-3.5 h-3.5" /> New board
               </button>
@@ -620,7 +622,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
         </div>
       )}
 
-      {isEmpty && canManage && (
+      {isEmpty && canManageBoardGrade && (
         <AppCard className="mb-6 accent-yellow">
           <h3 className="font-display text-lg text-foreground mb-1">Start your curriculum</h3>
           <p className="text-sm text-muted-foreground mb-4">
@@ -646,7 +648,16 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
         </AppCard>
       )}
 
-      {addTarget === 'board' && canManage && !isEmpty && (
+      {isEmpty && !canManageBoardGrade && (
+        <AppCard className="mb-6">
+          <h3 className="font-display text-lg text-foreground mb-1">Curriculum not set up yet</h3>
+          <p className="text-sm text-muted-foreground">
+            An admin needs to add boards and grades before you can add subjects, topics, or batches.
+          </p>
+        </AppCard>
+      )}
+
+      {addTarget === 'board' && canManageBoardGrade && !isEmpty && (
         <AppCard className="mb-4">
           <InlineAddForm
             label="Board name"
@@ -677,7 +688,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
               <Network className="w-3 h-3" /> Boards
             </div>
-            {canManage && (
+            {canManageBoardGrade && (
               <button
                 type="button"
                 onClick={() => setAddTarget(addTarget === 'board' ? null : 'board')}
@@ -693,7 +704,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             ) : (
               curriculum.map((b) => (
               <div key={b.board} className="space-y-0.5">
-                <div className="flex items-stretch gap-0.5 group">
+                <div className="flex items-stretch gap-2 group">
                   <button
                     type="button"
                     onClick={() => selectBoard(b.board)}
@@ -713,7 +724,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                       {b.grades.reduce((a, g) => a + g.subjects.length, 0)} subjects
                     </div>
                   </button>
-                  {canManage && (
+                  {canManageBoardGrade && (
                     <>
                       <EditButton
                         label={b.board}
@@ -740,7 +751,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                     </>
                   )}
                 </div>
-                {editTarget?.kind === 'board' && editTarget.name === b.board && (
+                {editTarget?.kind === 'board' && editTarget.name === b.board && canManageBoardGrade && (
                   <InlineEditForm
                     label="Rename board"
                     currentValue={b.board}
@@ -767,7 +778,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
               Grades · {board || '—'}
             </div>
-            {canManage && (
+            {canManageBoardGrade && (
               <button
                 type="button"
                 onClick={() => setAddTarget(addTarget === 'grade' ? null : 'grade')}
@@ -777,7 +788,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               </button>
             )}
           </div>
-          {addTarget === 'grade' && (
+          {addTarget === 'grade' && canManageBoardGrade && (
             <InlineAddForm
               label="Grade name"
               placeholder="e.g. Grade 10"
@@ -800,13 +811,17 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
           )}
           <div className="space-y-1 max-h-64 overflow-y-auto scrollbar-thin mt-2">
             {!boardData ? (
-              <p className="text-xs text-muted-foreground py-4 text-center">Select or add a board</p>
+              <p className="text-xs text-muted-foreground py-4 text-center">
+                {canManageBoardGrade ? 'Select or add a board' : 'Select a board'}
+              </p>
             ) : boardData.grades.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-4 text-center">No grades yet</p>
+              <p className="text-xs text-muted-foreground py-4 text-center">
+                {canManageBoardGrade ? 'No grades yet' : 'No grades yet — ask an admin to add grades'}
+              </p>
             ) : (
               boardData.grades.map((g) => (
               <div key={g.grade} className="space-y-0.5">
-                <div className="flex items-stretch gap-0.5 group">
+                <div className="flex items-stretch gap-2 group">
                   <button
                     type="button"
                     onClick={() => selectGrade(g.grade)}
@@ -826,7 +841,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                       {g.subjects.reduce((a, s) => a + s.topics.length, 0)} topics
                     </div>
                   </button>
-                  {canManage && (
+                  {canManageBoardGrade && (
                     <>
                       <EditButton
                         label={g.grade}
@@ -853,7 +868,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                     </>
                   )}
                 </div>
-                {editTarget?.kind === 'grade' && editTarget.name === g.grade && (
+                {editTarget?.kind === 'grade' && editTarget.name === g.grade && canManageBoardGrade && (
                   <InlineEditForm
                     label="Rename grade"
                     currentValue={g.grade}
@@ -920,7 +935,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             ) : (
               gradeData.subjects.map((s) => (
               <div key={s.name} className="space-y-0.5">
-                <div className="flex items-stretch gap-0.5 group">
+                <div className="flex items-stretch gap-2 group">
                   <button
                     type="button"
                     onClick={() => selectSubject(s.name)}
@@ -1037,7 +1052,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               const active = selectedTopic === t.name
               return (
                 <div key={t.name} className="space-y-0.5">
-                  <div className="flex items-stretch gap-0.5 group">
+                  <div className="flex items-stretch gap-2 group">
                     <button
                       type="button"
                       onClick={() => setSelectedTopic(active ? null : t.name)}
@@ -1122,7 +1137,9 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               <p className="text-xs text-muted-foreground">
                 {board && grade
                   ? `${board} · ${grade} — ${scopedBatches.length} batch${scopedBatches.length !== 1 ? 'es' : ''} · ${batches.length} total`
-                  : 'Add board and grade to create batches'}
+                  : canManageBoardGrade
+                    ? 'Add board and grade to create batches'
+                    : 'Select a board and grade to create batches'}
               </p>
             </div>
           </div>

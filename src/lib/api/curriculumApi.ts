@@ -71,16 +71,21 @@ export async function fetchCurriculum(): Promise<CurriculumBoard[]> {
   return mapCurriculumBoards(data)
 }
 
-export async function fetchStudents(center?: string): Promise<StudentSummary[]> {
-  const data = await apiFetch<ApiStudentSummary[]>(
-    `/students${center ? `?center=${encodeURIComponent(center)}` : ''}`,
-  )
-  return data.map(mapStudent)
+export async function fetchBatches(academicYearId?: string): Promise<TutorBatch[]> {
+  const qs = academicYearId
+    ? `?academic_year_id=${encodeURIComponent(academicYearId)}`
+    : ''
+  const data = await apiFetch<ApiTutorBatch[]>(`/batches${qs}`)
+  return data.map(mapBatch)
 }
 
-export async function fetchBatches(): Promise<TutorBatch[]> {
-  const data = await apiFetch<ApiTutorBatch[]>('/batches')
-  return data.map(mapBatch)
+export async function fetchStudents(center?: string, academicYearId?: string): Promise<StudentSummary[]> {
+  const params = new URLSearchParams()
+  if (center) params.set('center', center)
+  if (academicYearId) params.set('academic_year_id', academicYearId)
+  const qs = params.toString()
+  const data = await apiFetch<ApiStudentSummary[]>(`/students${qs ? `?${qs}` : ''}`)
+  return data.map(mapStudent)
 }
 
 export async function fetchStudentsForBatch(batchId: string, center?: string): Promise<StudentSummary[]> {
@@ -197,6 +202,7 @@ export async function createStudent(student: {
   batchId?: string
   centerId?: string
   academicYear?: string
+  academicYearId?: string
   phone?: string
   password?: string
   schoolName?: string
@@ -211,6 +217,7 @@ export async function createStudent(student: {
       batchId: student.batchId,
       centerId: student.centerId ?? '',
       academicYear: student.academicYear ?? '2025-26',
+      academicYearId: student.academicYearId,
       phone: student.phone,
       password: student.password,
       schoolName: student.schoolName,

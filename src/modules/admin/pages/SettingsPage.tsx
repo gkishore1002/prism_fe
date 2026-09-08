@@ -9,6 +9,7 @@ import {
 } from '@/lib/api/institutionPoliciesApi'
 import { useCenters } from '@/hooks/useCenters'
 import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
+import { AcademicYearsSettingsCard } from '@/modules/admin/components/AcademicYearsSettingsCard'
 import type { AssessmentPolicy, CscPolicy, InstitutionPolicies } from '@/types'
 
 function yesNo(value: boolean) {
@@ -170,7 +171,7 @@ export function AdminSettingsPage() {
     <>
       <PageHeader
         title="Settings"
-        sub="Rules for late exam requests and CSC visits at your institution"
+        sub="Academic years, late exam requests, and CSC visits at your institution"
         actions={
           !loading && saved && !editing ? (
             <button
@@ -196,29 +197,32 @@ export function AdminSettingsPage() {
         </div>
       )}
 
+      {canManageTenant && organization && (
+        <AppCard className="mb-6">
+          <h3 className="font-display font-semibold text-foreground mb-1">Organization</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            {isPlatformSuperUser
+              ? 'Platform super user view — internal identifiers for this tenant.'
+              : 'Organization owner only — internal identifiers for this deployment.'}
+          </p>
+          <ViewRow label="Organization name" value={organization.name} />
+          {organization.code && (
+            <ViewRow
+              label="Organization code"
+              value={
+                <span className="font-mono text-xs tracking-wide">{organization.code}</span>
+              }
+            />
+          )}
+        </AppCard>
+      )}
+
+      <AcademicYearsSettingsCard />
+
       {loading || !view || !a || !c ? (
         <AppCard className="text-sm text-muted-foreground py-10 text-center">Loading settings…</AppCard>
       ) : (
         <>
-          {canManageTenant && organization && (
-            <AppCard className="mb-6">
-              <h3 className="font-display font-semibold text-foreground mb-1">Organization</h3>
-              <p className="text-xs text-muted-foreground mb-4">
-                {isPlatformSuperUser
-                  ? 'Platform super user view — internal identifiers for this tenant.'
-                  : 'Organization owner only — internal identifiers for this deployment.'}
-              </p>
-              <ViewRow label="Organization name" value={organization.name} />
-              {organization.code && (
-                <ViewRow
-                  label="Organization code"
-                  value={
-                    <span className="font-mono text-xs tracking-wide">{organization.code}</span>
-                  }
-                />
-              )}
-            </AppCard>
-          )}
           <div className="grid lg:grid-cols-2 gap-6">
             <AppCard>
               <h3 className="font-display font-semibold text-foreground mb-1">Late exam requests</h3>

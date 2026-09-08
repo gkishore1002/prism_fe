@@ -18,7 +18,12 @@ import {
   downloadQuestionJsonTemplate,
   parseQuestionUploadFile,
   QUESTION_UPLOAD_COLUMNS,
+  validateQuestionUploadRow,
 } from '@/lib/questionUploadParse'
+import {
+  canParseExcelImages,
+  parseQuestionUploadExcelWithImages,
+} from '@/lib/questionUploadParseExcelImages'
 import { mapQuestionTopics } from '@/lib/api/syllabusBooksApi'
 import { ApiError, isApiEnabled } from '@/lib/apiClient'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
@@ -54,6 +59,9 @@ export function QuestionUploadWorkflow({
   const [mappingTopics, setMappingTopics] = useState(false)
   const [mapError, setMapError] = useState<string | null>(null)
   const [mapNote, setMapNote] = useState<string | null>(null)
+  const [mappedRowIds, setMappedRowIds] = useState<number[]>([])
+  const [showTopicReview, setShowTopicReview] = useState(false)
+  const [imageParseNote, setImageParseNote] = useState<string | null>(null)
 
   const validRows = rows.filter((r) => r.valid)
   const invalidRows = rows.filter((r) => !r.valid)
@@ -67,7 +75,46 @@ export function QuestionUploadWorkflow({
     setSaveError(null)
     setMapError(null)
     setMapNote(null)
+    setImageParseNote(null)
+    setMappedRowIds([])
+    setShowTopicReview(false)
     try {
+      if (canParseExcelImages(file.name)) {
+        try {
+          const excel = await parseQuestionUploadExcelWithImages(file)
+          setRows(excel.rows)
+          setUploaded(true)
+          setFileLabel(file.name)
+          if (excel.suggestedName) setPaperName(excel.suggestedName)
+          else {
+            const base = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')
+            setPaperName(base)
+          }
+          const bits: string[] = []
+          if (excel.meta.mappedCount > 0) {
+            bits.push(
+              `Linked ${excel.meta.mappedCount} cell image${excel.meta.mappedCount === 1 ? '' : 's'} to questions.`,
+            )
+          } else if (excel.meta.imageCount > 0) {
+            bits.push(
+              `Found ${excel.meta.imageCount} image(s) but none mapped — put each photo in the Question Text or Option A–D cell on that row (Excel: Insert → Pictures → Place in Cell).`,
+            )
+          } else if (excel.meta.warnings.some((w) => /no embedded sheet images/i.test(w))) {
+            bits.push(
+              'No images detected in this .xlsx. Use Excel Place in Cell on Question Text / Option columns, then re-save as Excel 2010–365 (.xlsx). Floating / LibreOffice images often do not import.',
+            )
+          }
+          if (excel.meta.warnings.length) {
+            bits.push(excel.meta.warnings.slice(0, 2).join(' '))
+          }
+          setImageParseNote(bits.length ? bits.join(' ') : null)
+          return
+        } catch (err) {
+          // Fall through to text-only parser
+          console.warn('Excel image parse failed, using text parser', err)
+        }
+      }
+
       const result = await parseQuestionUploadFile(file)
       if (!result.ok) {
         setUploaded(false)
@@ -99,7 +146,20 @@ export function QuestionUploadWorkflow({
     setSaveError(null)
     setMapError(null)
     setMapNote(null)
+    setImageParseNote(null)
+    setMappedRowIds([])
+    setShowTopicReview(false)
     setMappingTopics(false)
+  }
+
+  function updateRowTopic(rowNumber: number, topic: string) {
+    setRows((prev) =>
+      prev.map((row) => {
+        if (row.row !== rowNumber) return row
+        const { valid: _valid, errors: _errors, ...partial } = row
+        return validateQuestionUploadRow({ ...partial, topic })
+      }),
+    )
   }
 
   async function handleUpdateTopics() {
@@ -123,11 +183,19 @@ export function QuestionUploadWorkflow({
       }))
       const { mappings } = await mapQuestionTopics(payload)
       const next = applyMappedTopics(rows, mappings)
-      const filled = next.filter((row) => row.topic.trim()).length - rows.filter((r) => r.topic.trim()).length
+      const newlyMapped = mappings
+        .filter((m) => m.topic.trim())
+        .map((m) => m.row)
+      const filled = newlyMapped.filter((rowNum) => {
+        const before = rows.find((r) => r.row === rowNum)
+        return before && !before.topic.trim()
+      }).length
       setRows(next)
+      setMappedRowIds(newlyMapped)
+      setShowTopicReview(newlyMapped.length > 0)
       setMapNote(
         filled > 0
-          ? `Mapped topics onto ${filled} question${filled === 1 ? '' : 's'} from the syllabus book outline.`
+          ? `Mapped topics onto ${filled} question${filled === 1 ? '' : 's'} from the syllabus book outline. Review and edit below before publishing.`
           : 'No topics were mapped. Upload an analyzed syllabus book for this board / grade / subject, then try again.',
       )
     } catch (err) {
@@ -203,7 +271,24 @@ export function QuestionUploadWorkflow({
   )
 
   const templateActions = (
-    <div className="grid sm:grid-cols-2 gap-3">
+    <div className="space-y-3">
+      <div className="rounded-[12px] border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-foreground">
+        <p className="font-semibold text-foreground">Photo questions (formulas / diagrams)</p>
+        <ol className="mt-2 list-decimal pl-4 space-y-1 text-xs text-muted-foreground">
+          <li>Download the Excel template (.xlsx).</li>
+          <li>
+            Select the <span className="font-medium text-foreground">Question Text</span> or{' '}
+            <span className="font-medium text-foreground">Option A–D</span> cell.
+          </li>
+          <li>
+            Use <span className="font-medium text-foreground">Insert → Pictures → Place in Cell</span>{' '}
+            (not “Place over Cells”).
+          </li>
+          <li>One photo per cell. Text in the cell is optional when a photo is present.</li>
+          <li>.csv / .xls stay text-only — use .xlsx for images.</li>
+        </ol>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
       <button
         type="button"
         onClick={() => downloadQuestionExcelTemplate()}
@@ -215,7 +300,7 @@ export function QuestionUploadWorkflow({
         <span>
           <span className="block text-sm font-semibold text-foreground">Excel / CSV template</span>
           <span className="block text-xs text-muted-foreground mt-0.5">
-            Spreadsheet columns for bulk question intake
+            Spreadsheet columns — use .xlsx + Place in Cell for photos
           </span>
         </span>
         <Download className="w-4 h-4 text-muted-foreground ml-auto shrink-0 mt-1" />
@@ -236,6 +321,7 @@ export function QuestionUploadWorkflow({
         </span>
         <Download className="w-4 h-4 text-muted-foreground ml-auto shrink-0 mt-1" />
       </button>
+      </div>
     </div>
   )
 
@@ -268,7 +354,9 @@ export function QuestionUploadWorkflow({
       <p className="text-sm font-semibold text-foreground">
         {parsing ? 'Validating file…' : 'Drop file or click to browse'}
       </p>
-      <p className="text-xs text-muted-foreground mt-1">.xlsx · .xls · .csv · .json</p>
+      <p className="text-xs text-muted-foreground mt-1">
+        .xlsx (text + Place in Cell photos) · .xls / .csv / .json (text only)
+      </p>
       {fileLabel && (
         <p className="text-xs text-leaf mt-2 inline-flex items-center gap-1">
           <CheckCircle2 className="w-3.5 h-3.5" />
@@ -324,7 +412,7 @@ export function QuestionUploadWorkflow({
               <button
                 type="button"
                 onClick={resetPreview}
-                className="h-10 px-4 rounded-md text-sm border border-border hover:bg-secondary/60"
+                className="btn btn-secondary shrink-0"
               >
                 Cancel
               </button>
@@ -332,7 +420,7 @@ export function QuestionUploadWorkflow({
                 type="button"
                 onClick={() => void handleUpdateTopics()}
                 disabled={blankTopicRows.length === 0 || mappingTopics || saving}
-                className="h-10 px-4 rounded-md text-sm border border-accent/40 bg-accent/10 text-foreground hover:bg-accent/15 disabled:opacity-40 inline-flex items-center gap-1.5"
+                className="btn btn-secondary shrink-0 disabled:opacity-40 border-accent/40 bg-accent/10 hover:bg-accent/15"
                 title={
                   blankTopicRows.length === 0
                     ? 'All ready rows already have a topic'
@@ -349,7 +437,7 @@ export function QuestionUploadWorkflow({
               <button
                 type="submit"
                 disabled={validRows.length === 0 || saving || mappingTopics}
-                className="h-10 px-4 rounded-md text-sm font-medium bg-ink text-paper disabled:opacity-40"
+                className="btn btn-primary shrink-0 disabled:opacity-40"
               >
                 {saving ? 'Publishing…' : `Publish ${validRows.length} Qs`}
               </button>
@@ -362,6 +450,53 @@ export function QuestionUploadWorkflow({
       {mapNote && !mapError && <p className="text-sm text-leaf px-4 sm:px-5 pt-3">{mapNote}</p>}
       {saveError && <p className="text-sm text-rose px-4 sm:px-5 pt-3">{saveError}</p>}
 
+      {showTopicReview && mappedRowIds.length > 0 && (
+        <div className="mx-4 sm:mx-5 mt-3 mb-1 rounded-[12px] border border-accent/35 bg-accent/5 p-3 sm:p-4 space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h4 className="text-sm font-semibold text-foreground">Mapped topics from syllabus books</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Review the topics Vertex mapped. Edit any that look wrong, then continue to publish.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowTopicReview(false)}
+              className="h-8 px-3 rounded-md text-xs border border-border hover:bg-secondary/60"
+            >
+              Done reviewing
+            </button>
+          </div>
+          <ul className="space-y-2 max-h-64 overflow-y-auto">
+            {rows
+              .filter((row) => mappedRowIds.includes(row.row))
+              .map((row) => (
+                <li
+                  key={`mapped-${row.row}`}
+                  className="grid grid-cols-1 sm:grid-cols-[3rem_1fr_minmax(10rem,14rem)] gap-2 items-start rounded-lg border border-border bg-card px-3 py-2.5"
+                >
+                  <span className="font-mono-data text-xs text-muted-foreground pt-2">#{row.row}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm text-foreground line-clamp-2">{row.text || '—'}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {row.chapter || '—'} · {row.subject || '—'}
+                    </p>
+                  </div>
+                  <label className="block">
+                    <span className="sr-only">Topic for row {row.row}</span>
+                    <input
+                      value={row.topic}
+                      onChange={(e) => updateRowTopic(row.row, e.target.value)}
+                      className="h-9 w-full border border-accent/40 rounded-md px-2.5 text-sm bg-background"
+                      placeholder="Topic"
+                    />
+                  </label>
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
+
       <div className="overflow-x-auto max-h-[420px]">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-card z-[1]">
@@ -369,51 +504,114 @@ export function QuestionUploadWorkflow({
               <th className="px-4 py-2.5 font-semibold">Row</th>
               <th className="px-4 py-2.5 font-semibold">Question</th>
               <th className="px-4 py-2.5 font-semibold">Academic path</th>
+              <th className="px-4 py-2.5 font-semibold">Topic</th>
               <th className="px-4 py-2.5 font-semibold">Meta</th>
               <th className="px-4 py-2.5 font-semibold">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {rows.map((row) => (
-              <tr key={row.row} className={row.valid ? '' : 'bg-rose/5'}>
-                <td className="px-4 py-2.5 font-mono-data text-muted-foreground">{row.row}</td>
-                <td className="px-4 py-2.5 max-w-xs">
-                  <p className="line-clamp-2 text-foreground">{row.text || '—'}</p>
-                </td>
-                <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                  {row.board || '—'} · G{row.grade || '—'}
-                  <br />
-                  {row.subject || '—'} / {row.chapter || '—'} /{' '}
-                  {row.topic ? (
-                    row.topic
-                  ) : (
-                    <span className="text-amber-700">topic pending</span>
+            {rows.map((row) => {
+              const wasMapped = mappedRowIds.includes(row.row)
+              return (
+                <tr
+                  key={row.row}
+                  className={cn(
+                    !row.valid && 'bg-rose/5',
+                    wasMapped && row.valid && 'bg-accent/[0.04]',
                   )}
-                </td>
-                <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                  {row.difficulty || '—'} · {Number.isFinite(row.marks) ? `${row.marks}m` : '—'} ·{' '}
-                  {row.questionType || '—'}
-                </td>
-                <td className="px-4 py-2.5">
-                  {!row.valid ? (
-                    <div>
-                      <span className="inline-flex items-center gap-1 text-rose text-xs font-medium">
-                        <XCircle className="w-3.5 h-3.5" /> Blocked
-                      </span>
-                      <p className="text-[10px] text-rose mt-0.5">{row.errors.join(', ')}</p>
+                >
+                  <td className="px-4 py-2.5 font-mono-data text-muted-foreground">{row.row}</td>
+                  <td className="px-4 py-2.5 max-w-sm">
+                    <div className="space-y-2">
+                      <p className="line-clamp-2 text-foreground">{row.text || (row.textImagePreviewUrl ? 'Image question' : '—')}</p>
+                      {(row.textImagePreviewUrl ||
+                        row.optionAImagePreviewUrl ||
+                        row.optionBImagePreviewUrl ||
+                        row.optionCImagePreviewUrl ||
+                        row.optionDImagePreviewUrl) && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {row.textImagePreviewUrl && (
+                            <img
+                              src={row.textImagePreviewUrl}
+                              alt="Question"
+                              className="h-14 w-auto max-w-[7rem] rounded-md border border-border object-contain bg-secondary/40"
+                            />
+                          )}
+                          {(
+                            [
+                              ['A', row.optionAImagePreviewUrl],
+                              ['B', row.optionBImagePreviewUrl],
+                              ['C', row.optionCImagePreviewUrl],
+                              ['D', row.optionDImagePreviewUrl],
+                            ] as const
+                          )
+                            .filter(([, url]) => Boolean(url))
+                            .map(([label, url]) => (
+                              <div key={label} className="relative">
+                                <img
+                                  src={url!}
+                                  alt={`Option ${label}`}
+                                  className="h-12 w-auto max-w-[5.5rem] rounded-md border border-border object-contain bg-secondary/40"
+                                />
+                                <span className="absolute -top-1 -left-1 text-[9px] font-semibold bg-ink text-paper rounded px-1 leading-4">
+                                  {label}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </div>
-                  ) : !row.topic.trim() ? (
-                    <span className="inline-flex items-center gap-1 text-amber-700 text-xs font-medium">
-                      <Sparkles className="w-3.5 h-3.5" /> Needs topic
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-leaf text-xs font-medium">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Ready
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    {row.board || '—'} · G{row.grade || '—'}
+                    <br />
+                    {row.subject || '—'} / {row.chapter || '—'}
+                  </td>
+                  <td className="px-4 py-2.5 min-w-[9rem]">
+                    {row.valid ? (
+                      <input
+                        value={row.topic}
+                        onChange={(e) => updateRowTopic(row.row, e.target.value)}
+                        className={cn(
+                          'h-8 w-full border rounded-md px-2 text-xs bg-background',
+                          wasMapped ? 'border-accent/50' : 'border-border',
+                          !row.topic.trim() && 'border-amber-500/50',
+                        )}
+                        placeholder="Topic"
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">{row.topic || '—'}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    {row.difficulty || '—'} · {Number.isFinite(row.marks) ? `${row.marks}m` : '—'} ·{' '}
+                    {row.questionType || '—'}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {!row.valid ? (
+                      <div>
+                        <span className="inline-flex items-center gap-1 text-rose text-xs font-medium">
+                          <XCircle className="w-3.5 h-3.5" /> Blocked
+                        </span>
+                        <p className="text-[10px] text-rose mt-0.5">{row.errors.join(', ')}</p>
+                      </div>
+                    ) : !row.topic.trim() ? (
+                      <span className="inline-flex items-center gap-1 text-amber-700 text-xs font-medium">
+                        <Sparkles className="w-3.5 h-3.5" /> Needs topic
+                      </span>
+                    ) : wasMapped ? (
+                      <span className="inline-flex items-center gap-1 text-accent text-xs font-medium">
+                        <Sparkles className="w-3.5 h-3.5" /> Mapped
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-leaf text-xs font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -437,6 +635,11 @@ export function QuestionUploadWorkflow({
           Learning portal intake: validated rows publish as one reusable paper.
         </p>
         {parseError && <p className="text-sm text-rose mt-2">{parseError}</p>}
+        {imageParseNote && (
+          <p className="text-xs text-muted-foreground mt-2 rounded-md border border-border bg-secondary/30 px-3 py-2">
+            {imageParseNote}
+          </p>
+        )}
         {preview && <div className="mt-4">{preview}</div>}
       </div>
     )

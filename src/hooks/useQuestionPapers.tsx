@@ -58,7 +58,12 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
         questionsApi.fetchQuestionPapers(),
       ])
       setQuestions(qs)
-      setQuestionPapers(papers.map((p) => questionsApi.enrichPaper(p, qs)))
+      const newestFirst = [...papers].sort((a, b) => {
+        const aKey = a.createdAt || a.id
+        const bKey = b.createdAt || b.id
+        return bKey.localeCompare(aKey)
+      })
+      setQuestionPapers(newestFirst.map((p) => questionsApi.enrichPaper(p, qs)))
       setLoaded(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load questions')

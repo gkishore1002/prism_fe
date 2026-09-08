@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useCenters } from '@/hooks/useCenters'
+import { useAcademicYears } from '@/hooks/useAcademicYears'
 import * as curriculumApi from '@/lib/api/curriculumApi'
 import type { StudentSummary, TutorBatch } from '@/types'
 import type { CurriculumBoard, CurriculumTopic } from '@/types/curriculum'
@@ -53,11 +54,11 @@ interface CurriculumContextValue {
 
 const CurriculumContext = createContext<CurriculumContextValue | null>(null)
 
-async function loadFromApi(center?: string) {
+async function loadFromApi(center?: string, academicYearId?: string) {
   const [curriculum, batches, students] = await Promise.all([
     curriculumApi.fetchCurriculum(),
-    curriculumApi.fetchBatches(),
-    curriculumApi.fetchStudents(center),
+    curriculumApi.fetchBatches(academicYearId),
+    curriculumApi.fetchStudents(center, academicYearId),
   ])
   return { curriculum, batches, students }
 }
@@ -65,6 +66,7 @@ async function loadFromApi(center?: string) {
 export function CurriculumProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, role } = useAuth()
   const { activeCenterId, isAllBranches } = useCenters()
+  const { activeYearId } = useAcademicYears()
   const branchCenterId = isAllBranches ? undefined : activeCenterId
   const [curriculum, setCurriculum] = useState<CurriculumBoard[]>([])
   const [batches, setBatches] = useState<TutorBatch[]>([])
@@ -79,7 +81,7 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
     if (isInitialLoad) setLoading(true)
     setError(null)
     try {
-      const data = await loadFromApi(branchCenterId)
+      const data = await loadFromApi(branchCenterId, activeYearId)
       setCurriculum(data.curriculum)
       setBatches(data.batches)
       setStudents(data.students)
@@ -90,7 +92,7 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
     } finally {
       if (isInitialLoad) setLoading(false)
     }
-  }, [isAuthenticated, role, curriculum.length, batches.length, branchCenterId])
+  }, [isAuthenticated, role, curriculum.length, batches.length, branchCenterId, activeYearId])
 
   const ensureLoaded = useCallback(async () => {
     if (!isAuthenticated || role === 'student') return
@@ -115,9 +117,9 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
     if (!isAuthenticated || role === 'student') return
     if (curriculum.length === 0 && batches.length === 0) return
     void refresh()
-    // Reload student lists when the header branch changes.
+    // Reload when header branch or academic year changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branchCenterId])
+  }, [branchCenterId, activeYearId])
 
   const addBoard = useCallback(async (name: string) => {
     await curriculumApi.addBoard(name.trim())

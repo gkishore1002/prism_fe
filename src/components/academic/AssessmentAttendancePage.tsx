@@ -146,23 +146,20 @@ export function AssessmentAttendancePage({ portal }: AssessmentAttendancePagePro
         title={assessment.title}
         sub={`Created by ${tutorNames[assessment.createdByTutorId ?? ''] ?? 'Tutor'} · ${assessment.board} · ${assessment.grade} · ${assessment.batchName}`}
         actions={
-          <div className="page-actions">
+          <>
             <button
               type="button"
               onClick={() => exportAssessmentResultsCsv(assessment.title, records)}
               disabled={records.length === 0}
-              className="inline-flex items-center gap-2 text-sm border border-border px-4 py-2.5 rounded-md hover:bg-secondary disabled:opacity-50 min-h-[44px]"
+              className="btn btn-secondary inline-flex items-center gap-2 disabled:opacity-50"
             >
               <Download className="w-4 h-4" />
               Export CSV
             </button>
-            <Link
-              to={backPath}
-              className="inline-flex items-center justify-center text-sm border border-border px-4 py-2.5 rounded-md hover:bg-secondary min-h-[44px]"
-            >
+            <Link to={backPath} className="btn btn-secondary inline-flex items-center justify-center">
               All tests
             </Link>
-          </div>
+          </>
         }
       />
 

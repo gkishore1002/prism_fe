@@ -45,6 +45,31 @@ export async function deleteSyllabusBook(bookId: string): Promise<void> {
   await apiFetch(`/syllabus-books/${encodeURIComponent(bookId)}`, { method: 'DELETE' })
 }
 
+export interface SyllabusChapterDraft {
+  title: string
+  topics: string[]
+}
+
+export async function updateSyllabusBookOutline(
+  bookId: string,
+  chapters: SyllabusChapterDraft[],
+): Promise<SyllabusBook> {
+  return apiFetch(`/syllabus-books/${encodeURIComponent(bookId)}/outline`, {
+    method: 'PUT',
+    body: JSON.stringify({ chapters }),
+  })
+}
+
+export async function approveSyllabusBook(
+  bookId: string,
+  chapters?: SyllabusChapterDraft[],
+): Promise<SyllabusBook> {
+  return apiFetch(`/syllabus-books/${encodeURIComponent(bookId)}/approve`, {
+    method: 'POST',
+    body: JSON.stringify(chapters ? { chapters } : {}),
+  })
+}
+
 export async function importBookTopics(bookId: string): Promise<{ status: string; topicsAdded: number }> {
   return apiFetch(`/syllabus-books/${encodeURIComponent(bookId)}/import-topics`, { method: 'POST' })
 }

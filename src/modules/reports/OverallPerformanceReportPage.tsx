@@ -268,7 +268,7 @@ export function OverallPerformanceReportPage({
     }
   }, [studentId])
 
-  if (loading) {
+  if (loading && !report) {
     return <ReportLoader label="Building overall performance report…" />
   }
 

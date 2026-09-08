@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -92,6 +93,8 @@ export function AppSelect({
   }, [options, search])
 
   const selectableFiltered = filtered.filter((o) => !o.disabled)
+  const useMobileSheet = isMobile && portal
+  const lightweight = variant === 'inline'
 
   const closePanel = useCallback(() => {
     setOpen(false)
@@ -138,9 +141,14 @@ export function AppSelect({
     })
   }, [isMobile])
 
-  useEffect(() => {
-    if (!open) return
+  // Layout effect avoids a one-frame unpositioned panel (looks like page flicker).
+  useLayoutEffect(() => {
+    if (!open || useMobileSheet) return
     updatePanelPosition()
+  }, [open, useMobileSheet, updatePanelPosition])
+
+  useEffect(() => {
+    if (!open || useMobileSheet) return
     const onScrollOrResize = () => updatePanelPosition()
     window.addEventListener('resize', onScrollOrResize)
     window.addEventListener('scroll', onScrollOrResize, true)
@@ -148,7 +156,7 @@ export function AppSelect({
       window.removeEventListener('resize', onScrollOrResize)
       window.removeEventListener('scroll', onScrollOrResize, true)
     }
-  }, [open, updatePanelPosition])
+  }, [open, useMobileSheet, updatePanelPosition])
 
   useEffect(() => {
     if (!open) return
@@ -201,30 +209,31 @@ export function AppSelect({
     })
   }
 
-  const useMobileSheet = isMobile && portal
-
   const panel = open ? (
     <>
-      <div
-        className={cn(
-          'fixed inset-0 z-ln-dropdown',
-          useMobileSheet ? 'bg-ink/35 backdrop-blur-[2px]' : 'sm:bg-transparent sm:backdrop-blur-none sm:pointer-events-none',
-          !useMobileSheet && 'bg-ink/30 backdrop-blur-sm sm:bg-transparent',
-        )}
-        aria-hidden
-        onClick={closePanel}
-      />
+      {/* Dim/blur only for mobile bottom sheets — never over the page for desktop/navbar menus */}
+      {useMobileSheet && (
+        <div
+          className="fixed inset-0 z-ln-dropdown bg-ink/35 backdrop-blur-[2px]"
+          aria-hidden
+          onClick={closePanel}
+        />
+      )}
       <div
         ref={panelRef}
         id={listId}
         role="listbox"
         style={portal && !useMobileSheet ? panelStyle : undefined}
         className={cn(
-          'glass-sheet border border-border overflow-hidden flex flex-col z-ln-dropdown',
+          'border border-border overflow-hidden flex flex-col z-ln-dropdown',
+          lightweight
+            ? 'rounded-md bg-background shadow-lg'
+            : 'glass-sheet',
           useMobileSheet
             ? 'ln-dropdown-sheet fixed inset-x-0 bottom-0 rounded-t-[20px] max-h-[min(85dvh,560px)] animate-ln-sheet-up safe-bottom'
             : cn(
-                'rounded-[14px] animate-ios-sheet',
+                lightweight ? 'rounded-md' : 'rounded-[14px]',
+                !lightweight && 'animate-ios-sheet',
                 !portal && 'absolute left-0 right-0 top-full mt-2 max-h-72',
               ),
         )}

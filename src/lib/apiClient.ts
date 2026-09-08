@@ -151,6 +151,39 @@ export async function apiFetch<T>(
   return res.json() as Promise<T>
 }
 
+/** Authenticated binary fetch (question images, exports). */
+export async function apiFetchBlob(
+  path: string,
+  options: RequestInit & { auth?: boolean } = {},
+): Promise<Blob> {
+  if (!isApiEnabled()) {
+    throw new ApiError('API base URL not configured', 0)
+  }
+
+  const { auth = true, headers: initHeaders, ...rest } = options
+  const headers = new Headers(initHeaders)
+  if (auth) {
+    const session = readSession()
+    const token = session?.accessToken
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+    if (session?.role === 'super_user') {
+      const orgCode = readActiveOrgCode()
+      if (orgCode && !isPlatformContext()) headers.set('X-Org-Code', orgCode)
+    }
+  }
+
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...rest, headers })
+  } catch {
+    throw new ApiError(`Cannot reach the API at ${API_BASE}.`, 0)
+  }
+  if (!res.ok) {
+    throw new ApiError(res.statusText || 'Failed to load file', res.status)
+  }
+  return res.blob()
+}
+
 export function getApiBaseUrl(): string {
   return API_BASE
 }

@@ -50,6 +50,10 @@ type McqSource = {
   optionB?: string
   optionC?: string
   optionD?: string
+  optionAImageUrl?: string
+  optionBImageUrl?: string
+  optionCImageUrl?: string
+  optionDImageUrl?: string
 }
 
 export type ShuffledMcqOption = {
@@ -58,17 +62,35 @@ export type ShuffledMcqOption = {
   /** Original bank key (A–D) sent back to the API for grading. */
   originalKey: string
   label: string
+  imageUrl?: string
 }
 
-function collectMcqOptions(question: McqSource): { originalKey: string; label: string }[] {
-  if (question.optionA && question.optionB) {
-    return [
-      { originalKey: 'A', label: question.optionA },
-      { originalKey: 'B', label: question.optionB },
-      ...(question.optionC ? [{ originalKey: 'C', label: question.optionC }] : []),
-      ...(question.optionD ? [{ originalKey: 'D', label: question.optionD }] : []),
-    ]
-  }
+function collectMcqOptions(question: McqSource): { originalKey: string; label: string; imageUrl?: string }[] {
+  const options = [
+    {
+      originalKey: 'A',
+      label: question.optionA || '',
+      imageUrl: question.optionAImageUrl,
+    },
+    {
+      originalKey: 'B',
+      label: question.optionB || '',
+      imageUrl: question.optionBImageUrl,
+    },
+    {
+      originalKey: 'C',
+      label: question.optionC || '',
+      imageUrl: question.optionCImageUrl,
+    },
+    {
+      originalKey: 'D',
+      label: question.optionD || '',
+      imageUrl: question.optionDImageUrl,
+    },
+  ].filter((o) => o.label.trim() || o.imageUrl)
+
+  if (options.length >= 2) return options
+
   return [
     { originalKey: 'A', label: 'Option A' },
     { originalKey: 'B', label: 'Option B' },
@@ -82,6 +104,7 @@ export function mcqOptionsInBankOrder(question: McqSource): ShuffledMcqOption[] 
     displayKey: opt.originalKey,
     originalKey: opt.originalKey,
     label: opt.label,
+    imageUrl: opt.imageUrl,
   }))
 }
 
@@ -103,5 +126,6 @@ export function shuffledMcqOptions(
     displayKey: String.fromCharCode(65 + index),
     originalKey: opt.originalKey,
     label: opt.label,
+    imageUrl: opt.imageUrl,
   }))
 }

@@ -1,5 +1,6 @@
 import { AnalyticsProvider } from '@/hooks/useAnalytics'
 import { CentersProvider } from '@/hooks/useCenters'
+import { AcademicYearsProvider } from '@/hooks/useAcademicYears'
 import { RouterProvider } from 'react-router-dom'
 import { AuthProvider } from '@/hooks/useAuth'
 import { AssessmentProvider } from '@/hooks/useAssessments'
@@ -14,21 +15,23 @@ export function App() {
   return (
     <AuthProvider>
       <CentersProvider>
-        <AnalyticsProvider>
-          <CurriculumProvider>
-            <QuestionPaperProvider>
-              <AssessmentProvider>
-                <NotificationsProvider>
-                  <ToastProvider>
-                    <ConfirmModalProvider>
-                      <RouterProvider router={router} />
-                    </ConfirmModalProvider>
-                  </ToastProvider>
-                </NotificationsProvider>
-              </AssessmentProvider>
-            </QuestionPaperProvider>
-          </CurriculumProvider>
-        </AnalyticsProvider>
+        <AcademicYearsProvider>
+          <AnalyticsProvider>
+            <CurriculumProvider>
+              <QuestionPaperProvider>
+                <AssessmentProvider>
+                  <NotificationsProvider>
+                    <ToastProvider>
+                      <ConfirmModalProvider>
+                        <RouterProvider router={router} />
+                      </ConfirmModalProvider>
+                    </ToastProvider>
+                  </NotificationsProvider>
+                </AssessmentProvider>
+              </QuestionPaperProvider>
+            </CurriculumProvider>
+          </AnalyticsProvider>
+        </AcademicYearsProvider>
       </CentersProvider>
     </AuthProvider>
   )

@@ -28,6 +28,14 @@ interface StudentProfileViewProps {
   batchLabel: string
   centerLabel: string
   scope: 'tutor' | 'admin'
+  enrollments?: {
+    id: string
+    academicYear: string
+    grade: string
+    batch: string
+    centerName: string
+    status: string
+  }[]
   onReviewRequest?: (req: StudentAccessRequest) => void
 }
 
@@ -76,6 +84,7 @@ export function StudentProfileView({
   batchLabel,
   centerLabel,
   scope,
+  enrollments = [],
   onReviewRequest,
 }: StudentProfileViewProps) {
   const [tab, setTab] = useState<ProfileTab>('overview')
@@ -226,6 +235,34 @@ export function StudentProfileView({
             <InfoRow label="Batch" value={batchLabel} />
             {student.schoolName && <InfoRow label="School" value={student.schoolName} />}
           </AppCardSection>
+          {enrollments.length > 0 && (
+            <AppCardSection title="Academic history">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                      <th className="py-2 pr-3 font-semibold">Year</th>
+                      <th className="py-2 pr-3 font-semibold">Grade</th>
+                      <th className="py-2 pr-3 font-semibold">Batch</th>
+                      <th className="py-2 pr-3 font-semibold">Center</th>
+                      <th className="py-2 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {enrollments.map((e) => (
+                      <tr key={e.id} className="border-b border-border/60 last:border-0">
+                        <td className="py-2 pr-3">{e.academicYear}</td>
+                        <td className="py-2 pr-3">{e.grade}</td>
+                        <td className="py-2 pr-3">{e.batch || '—'}</td>
+                        <td className="py-2 pr-3">{e.centerName || '—'}</td>
+                        <td className="py-2 capitalize">{e.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </AppCardSection>
+          )}
           <AppCardSection title="Exam performance">
             {trackingLoading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>

@@ -564,6 +564,8 @@ export interface TutorAssessmentSchedule {
   timingOver?: boolean
   accessRequestStatus?: 'pending' | 'approved' | 'rejected' | null
   canAttend?: boolean
+  /** ISO timestamp when the assessment was created (newest-first lists). */
+  createdAt?: string
 }
 
 export interface QuestionBankEntry {
@@ -583,6 +585,16 @@ export interface QuestionBankEntry {
   optionC?: string
   optionD?: string
   correctAnswer?: string
+  textImageKey?: string
+  optionAImageKey?: string
+  optionBImageKey?: string
+  optionCImageKey?: string
+  optionDImageKey?: string
+  textImageUrl?: string
+  optionAImageUrl?: string
+  optionBImageUrl?: string
+  optionCImageUrl?: string
+  optionDImageUrl?: string
 }
 
 export interface QuestionPaper {
@@ -626,6 +638,21 @@ export interface QuestionUploadRow {
   optionC?: string
   optionD?: string
   correctAnswer?: string
+  textImageBlob?: Blob
+  optionAImageBlob?: Blob
+  optionBImageBlob?: Blob
+  optionCImageBlob?: Blob
+  optionDImageBlob?: Blob
+  textImageKey?: string
+  optionAImageKey?: string
+  optionBImageKey?: string
+  optionCImageKey?: string
+  optionDImageKey?: string
+  textImagePreviewUrl?: string
+  optionAImagePreviewUrl?: string
+  optionBImagePreviewUrl?: string
+  optionCImagePreviewUrl?: string
+  optionDImagePreviewUrl?: string
   valid: boolean
   errors: string[]
 }

@@ -107,7 +107,9 @@ export function validateQuestionUploadRow(
   if (!partial.grade) errors.push('Grade is required')
   if (!partial.subject) errors.push('Subject is required')
   if (!partial.chapter) errors.push('Chapter is required')
-  if (!partial.text) errors.push('Question text is required')
+  if (!partial.text && !partial.textImageBlob && !partial.textImageKey) {
+    errors.push('Question text or stem photo is required')
+  }
 
   const diff = partial.difficulty.toLowerCase()
   if (!diff) errors.push('Difficulty is required')
@@ -120,8 +122,10 @@ export function validateQuestionUploadRow(
   }
 
   if (isMcqType(partial.questionType)) {
-    if (!partial.optionA || !partial.optionB) {
-      errors.push('MCQs require Option A and Option B')
+    const hasA = Boolean(partial.optionA || partial.optionAImageBlob || partial.optionAImageKey)
+    const hasB = Boolean(partial.optionB || partial.optionBImageBlob || partial.optionBImageKey)
+    if (!hasA || !hasB) {
+      errors.push('MCQs require Option A and Option B (text or photo)')
     }
     if (!partial.correctAnswer) {
       errors.push('Correct answer is required for MCQs')

@@ -33,12 +33,34 @@ export interface InstitutionOperationalStats {
   activeStudents: number
   inactiveStudents: number
   totalCenters: number
+  totalStaff?: number
+  tutorCount?: number
+  adminCount?: number
+  activeStaff?: number
+  staffUnassigned?: number
+  assessmentsTotal?: number
+  assessmentsLive?: number
+  assessmentsScheduled?: number
+  assessmentsCompleted?: number
+  assessmentsDraft?: number
+  assessmentsOverdue?: number
+  studentHealthExcellent?: number
+  studentHealthGood?: number
+  studentHealthSupport?: number
+  studentHealthAtRisk?: number
+  curriculumProgress?: number
   cscDueSoon: number
   cscInactive: number
   cscNeverVisited: number
   reassignmentPending: number
   reassignmentApproved: number
   reassignmentRejected: number
+}
+
+export interface BranchSubjectMatrix {
+  subjects: string[]
+  branches: Record<string, string | number>[]
+  series: { subject: string; points: { branch: string; health: number }[] }[]
 }
 
 export interface StudentProfileAnalytics {
@@ -123,43 +145,51 @@ export interface StudentMasterRow {
   daysUntilCscDisable?: number | null
 }
 
-function withCenterQuery(path: string, centerId?: string): string {
-  if (!centerId) return path
+function withScopeQuery(path: string, centerId?: string, academicYearId?: string): string {
+  const params = new URLSearchParams()
+  if (centerId) params.set('center_id', centerId)
+  if (academicYearId) params.set('academic_year_id', academicYearId)
+  const qs = params.toString()
+  if (!qs) return path
   const sep = path.includes('?') ? '&' : '?'
-  return `${path}${sep}center_id=${encodeURIComponent(centerId)}`
+  return `${path}${sep}${qs}`
 }
 
 export const analyticsApi = {
-  institutionOverview: (centerId?: string) =>
-    apiFetch<InstitutionOverview>(withCenterQuery('/analytics/institution/overview', centerId)),
-  institutionOperationalStats: (centerId?: string) =>
+  institutionOverview: (centerId?: string, academicYearId?: string) =>
+    apiFetch<InstitutionOverview>(withScopeQuery('/analytics/institution/overview', centerId, academicYearId)),
+  institutionOperationalStats: (centerId?: string, academicYearId?: string) =>
     apiFetch<InstitutionOperationalStats>(
-      withCenterQuery('/analytics/institution/operational-stats', centerId),
+      withScopeQuery('/analytics/institution/operational-stats', centerId, academicYearId),
     ),
-  institutionCenters: (centerId?: string) =>
-    apiFetch<CenterAnalytics[]>(withCenterQuery('/analytics/institution/centers', centerId)),
-  institutionBoards: (centerId?: string) =>
-    apiFetch<BoardReportRow[]>(withCenterQuery('/analytics/institution/boards', centerId)),
-  institutionTeachers: (centerId?: string) =>
-    apiFetch<TeacherRow[]>(withCenterQuery('/analytics/institution/teachers', centerId)),
-  hardestTopics: (centerId?: string) =>
+  institutionCenters: (centerId?: string, academicYearId?: string) =>
+    apiFetch<CenterAnalytics[]>(withScopeQuery('/analytics/institution/centers', centerId, academicYearId)),
+  branchSubjectMatrix: (centerId?: string, academicYearId?: string) =>
+    apiFetch<BranchSubjectMatrix>(
+      withScopeQuery('/analytics/institution/branch-subject-matrix', centerId, academicYearId),
+    ),
+  institutionBoards: (centerId?: string, academicYearId?: string) =>
+    apiFetch<BoardReportRow[]>(withScopeQuery('/analytics/institution/boards', centerId, academicYearId)),
+  institutionTeachers: (centerId?: string, academicYearId?: string) =>
+    apiFetch<TeacherRow[]>(withScopeQuery('/analytics/institution/teachers', centerId, academicYearId)),
+  hardestTopics: (centerId?: string, academicYearId?: string) =>
     apiFetch<{ topic: string; correct: number }[]>(
-      withCenterQuery('/analytics/institution/hardest-topics', centerId),
+      withScopeQuery('/analytics/institution/hardest-topics', centerId, academicYearId),
     ),
-  syllabusCompletion: (centerId?: string) =>
+  syllabusCompletion: (centerId?: string, academicYearId?: string) =>
     apiFetch<Record<string, number | string>[]>(
-      withCenterQuery('/analytics/institution/syllabus', centerId),
+      withScopeQuery('/analytics/institution/syllabus', centerId, academicYearId),
     ),
-  monthlyTrend: (centerId?: string) =>
+  monthlyTrend: (centerId?: string, academicYearId?: string) =>
     apiFetch<{ month: string; score: number }[]>(
-      withCenterQuery('/analytics/institution/monthly-trend', centerId),
+      withScopeQuery('/analytics/institution/monthly-trend', centerId, academicYearId),
     ),
-  subjectHealth: (centerId?: string) =>
+  subjectHealth: (centerId?: string, academicYearId?: string) =>
     apiFetch<{ subject: string; health: number }[]>(
-      withCenterQuery('/analytics/institution/subject-health', centerId),
+      withScopeQuery('/analytics/institution/subject-health', centerId, academicYearId),
     ),
-  studentMaster: (centerId?: string) =>
-    apiFetch<StudentMasterRow[]>(withCenterQuery('/analytics/students/master', centerId)),
+  studentMaster: (centerId?: string, academicYearId?: string) =>
+    apiFetch<StudentMasterRow[]>(withScopeQuery('/analytics/students/master', centerId, academicYearId)),
   tutorNames: () => apiFetch<Record<string, string>>('/analytics/users/tutor-names'),
 
   studentProfile: (studentId?: string) =>
@@ -211,43 +241,48 @@ export const analyticsApi = {
     }
   },
 
-  tutorTopicWeakness: (batchId?: string, batchName?: string, centerId?: string) => {
+  tutorTopicWeakness: (batchId?: string, batchName?: string, centerId?: string, academicYearId?: string) => {
     const params = new URLSearchParams()
     if (batchId) params.set('batch_id', batchId)
     else if (batchName) params.set('batch_name', batchName)
     if (centerId) params.set('center_id', centerId)
+    if (academicYearId) params.set('academic_year_id', academicYearId)
     const qs = params.toString()
     return apiFetch<BatchTopicWeakness[]>(`/analytics/tutor/topic-weakness${qs ? `?${qs}` : ''}`)
   },
-  tutorAtRisk: (batchId?: string, batchName?: string, centerId?: string) => {
+  tutorAtRisk: (batchId?: string, batchName?: string, centerId?: string, academicYearId?: string) => {
     const params = new URLSearchParams()
     if (batchId) params.set('batch_id', batchId)
     else if (batchName) params.set('batch_name', batchName)
     if (centerId) params.set('center_id', centerId)
+    if (academicYearId) params.set('academic_year_id', academicYearId)
     const qs = params.toString()
     return apiFetch<AtRiskStudent[]>(`/analytics/tutor/at-risk${qs ? `?${qs}` : ''}`)
   },
-  tutorBatchHeatmap: (batchId?: string, batchName?: string, centerId?: string) => {
+  tutorBatchHeatmap: (batchId?: string, batchName?: string, centerId?: string, academicYearId?: string) => {
     const params = new URLSearchParams()
     if (batchId) params.set('batch_id', batchId)
     else if (batchName) params.set('batch_name', batchName)
     if (centerId) params.set('center_id', centerId)
+    if (academicYearId) params.set('academic_year_id', academicYearId)
     const qs = params.toString()
     return apiFetch<{ topic: string; mastery: number }[]>(
       `/analytics/tutor/batch-heatmap${qs ? `?${qs}` : ''}`,
     )
   },
-  classInsights: (centerId?: string, batchId?: string) => {
+  classInsights: (centerId?: string, batchId?: string, academicYearId?: string) => {
     const params = new URLSearchParams()
     if (centerId) params.set('center_id', centerId)
     if (batchId) params.set('batch_id', batchId)
+    if (academicYearId) params.set('academic_year_id', academicYearId)
     const qs = params.toString()
     return apiFetch<ClassInsight[]>(`/analytics/tutor/class-insights${qs ? `?${qs}` : ''}`)
   },
-  tutorCopilot: (batchName?: string, centerId?: string) => {
+  tutorCopilot: (batchName?: string, centerId?: string, academicYearId?: string) => {
     const params = new URLSearchParams()
     if (batchName) params.set('batch_name', batchName)
     if (centerId) params.set('center_id', centerId)
+    if (academicYearId) params.set('academic_year_id', academicYearId)
     const qs = params.toString()
     return apiFetch<TutorCopilotAnalytics>(`/analytics/tutor/copilot${qs ? `?${qs}` : ''}`)
   },
