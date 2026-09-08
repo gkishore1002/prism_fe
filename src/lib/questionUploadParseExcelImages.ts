@@ -70,11 +70,12 @@ function bufferToBlob(buffer: ExcelJS.Buffer, extension?: string): Blob {
   return new Blob([bytes], { type: mime })
 }
 
-function anchorRowCol(img: ExcelJS.Image): { row0: number; col0: number } | null {
-  const range = img.range as {
-    tl?: { nativeRow?: number; nativeCol?: number; row?: number; col?: number }
-  }
-  const tl = range?.tl
+type SheetImage = ReturnType<ExcelJS.Worksheet['getImages']>[number]
+
+function anchorRowCol(img: SheetImage): { row0: number; col0: number } | null {
+  const tl = img.range?.tl as
+    | { nativeRow?: number; nativeCol?: number; row?: number; col?: number }
+    | undefined
   if (!tl) return null
   if (typeof tl.nativeRow === 'number' && typeof tl.nativeCol === 'number') {
     return { row0: tl.nativeRow, col0: tl.nativeCol }
@@ -130,12 +131,19 @@ export async function parseQuestionUploadExcelWithImages(
       warnings.push(`Skipped an image that could not be read (id ${img.imageId}).`)
       continue
     }
-    const anchor = anchorRowCol(img as ExcelJS.Image)
+    const anchor = anchorRowCol(img)
     if (!anchor) {
       warnings.push('An image has no cell anchor and was skipped.')
       continue
     }
-    const applied = applyImage(rows, anchor.row0, anchor.col0 + 1, media, colToField, warnings)
+    const applied = applyImage(
+      rows,
+      anchor.row0,
+      anchor.col0 + 1,
+      { buffer: media.buffer, extension: media.extension },
+      colToField,
+      warnings,
+    )
     if (applied) mappedCount += 1
   }
 
@@ -189,14 +197,16 @@ function applyImage(
   }
   const blob = bufferToBlob(media.buffer, media.extension)
   row[field] = blob
-  const previewMap: Record<ImageField, keyof QuestionUploadRow> = {
-    textImageBlob: 'textImagePreviewUrl',
-    optionAImageBlob: 'optionAImagePreviewUrl',
-    optionBImageBlob: 'optionBImagePreviewUrl',
-    optionCImageBlob: 'optionCImagePreviewUrl',
-    optionDImageBlob: 'optionDImagePreviewUrl',
-  }
-  ;(row as Record<string, unknown>)[previewMap[field]] = URL.createObjectURL(blob)
+  const previewKey = (
+    {
+      textImageBlob: 'textImagePreviewUrl',
+      optionAImageBlob: 'optionAImagePreviewUrl',
+      optionBImageBlob: 'optionBImagePreviewUrl',
+      optionCImageBlob: 'optionCImagePreviewUrl',
+      optionDImageBlob: 'optionDImagePreviewUrl',
+    } as const
+  )[field]
+  row[previewKey] = URL.createObjectURL(blob)
   return true
 }
 

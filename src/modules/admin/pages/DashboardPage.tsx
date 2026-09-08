@@ -778,7 +778,7 @@ export function AdminDashboardPage() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number, name: string) => [`${value} students`, name]}
+                      formatter={(value, name) => [`${value ?? 0} students`, String(name)]}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -977,7 +977,7 @@ export function AdminDashboardPage() {
                             '',
                         )
                       }
-                      formatter={(value: number, name: string) => [`${value}%`, name]}
+                      formatter={(value, name) => [`${value ?? 0}%`, String(name)]}
                     />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <ReferenceLine y={70} stroke={CHART.slate} strokeDasharray="4 4" />
@@ -1094,7 +1094,7 @@ export function AdminDashboardPage() {
                       strokeWidth={2}
                     />
                     <Tooltip
-                      formatter={(value: number, name: string) => [`${value}%`, name]}
+                      formatter={(value, name) => [`${value ?? 0}%`, String(name)]}
                       labelFormatter={(label, payload) =>
                         String(
                           (payload?.[0]?.payload as { fullSubject?: string } | undefined)

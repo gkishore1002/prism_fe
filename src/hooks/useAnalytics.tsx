@@ -121,7 +121,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
   const [branchSubjectMatrix, setBranchSubjectMatrix] = useState<BranchSubjectMatrix | null>(null)
   const [boardReport, setBoardReport] = useState<BoardReportRow[]>([])
   const [teachers, setTeachers] = useState<TeacherRow[]>([])
-  const [hardestTopics, setHardestTopics] = useState<{ topic: string; correct: number }[]>([])
+  const [hardestTopics] = useState<{ topic: string; correct: number }[]>([])
   const [syllabusCompletion, setSyllabusCompletion] = useState<Record<string, number | string>[]>([])
   const [monthlyTrend, setMonthlyTrend] = useState<{ month: string; score: number }[]>([])
   const [subjectHealth, setSubjectHealth] = useState<{ subject: string; health: number }[]>([])

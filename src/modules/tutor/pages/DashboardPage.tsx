@@ -440,7 +440,7 @@ export function TutorDashboardPage() {
                     axisLine={false}
                   />
                   <Tooltip
-                    formatter={(value: number) => [value, 'Count']}
+                    formatter={(value) => [Number(value ?? 0), 'Count']}
                     contentStyle={{ borderRadius: 10, border: '1px solid var(--border)', fontSize: 12 }}
                   />
                   <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={18}>
@@ -499,9 +499,9 @@ export function TutorDashboardPage() {
                     tickFormatter={(v) => `${v}`}
                   />
                   <Tooltip
-                    formatter={(value: number, _name, item) => [
-                      `${value}%`,
-                      (item?.payload as { fullName?: string })?.fullName ?? 'Health',
+                    formatter={(value, _name, item) => [
+                      `${value ?? 0}%`,
+                      (item?.payload as { fullName?: string } | undefined)?.fullName ?? 'Health',
                     ]}
                     contentStyle={{ borderRadius: 10, border: '1px solid var(--border)', fontSize: 12 }}
                   />
