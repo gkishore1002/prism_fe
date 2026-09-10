@@ -27,7 +27,7 @@ import {
   descriptionForAccessRequestStatus,
 } from '@/lib/accessRequestTheme'
 import { cn } from '@/lib/cn'
-import * as analyticsApi from '@/lib/api/analyticsApi'
+import { analyticsApi } from '@/lib/api/analyticsApi'
 import type { AssessmentResult } from '@/types'
 
 export function StudentAssessmentsPage() {

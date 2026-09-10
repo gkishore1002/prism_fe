@@ -15,7 +15,7 @@ import {
   Pencil,
 } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
-import { AppDropdown, AppSelectMulti } from '@/components/ui/AppDropdown'
+import { AppSelectMulti } from '@/components/ui/AppDropdown'
 import { BatchStudentSearchList } from '@/components/academic/BatchStudentSearchList'
 import { BatchStudentPicker } from '@/components/academic/BatchStudentPicker'
 import { SyllabusCompletionSection } from '@/components/academic/SyllabusCompletionSection'
