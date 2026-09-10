@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { useCenters } from '@/hooks/useCenters'
 import { formatCenterLabel } from '@/lib/centerLabel'
 import { cn } from '@/lib/cn'
+import { reloadAppAfterScopeChange } from '@/lib/reloadAppScope'
 
 /** Lightweight navbar menu — portals the panel, never dims/blurs the page. */
 export function BranchSwitcher({ className }: { className?: string }) {
@@ -124,8 +125,13 @@ export function BranchSwitcher({ className }: { className?: string }) {
                 role="option"
                 aria-selected={isAllBranches}
                 onClick={() => {
+                  if (isAllBranches) {
+                    setOpen(false)
+                    return
+                  }
                   setActiveBranch('all')
                   setOpen(false)
+                  reloadAppAfterScopeChange()
                 }}
                 className={cn(
                   'block w-full px-3 py-2 text-left text-xs hover:bg-secondary/50',
@@ -142,8 +148,13 @@ export function BranchSwitcher({ className }: { className?: string }) {
                 role="option"
                 aria-selected={activeBranch === center.id}
                 onClick={() => {
+                  if (activeBranch === center.id) {
+                    setOpen(false)
+                    return
+                  }
                   setActiveBranch(center.id)
                   setOpen(false)
+                  reloadAppAfterScopeChange()
                 }}
                 className={cn(
                   'block w-full px-3 py-2 text-left text-xs hover:bg-secondary/50',

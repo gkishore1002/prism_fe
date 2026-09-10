@@ -15,7 +15,7 @@ import {
   Pencil,
 } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
-import { AppDropdown } from '@/components/ui/AppDropdown'
+import { AppDropdown, AppSelectMulti } from '@/components/ui/AppDropdown'
 import { BatchStudentSearchList } from '@/components/academic/BatchStudentSearchList'
 import { BatchStudentPicker } from '@/components/academic/BatchStudentPicker'
 import { SyllabusCompletionSection } from '@/components/academic/SyllabusCompletionSection'
@@ -23,6 +23,7 @@ import { useCurriculum } from '@/hooks/useCurriculum'
 import { useConfirmModal } from '@/components/ui/AppModal'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
 import { boardsMatch, gradesMatch } from '@/lib/academicScope'
+import { formatSubjects, normalizeSubjectsList } from '@/lib/formatSubjects'
 import { cn } from '@/lib/cn'
 
 interface CurriculumSetupPanelProps {
@@ -30,7 +31,13 @@ interface CurriculumSetupPanelProps {
 }
 
 type AddTarget = 'board' | 'grade' | 'subject' | 'topic' | 'batch' | null
-type EditTarget = { kind: 'board'; name: string } | { kind: 'grade'; name: string } | { kind: 'subject'; name: string } | { kind: 'topic'; name: string } | { kind: 'batch'; id: string; name: string; subject: string; scheduleTiming: string } | null
+type EditTarget =
+  | { kind: 'board'; name: string }
+  | { kind: 'grade'; name: string }
+  | { kind: 'subject'; name: string }
+  | { kind: 'topic'; name: string }
+  | { kind: 'batch'; id: string; name: string; subjects: string[]; scheduleTiming: string }
+  | null
 
 function topicMatches(questionTopic: string, selectedTopic: string): boolean {
   const q = questionTopic.toLowerCase()
@@ -327,7 +334,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   const [addTarget, setAddTarget] = useState<AddTarget>(null)
   const [editTarget, setEditTarget] = useState<EditTarget>(null)
   const [batchName, setBatchName] = useState('')
-  const [batchSubject, setBatchSubject] = useState('')
+  const [batchSubject, setBatchSubject] = useState<string[]>([])
   const [batchScheduleTiming, setBatchScheduleTiming] = useState('')
   const [createSelectedIds, setCreateSelectedIds] = useState<string[]>([])
   const [createPendingNames, setCreatePendingNames] = useState<string[]>([])
@@ -448,7 +455,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
       setGrade('')
       setSubject('')
     }
-    setBatchSubject('')
+    setBatchSubject([])
     setSelectedBatchId(null)
     setSelectedTopic(null)
     setAddTarget(null)
@@ -459,7 +466,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
     if (!data) return
     setGrade(next)
     setSubject(data.subjects[0]?.name ?? '')
-    setBatchSubject('')
+    setBatchSubject([])
     setSelectedBatchId(null)
     setSelectedTopic(null)
     setAddTarget(null)
@@ -473,7 +480,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
 
   function resetBatchForm() {
     setBatchName('')
-    setBatchSubject('')
+    setBatchSubject([])
     setBatchScheduleTiming('')
     setCreateSelectedIds([])
     setCreatePendingNames([])
@@ -517,7 +524,8 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
         name: trimmed,
         board,
         grade,
-        subject: batchSubject.trim() || undefined,
+        subjects: batchSubject,
+        subject: batchSubject[0],
         scheduleTiming: batchScheduleTiming.trim() || undefined,
         avgScore: 0,
         studentIds: createSelectedIds,
@@ -1180,15 +1188,13 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                   className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
                 />
               </label>
-              <AppDropdown
-                label="Subject (optional)"
-                value={batchSubject}
+              <AppSelectMulti
+                label="Subjects (optional)"
+                values={batchSubject}
                 onChange={setBatchSubject}
-                options={[
-                  { value: '', label: 'No subject' },
-                  ...gradeData.subjects.map((s) => ({ value: s.name, label: s.name })),
-                ]}
-                placeholder="No subject"
+                options={gradeData.subjects.map((s) => ({ value: s.name, label: s.name }))}
+                placeholder="Select subjects"
+                searchable
               />
               <label className="block">
                 <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
@@ -1352,7 +1358,9 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                           className={cn('hover:bg-secondary/30', active && 'bg-accent/5')}
                         >
                           <td className="py-3 font-medium">{b.name}</td>
-                          <td className="py-3 text-muted-foreground">{b.subject ?? '—'}</td>
+                          <td className="py-3 text-muted-foreground">
+                            {formatSubjects(b.subjects, b.subject)}
+                          </td>
                           <td className="py-3 text-muted-foreground text-xs">{b.scheduleTiming ?? '—'}</td>
                           <td className="py-3 font-mono-data">{count}</td>
                           <td className="py-3 text-right">
@@ -1373,7 +1381,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                                         kind: 'batch',
                                         id: b.id,
                                         name: b.name,
-                                        subject: b.subject ?? '',
+                                        subjects: normalizeSubjectsList(b.subjects, b.subject),
                                         scheduleTiming: b.scheduleTiming ?? '',
                                       })
                                     }
@@ -1406,7 +1414,8 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                                   void runAction(async () => {
                                     await updateBatch(b.id, {
                                       name: editTarget.name.trim() || undefined,
-                                      subject: editTarget.subject.trim() || undefined,
+                                      subjects: editTarget.subjects,
+                                      subject: editTarget.subjects[0],
                                       scheduleTiming: editTarget.scheduleTiming.trim() || undefined,
                                     })
                                     setEditTarget(null)
@@ -1423,15 +1432,21 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                                       className="mt-1 w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
                                     />
                                   </label>
-                                  <label className="block">
-                                    <span className="text-xs text-muted-foreground">Subject (optional)</span>
-                                    <input
-                                      value={editTarget.subject}
-                                      onChange={(e) => setEditTarget({ ...editTarget, subject: e.target.value })}
-                                      placeholder="e.g. Mathematics"
-                                      className="mt-1 w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
-                                    />
-                                  </label>
+                                  <AppSelectMulti
+                                    label="Subjects (optional)"
+                                    values={editTarget.subjects}
+                                    onChange={(subjects) =>
+                                      setEditTarget({ ...editTarget, subjects })
+                                    }
+                                    options={
+                                      gradeData?.subjects.map((s) => ({
+                                        value: s.name,
+                                        label: s.name,
+                                      })) ?? []
+                                    }
+                                    placeholder="Select subjects"
+                                    searchable
+                                  />
                                   <label className="block">
                                     <span className="text-xs text-muted-foreground">Class timing (optional)</span>
                                     <input
@@ -1468,10 +1483,15 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                     Students in {selectedBatch.name}
                   </h4>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {board} · {grade}
-                    {selectedBatch.subject ? ` · ${selectedBatch.subject}` : ''}
-                    {selectedBatch.scheduleTiming ? ` · ${selectedBatch.scheduleTiming}` : ''} ·{' '}
-                    {batchStudents.length} enrolled
+                    {[
+                      board,
+                      grade,
+                      formatSubjects(selectedBatch.subjects, selectedBatch.subject, ''),
+                      selectedBatch.scheduleTiming,
+                      `${batchStudents.length} enrolled`,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </p>
                 </div>
 

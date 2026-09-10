@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
 import { btnClass } from '@/components/ui/Button'
 import { useAcademicYears } from '@/hooks/useAcademicYears'
+import { reloadAppAfterScopeChange } from '@/lib/reloadAppScope'
 
 function suggestNextYearName(currentName?: string | null): string {
   const match = (currentName || '').match(/^(\d{4})\s*[-–]\s*(\d{2}|\d{4})$/)
@@ -162,7 +163,10 @@ export function AcademicYearsSettingsCard() {
                   <button
                     type="button"
                     className={`${btnClass.secondary} text-xs px-2.5 py-1`}
-                    onClick={() => setActiveYearId(y.id)}
+                    onClick={() => {
+                      setActiveYearId(y.id)
+                      reloadAppAfterScopeChange()
+                    }}
                   >
                     View in header
                   </button>

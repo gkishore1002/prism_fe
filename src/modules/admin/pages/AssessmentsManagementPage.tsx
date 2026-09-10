@@ -10,6 +10,7 @@ import { useCenters } from '@/hooks/useCenters'
 import { centerLabelsForIds } from '@/lib/centerLabel'
 import { DEFAULT_PAGE_LIMIT, pageCount, paginateItems } from '@/lib/pagination'
 import type { InstitutionCenter, TutorAssessmentSchedule } from '@/types'
+import { formatSubjects } from '@/lib/formatSubjects'
 
 function centerLabel(ids: string[], centers: InstitutionCenter[]) {
   return centerLabelsForIds(ids, centers)
@@ -85,7 +86,7 @@ export function AdminAssessmentsManagementPage() {
                     <td className="px-5 py-4">
                       <p className="font-medium">{a.title}</p>
                       <p className="text-xs text-muted-foreground mt-0.5 capitalize">
-                        {a.subject} · {a.mode} · {a.status}
+                        {formatSubjects(a.subjects, a.subject)} · {a.mode} · {a.status}
                       </p>
                     </td>
                     <td className="px-5 py-4 text-muted-foreground">

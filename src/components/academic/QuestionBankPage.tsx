@@ -22,6 +22,7 @@ import { DEFAULT_PAGE_LIMIT } from '@/lib/pagination'
 import { topicCounts, totalMarksForQuestions } from '@/lib/questionPaperUtils'
 import { cn } from '@/lib/cn'
 import { useConfirmModal } from '@/components/ui/AppModal'
+import { formatSubjects } from '@/lib/formatSubjects'
 
 interface QuestionBankPageProps {
   role?: 'tutor' | 'admin'
@@ -270,7 +271,8 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                               </div>
                             </td>
                             <td className="px-4 sm:px-5 py-3 text-muted-foreground whitespace-nowrap">
-                              {paper.board} · {paper.grade} · {paper.subject}
+                              {paper.board} · {paper.grade} ·{' '}
+                              {formatSubjects(paper.subjects, paper.subject)}
                             </td>
                             <td className="px-4 sm:px-5 py-3">
                               <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-muted-foreground">

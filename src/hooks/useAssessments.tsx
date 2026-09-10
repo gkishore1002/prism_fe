@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useCenters } from '@/hooks/useCenters'
+import { useAcademicYears } from '@/hooks/useAcademicYears'
 import * as assessmentsApi from '@/lib/api/assessmentsApi'
 import type { TutorAssessmentSchedule } from '@/types'
 import { assessmentMatchesScope } from '@/lib/academicScope'
@@ -23,6 +24,7 @@ export type { StudentAssessmentQuery, AssessmentContextValue }
 export function AssessmentProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, role, user } = useAuth()
   const { activeCenterId, isAllBranches } = useCenters()
+  const { activeYearId } = useAcademicYears()
   const branchCenterId = isAllBranches ? undefined : activeCenterId
   const [assessments, setAssessments] = useState<TutorAssessmentSchedule[]>([])
   const [loading, setLoading] = useState(false)
@@ -33,11 +35,14 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
   )
 
   const loadedBranchRef = useRef<string | 'all' | null>(null)
+  const loadedYearRef = useRef<string | 'all' | null>(null)
   const loadedRoleRef = useRef<string | null>(null)
   const hasLoadedOnceRef = useRef(false)
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated) return
+    // Tutor/admin lists are year-scoped; wait for the year switcher.
+    if (role !== 'student' && !activeYearId) return
     const isInitialLoad = !hasLoadedOnceRef.current
     if (isInitialLoad) setLoading(true)
     setError(null)
@@ -45,10 +50,11 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
       const data =
         role === 'student'
           ? await assessmentsApi.fetchAssessmentsForStudent({ studentId: user.id })
-          : await assessmentsApi.fetchAssessments(branchCenterId)
+          : await assessmentsApi.fetchAssessments(branchCenterId, activeYearId)
       setAssessments(data)
       attendanceCacheRef.current.clear()
       loadedBranchRef.current = role === 'student' ? 'all' : (branchCenterId ?? 'all')
+      loadedYearRef.current = role === 'student' ? 'all' : (activeYearId ?? 'all')
       loadedRoleRef.current = role
       hasLoadedOnceRef.current = true
     } catch (e) {
@@ -56,14 +62,17 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
     } finally {
       if (isInitialLoad) setLoading(false)
     }
-  }, [isAuthenticated, role, user.id, branchCenterId])
+  }, [isAuthenticated, role, user.id, branchCenterId, activeYearId])
 
   const ensureLoaded = useCallback(async () => {
     if (!isAuthenticated) return
-    const key = role === 'student' ? 'all' : (branchCenterId ?? 'all')
+    if (role !== 'student' && !activeYearId) return
+    const branchKey = role === 'student' ? 'all' : (branchCenterId ?? 'all')
+    const yearKey = role === 'student' ? 'all' : (activeYearId ?? 'all')
     const alreadyLoaded =
       loadedRoleRef.current === role &&
-      loadedBranchRef.current === key &&
+      loadedBranchRef.current === branchKey &&
+      loadedYearRef.current === yearKey &&
       hasLoadedOnceRef.current
 
     if (!loadPromiseRef.current) {
@@ -77,12 +86,13 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
     if (!alreadyLoaded || assessments.length === 0) {
       await loadPromiseRef.current
     }
-  }, [isAuthenticated, role, assessments.length, branchCenterId, refresh])
+  }, [isAuthenticated, role, assessments.length, branchCenterId, activeYearId, refresh])
 
   useEffect(() => {
     if (!isAuthenticated) {
       setAssessments([])
       loadedBranchRef.current = null
+      loadedYearRef.current = null
       loadedRoleRef.current = null
       hasLoadedOnceRef.current = false
       return
@@ -90,10 +100,18 @@ export function AssessmentProvider({ children }: { children: ReactNode }) {
     // Admin shell: do not auto-fetch the full assessment list on every route.
     // Pages that need it call ensureLoaded / refresh explicitly.
     if (role === 'admin') return
-    const key = role === 'student' ? 'all' : (branchCenterId ?? 'all')
-    if (loadedRoleRef.current === role && loadedBranchRef.current === key) return
+    if (role !== 'student' && !activeYearId) return
+    const branchKey = role === 'student' ? 'all' : (branchCenterId ?? 'all')
+    const yearKey = role === 'student' ? 'all' : (activeYearId ?? 'all')
+    if (
+      loadedRoleRef.current === role &&
+      loadedBranchRef.current === branchKey &&
+      loadedYearRef.current === yearKey
+    ) {
+      return
+    }
     void refresh()
-  }, [isAuthenticated, role, branchCenterId, refresh])
+  }, [isAuthenticated, role, branchCenterId, activeYearId, refresh])
 
   const addAssessment = useCallback(async (assessment: TutorAssessmentSchedule) => {
     const created = await assessmentsApi.createAssessment(assessment)

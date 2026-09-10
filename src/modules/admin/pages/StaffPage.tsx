@@ -66,7 +66,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const { user, refreshAuth } = useAuth()
   const { organizationScoped } = useAdminPortalContext()
   const { centers, isPlatformSuperUser, ensureLoaded, refresh: refreshCenters, activeCenterId, isAllBranches } = useCenters()
-  const { activeYearId, activeYear } = useAcademicYears()
+  const { activeYearId, activeYear, ensureLoaded: ensureYearsLoaded } = useAcademicYears()
   const { teachers, loading: analyticsLoading, refresh } = useAnalytics()
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -102,8 +102,15 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const [historyLoading, setHistoryLoading] = useState(false)
 
   const branchCenterId = isAllBranches ? undefined : activeCenterId
+  const yearHint = activeYear?.name
 
   const load = useCallback(async () => {
+    // Wait for header year so we never flash the unscoped full directory.
+    if (!activeYearId) {
+      setStaff([])
+      setLoading(true)
+      return
+    }
     setLoading(true)
     setError(null)
     try {
@@ -118,8 +125,9 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
 
   useEffect(() => {
     void ensureLoaded()
+    void ensureYearsLoaded()
     void load()
-  }, [ensureLoaded, load])
+  }, [ensureLoaded, ensureYearsLoaded, load])
 
   useEffect(() => {
     if (!viewingProfile) {
@@ -315,13 +323,23 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
       )}
 
       <div className="grid sm:grid-cols-3 gap-4 mb-6">
-        <AppStat label="Staff" value={staff.length} hint="Admins and tutors" />
-        <AppStat label="Tutors" value={tutorRows.length} tone="leaf" />
+        <AppStat
+          label="Staff"
+          value={staff.length}
+          hint={yearHint ? `Assigned in ${yearHint}` : 'Admins and tutors'}
+        />
+        <AppStat
+          label="Tutors"
+          value={tutorRows.length}
+          tone="leaf"
+          hint={yearHint ? yearHint : undefined}
+        />
         <AppStat
           label="Students taught"
           value={totalStudents}
           unit={avgGrowth != null ? ` · avg growth ${avgGrowth}%` : undefined}
           tone="accent"
+          hint={yearHint ? yearHint : undefined}
         />
       </div>
 
@@ -950,7 +968,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
         open={bulkUploadOpen}
         onClose={() => setBulkUploadOpen(false)}
         title="Bulk upload staff"
-        description="Import branch admins and tutors from CSV. Organization owner column appears only in Organization Admin portal."
+        description="Import branch admins and tutors from CSV or Excel (.xlsx). Organization owner column appears only in Organization Admin portal."
         columnsHelp={
           organizationScoped
             ? [
@@ -959,7 +977,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
                 'branch_admin — yes/no',
                 'tutor — yes/no',
                 'org_owner — yes/no (Organization Admin only)',
-                'branches — branch names separated by ; or ,',
+                'branches — branch names or cities separated by ; or ,',
                 'password — optional custom password',
               ]
             : [
@@ -967,7 +985,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
                 'phone — 10-digit mobile (required)',
                 'branch_admin — yes/no',
                 'tutor — yes/no',
-                'branches — branch names separated by ; or ,',
+                'branches — branch names or cities separated by ; or ,',
                 'password — optional custom password',
               ]
         }

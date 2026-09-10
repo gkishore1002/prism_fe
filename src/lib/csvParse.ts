@@ -80,20 +80,84 @@ export function splitList(value: string | undefined): string[] {
     .filter(Boolean)
 }
 
+function recordsFromMatrix(matrix: unknown[][]): ParsedCsv {
+  const cleaned = matrix
+    .map((row) => row.map((cell) => String(cell ?? '').trim()))
+    .filter((cells) => cells.some((cell) => cell.length > 0))
+  if (cleaned.length === 0) {
+    return { headers: [], rows: [] }
+  }
+  const headers = cleaned[0].map(normalizeHeader)
+  const dataRows = cleaned.slice(1).map((cells) => {
+    const record: Record<string, string> = {}
+    headers.forEach((header, index) => {
+      if (!header) return
+      record[header] = (cells[index] ?? '').trim()
+    })
+    return record
+  })
+  return { headers, rows: dataRows }
+}
+
+/** Read .csv / .xlsx / .xls into normalized header records for bulk import. */
+export async function parseSpreadsheetFile(file: File): Promise<ParsedCsv> {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+  if (ext === 'xlsx' || ext === 'xls') {
+    const XLSX = await import('xlsx')
+    const buffer = await file.arrayBuffer()
+    const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+    const sheetName = workbook.SheetNames[0]
+    if (!sheetName) {
+      return { headers: [], rows: [] }
+    }
+    const sheet = workbook.Sheets[sheetName]
+    const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
+      defval: '',
+      raw: false,
+      blankrows: false,
+    })
+    return recordsFromMatrix(matrix)
+  }
+
+  if (ext && ext !== 'csv' && ext !== 'txt' && ext !== 'tsv') {
+    throw new Error('Unsupported file. Use .csv, .xlsx, or .xls.')
+  }
+
+  const text = await file.text()
+  // Excel-saved "CSV" sometimes uses tabs / semicolons.
+  if (ext === 'tsv' || (text.includes('\t') && !text.includes(','))) {
+    const matrix = text
+      .replace(/^\uFEFF/, '')
+      .split(/\r?\n/)
+      .map((line) => line.split('\t'))
+    return recordsFromMatrix(matrix)
+  }
+  return parseCsvText(text)
+}
+
+function pickRowValue(row: Record<string, string>, keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key]
+    if (value?.trim()) return value.trim()
+  }
+  return ''
+}
+
 export function studentRowsFromCsv(rows: Record<string, string>[]) {
   return rows
     .filter((row) => Object.values(row).some((value) => value.trim()))
     .map((row) => ({
-      name: row.name ?? '',
-      phone: row.phone ?? '',
-      board: row.board ?? '',
-      grade: row.grade ?? '',
-      batch: row.batch ?? '',
-      centerName: row.center ?? row.center_name ?? '',
-      centerId: row.center_id ?? '',
-      academicYear: row.academic_year ?? '2025-26',
-      password: row.password || undefined,
-      schoolName: row.school_name || undefined,
+      name: pickRowValue(row, ['name', 'student_name', 'student', 'full_name']),
+      phone: pickRowValue(row, ['phone', 'mobile', 'phone_number', 'mobile_number']),
+      board: pickRowValue(row, ['board']),
+      grade: pickRowValue(row, ['grade', 'class']),
+      batch: pickRowValue(row, ['batch', 'batch_name']),
+      centerName: pickRowValue(row, ['center', 'center_name', 'branch', 'branch_name']),
+      centerId: pickRowValue(row, ['center_id', 'branch_id']),
+      academicYear: pickRowValue(row, ['academic_year', 'year']) || '2025-26',
+      password: pickRowValue(row, ['password']) || undefined,
+      schoolName: pickRowValue(row, ['school_name', 'school']) || undefined,
     }))
 }
 
@@ -101,12 +165,12 @@ export function staffRowsFromCsv(rows: Record<string, string>[]) {
   return rows
     .filter((row) => Object.values(row).some((value) => value.trim()))
     .map((row) => ({
-      name: row.name ?? '',
-      phone: row.phone ?? '',
+      name: pickRowValue(row, ['name', 'staff_name', 'full_name']),
+      phone: pickRowValue(row, ['phone', 'mobile', 'phone_number', 'mobile_number']),
       isOwner: parseTruthy(row.org_owner),
       isBranchAdmin: parseTruthy(row.branch_admin),
       isTutor: parseTruthy(row.tutor),
-      centerNames: splitList(row.branches ?? row.centers ?? row.branch),
+      centerNames: splitList(row.branches ?? row.centers ?? row.branch ?? row.center),
       password: row.password || undefined,
     }))
 }

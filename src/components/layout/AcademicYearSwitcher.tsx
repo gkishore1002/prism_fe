@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from 'react-dom'
 import { useAcademicYears } from '@/hooks/useAcademicYears'
 import { cn } from '@/lib/cn'
+import { reloadAppAfterScopeChange } from '@/lib/reloadAppScope'
 
 /** Lightweight navbar filter — portals the panel, never dims/blurs the page. */
 export function AcademicYearSwitcher({ className }: { className?: string }) {
@@ -94,8 +95,13 @@ export function AcademicYearSwitcher({ className }: { className?: string }) {
                 role="option"
                 aria-selected={y.id === activeYearId}
                 onClick={() => {
+                  if (y.id === activeYearId) {
+                    setOpen(false)
+                    return
+                  }
                   setActiveYearId(y.id)
                   setOpen(false)
+                  reloadAppAfterScopeChange()
                 }}
                 className={cn(
                   'block w-full px-3 py-2 text-left text-xs hover:bg-secondary/50',

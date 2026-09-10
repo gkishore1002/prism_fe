@@ -173,7 +173,10 @@ export async function createPaperFromQuestions(
   }
   const board = questions[0].board
   const grade = questions[0].grade
-  const subject = questions[0].subject
+  const subjects = Array.from(
+    new Set(questions.map((q) => q.subject.trim()).filter(Boolean)),
+  )
+  const subject = subjects[0] ?? questions[0].subject
   const questionIds = questions.map((q) => q.id)
   const data = await apiFetch<ApiQuestionPaper>('/question-papers', {
     method: 'POST',
@@ -182,6 +185,7 @@ export async function createPaperFromQuestions(
       board,
       grade,
       subject,
+      subjects,
       questionIds,
       source: 'upload',
     }),

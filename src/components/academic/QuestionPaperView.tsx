@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Download, Printer, Trash2 } from 'lucide-react'
+import { Download, Loader2, Printer, Trash2 } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { AuthImage } from '@/components/ui/AuthImage'
 import { useAssessments } from '@/hooks/useAssessments'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
 import { fetchAssessment } from '@/lib/api/assessmentsApi'
 import { useConfirmModal } from '@/components/ui/AppModal'
+import {
+  downloadQuestionPaperPdf,
+  printQuestionPaper,
+  QUESTION_PAPER_PRINT_ROOT_ID,
+} from '@/lib/questionPaperPrint'
 import type { QuestionBankEntry, TutorAssessmentSchedule } from '@/types'
+import { formatSubjects } from '@/lib/formatSubjects'
 
 function renderOptions(q: QuestionBankEntry) {
   const opts = [
@@ -64,6 +70,8 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
   const [fetchedAssessment, setFetchedAssessment] = useState<TutorAssessmentSchedule | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [exportBusy, setExportBusy] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -128,8 +136,8 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
 
   const title = assessment?.title ?? paper?.name ?? 'Question paper'
   const subtitle = assessment
-    ? `${assessment.board} · ${assessment.grade} · ${assessment.subject} · ${assessment.mode} mode`
-    : `${paper?.board} · ${paper?.grade} · ${paper?.subject} · Saved question paper`
+    ? `${assessment.board} · ${assessment.grade} · ${formatSubjects(assessment.subjects, assessment.subject)} · ${assessment.mode} mode`
+    : `${paper?.board} · ${paper?.grade} · ${formatSubjects(paper?.subjects, paper?.subject)} · Saved question paper`
 
   const coverageLabel =
     assessment?.paperCoverage === 'selected_topics'
@@ -137,6 +145,24 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
       : assessment?.paperCoverage === 'full'
         ? 'Full question paper'
         : null
+
+  function handlePrint() {
+    setExportError(null)
+    printQuestionPaper({ title })
+  }
+
+  async function handleDownloadPdf() {
+    if (exportBusy) return
+    setExportBusy(true)
+    setExportError(null)
+    try {
+      await downloadQuestionPaperPdf({ title })
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'Failed to download PDF')
+    } finally {
+      setExportBusy(false)
+    }
+  }
 
   return (
     <>
@@ -146,25 +172,35 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
           title={title}
           sub={subtitle}
           actions={
-            <>
+            <div className="flex flex-wrap items-center gap-2 print:hidden">
               <button
                 type="button"
-                className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary"
+                onClick={handlePrint}
+                disabled={exportBusy || questions.length === 0}
+                className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary disabled:opacity-60"
               >
                 <Printer className="w-4 h-4" /> Print
               </button>
               <button
                 type="button"
-                className="btn btn-primary gap-2 px-4 py-2 text-sm"
+                onClick={() => void handleDownloadPdf()}
+                disabled={exportBusy || questions.length === 0}
+                className="btn btn-primary gap-2 px-4 py-2 text-sm disabled:opacity-60"
               >
-                <Download className="w-4 h-4" /> Download PDF
+                {exportBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {exportBusy ? 'Preparing…' : 'Download PDF'}
               </button>
-            </>
+            </div>
           }
         />
       )}
 
-      <AppCard className="max-w-3xl mx-auto">
+      {exportError && (
+        <p className="mb-4 text-sm text-rose print:hidden">{exportError}</p>
+      )}
+
+      <div id={QUESTION_PAPER_PRINT_ROOT_ID} className="question-paper-print-root max-w-3xl mx-auto">
+      <AppCard className="max-w-none">
         <div className="border-b border-ink pb-6 mb-8 text-center">
           <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
             BrightPath Academy · Question Paper
@@ -172,8 +208,8 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
           <div className="font-display text-3xl mt-3">{title}</div>
           <div className="text-sm text-muted-foreground mt-2">
             {assessment
-              ? `${assessment.board} · ${assessment.grade} · ${assessment.subject} · ${assessment.batchName}`
-              : `${paper?.board} · ${paper?.grade} · ${paper?.subject}`}
+              ? `${assessment.board} · ${assessment.grade} · ${formatSubjects(assessment.subjects, assessment.subject)} · ${assessment.batchName}`
+              : `${paper?.board} · ${paper?.grade} · ${formatSubjects(paper?.subjects, paper?.subject)}`}
           </div>
           <div className="flex flex-wrap justify-center gap-6 mt-4 text-xs text-muted-foreground">
             {assessment && <span>Duration: {assessment.durationMinutes} minutes</span>}
@@ -193,7 +229,7 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
         ) : (
           <div className="space-y-8">
             {questions.map((q, idx) => (
-              <div key={q.id} className="pb-6 border-b border-border last:border-0">
+              <div key={q.id} className="pb-6 border-b border-border last:border-0 break-inside-avoid">
                 <div className="flex items-baseline justify-between gap-4 mb-2">
                   <div className="text-sm font-medium space-y-2">
                     <div>
@@ -223,7 +259,7 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
                             if (ok) void removeQuestion(q.id)
                           })
                         }}
-                        className="text-rose hover:opacity-80"
+                        className="text-rose hover:opacity-80 print:hidden"
                         aria-label="Delete question"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -251,6 +287,7 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
           — End of question paper —
         </div>
       </AppCard>
+      </div>
     </>
   )
 }

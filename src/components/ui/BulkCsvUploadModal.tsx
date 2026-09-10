@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Download, Upload } from 'lucide-react'
 import { AppModal } from '@/components/ui/AppModal'
 import { btnClass } from '@/components/ui/Button'
-import { parseCsvText } from '@/lib/csvParse'
+import { parseSpreadsheetFile } from '@/lib/csvParse'
 
 export interface BulkCsvUploadModalProps<T> {
   open: boolean
@@ -65,17 +65,16 @@ export function BulkCsvUploadModal<T>({
     setParseError(null)
     setResult(null)
     try {
-      const text = await file.text()
-      const parsed = parseCsvText(text)
+      const parsed = await parseSpreadsheetFile(file)
       if (parsed.rows.length === 0) {
         setParsedRows([])
-        setParseError('CSV is empty or missing data rows.')
+        setParseError('File is empty or missing data rows. Use the template headers (name, phone, …).')
         return
       }
       setParsedRows(mapRows(parsed.rows))
     } catch (error) {
       setParsedRows([])
-      setParseError(error instanceof Error ? error.message : 'Could not read CSV file')
+      setParseError(error instanceof Error ? error.message : 'Could not read this file')
     }
   }
 
@@ -123,7 +122,7 @@ export function BulkCsvUploadModal<T>({
     >
       <div className="space-y-4">
         <div className="rounded-lg border border-border bg-secondary/20 px-4 py-3 text-sm">
-          <p className="font-medium text-foreground mb-2">CSV columns</p>
+          <p className="font-medium text-foreground mb-2">Spreadsheet columns</p>
           <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
             {columnsHelp.map((line) => (
               <li key={line}>{line}</li>
@@ -146,11 +145,13 @@ export function BulkCsvUploadModal<T>({
         {!result && (
           <label className="block rounded-xl border border-dashed border-border px-4 py-8 text-center cursor-pointer hover:bg-secondary/30 transition-colors">
             <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-            <span className="block text-sm font-medium">Upload CSV file</span>
-            <span className="block text-xs text-muted-foreground mt-1">Use the template headers exactly</span>
+            <span className="block text-sm font-medium">Upload CSV or Excel file</span>
+            <span className="block text-xs text-muted-foreground mt-1">
+              .csv, .xlsx, or .xls — use the template headers
+            </span>
             <input
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
               className="hidden"
               onChange={(event) => void handleFileChange(event.target.files?.[0] ?? null)}
             />

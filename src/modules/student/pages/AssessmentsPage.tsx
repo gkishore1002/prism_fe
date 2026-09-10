@@ -15,6 +15,7 @@ import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { resolveStudentProfile, scopeLabelFromProfile } from '@/modules/student/lib/studentProfile'
 import { StudentEnrollmentYearBar } from '@/modules/student/components/StudentEnrollmentYearBar'
 import { scopeLabel } from '@/lib/academicScope'
+import { formatSubjects } from '@/lib/formatSubjects'
 import type { StudentEnrollment } from '@/lib/api/academicYearsApi'
 import { RequestReassignmentModal } from '@/modules/student/components/RequestReassignmentModal'
 import { ExamStartButton } from '@/modules/student/components/ExamStartButton'
@@ -26,16 +27,20 @@ import {
   descriptionForAccessRequestStatus,
 } from '@/lib/accessRequestTheme'
 import { cn } from '@/lib/cn'
+import * as analyticsApi from '@/lib/api/analyticsApi'
+import type { AssessmentResult } from '@/types'
 
 export function StudentAssessmentsPage() {
   const { user } = useAuth()
   useAnalyticsPage('studentAssessments')
   const { getAssessmentsForStudent, canStudentAttend, loading: assessmentsLoading, error, refresh } =
     useAssessments()
-  const { loading: analyticsLoading, recentAssessments, studentProfile } = useAnalytics()
+  const { loading: analyticsLoading, recentAssessments: recentFromAnalytics, studentProfile } =
+    useAnalytics()
   const [reassignTarget, setReassignTarget] = useState<{ id: string; title: string } | null>(null)
   const [fullReportTarget, setFullReportTarget] = useState<string | null>(null)
   const [activeEnrollment, setActiveEnrollment] = useState<StudentEnrollment | null>(null)
+  const [recentAssessments, setRecentAssessments] = useState<AssessmentResult[]>([])
   const { refresh: refreshNotifications } = useNotifications()
 
   useEffect(() => {
@@ -57,6 +62,29 @@ export function StudentAssessmentsPage() {
     }
   }, [refresh])
 
+  useEffect(() => {
+    let cancelled = false
+    async function loadRecent() {
+      if (!activeEnrollment) {
+        setRecentAssessments(recentFromAnalytics)
+        return
+      }
+      try {
+        const rows = await analyticsApi.recentAssessments(undefined, {
+          academicYearId: activeEnrollment.academicYearId,
+          enrollmentId: activeEnrollment.id,
+        })
+        if (!cancelled) setRecentAssessments(rows)
+      } catch {
+        if (!cancelled) setRecentAssessments(recentFromAnalytics)
+      }
+    }
+    void loadRecent()
+    return () => {
+      cancelled = true
+    }
+  }, [activeEnrollment, recentFromAnalytics])
+
   const profile = resolveStudentProfile(studentProfile, user)
 
   const academicScope = profile ? { board: profile.board, grade: profile.grade } : null
@@ -64,10 +92,21 @@ export function StudentAssessmentsPage() {
     ? { studentId: profile.id || user.id, board: profile.board, grade: profile.grade }
     : null
 
-  const assigned = useMemo(
-    () => (query ? getAssessmentsForStudent(query) : []),
-    [getAssessmentsForStudent, query],
-  )
+  const assigned = useMemo(() => {
+    const rows = query ? getAssessmentsForStudent(query) : []
+    if (!activeEnrollment) return rows
+    // Live/upcoming only for the current enrollment year; past years show history only.
+    if (!activeEnrollment.isCurrent) {
+      return rows.filter(
+        (a) =>
+          a.academicYearId === activeEnrollment.academicYearId &&
+          (a.studentSubmitted || a.status === 'completed'),
+      )
+    }
+    return rows.filter(
+      (a) => !a.academicYearId || a.academicYearId === activeEnrollment.academicYearId,
+    )
+  }, [getAssessmentsForStudent, query, activeEnrollment])
 
   const availableNow = useMemo(
     () =>
@@ -105,9 +144,9 @@ export function StudentAssessmentsPage() {
     () =>
       recentAssessments.filter((row) => {
         if (!activeEnrollment) return true
-        const anyRow = row as { enrollmentId?: string; academicYearId?: string }
-        if (anyRow.enrollmentId) return anyRow.enrollmentId === activeEnrollment.id
-        if (anyRow.academicYearId) return anyRow.academicYearId === activeEnrollment.academicYearId
+        if (row.enrollmentId) return row.enrollmentId === activeEnrollment.id
+        if (row.academicYearId) return row.academicYearId === activeEnrollment.academicYearId
+        // Legacy rows without year/enrollment: only show on current year view.
         return activeEnrollment.isCurrent
       }),
     [recentAssessments, activeEnrollment],
@@ -279,7 +318,7 @@ export function StudentAssessmentsPage() {
                   <p className="text-paper/70 text-sm mt-1">
                     {a.questionCount} questions
                     {a.durationMinutes > 0 ? ` · ${a.durationMinutes} minutes` : ' · Untimed'} ·{' '}
-                    {a.subject}
+                    {formatSubjects(a.subjects, a.subject)}
                   </p>
                   <p className="text-paper/50 text-xs mt-1">
                     {scopeLabel({ board: a.board, grade: a.grade })} · {a.batchName}
@@ -407,7 +446,8 @@ export function StudentAssessmentsPage() {
                 <div>
                   <p className="font-medium text-foreground">{a.title}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {a.subject} · {a.mode} mode · {a.questionCount} questions · Scheduled
+                    {formatSubjects(a.subjects, a.subject)} · {a.mode} mode · {a.questionCount}{' '}
+                    questions · Scheduled
                   </p>
                 </div>
                 <div className="flex flex-col sm:items-end gap-2 text-xs text-muted-foreground shrink-0">

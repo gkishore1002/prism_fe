@@ -210,14 +210,32 @@ export const analyticsApi = {
     apiFetch<TopicReadinessPrediction[]>(`/analytics/student/topic-readiness${studentId ? `?student_id=${studentId}` : ''}`),
   studentSubjects: (studentId?: string) =>
     apiFetch<{ name: string; health: number; status: string }[]>(`/analytics/student/subjects${studentId ? `?student_id=${studentId}` : ''}`),
-  recentAssessments: (studentId?: string) =>
-    apiFetch<AssessmentResult[]>(`/analytics/student/recent-assessments${studentId ? `?student_id=${studentId}` : ''}`),
+  recentAssessments: (
+    studentId?: string,
+    opts?: { academicYearId?: string; enrollmentId?: string },
+  ) => {
+    const params = new URLSearchParams()
+    if (studentId) params.set('student_id', studentId)
+    if (opts?.academicYearId) params.set('academic_year_id', opts.academicYearId)
+    if (opts?.enrollmentId) params.set('enrollment_id', opts.enrollmentId)
+    const qs = params.toString()
+    return apiFetch<AssessmentResult[]>(`/analytics/student/recent-assessments${qs ? `?${qs}` : ''}`)
+  },
   studentReport: (studentId?: string) =>
     apiFetch<StudentWiseReport>(`/analytics/student/report${studentId ? `?student_id=${studentId}` : ''}`),
   overallReport: (studentId?: string) =>
     apiFetch<OverallPerformanceReport>(`/analytics/student/overall-report${studentId ? `?student_id=${studentId}` : ''}`),
-  assessmentReports: (studentId?: string) =>
-    apiFetch<AssessmentReport[]>(`/analytics/student/assessment-reports${studentId ? `?student_id=${studentId}` : ''}`),
+  assessmentReports: (
+    studentId?: string,
+    opts?: { academicYearId?: string; enrollmentId?: string },
+  ) => {
+    const params = new URLSearchParams()
+    if (studentId) params.set('student_id', studentId)
+    if (opts?.academicYearId) params.set('academic_year_id', opts.academicYearId)
+    if (opts?.enrollmentId) params.set('enrollment_id', opts.enrollmentId)
+    const qs = params.toString()
+    return apiFetch<AssessmentReport[]>(`/analytics/student/assessment-reports${qs ? `?${qs}` : ''}`)
+  },
   assessmentReport: (assessmentId: string, studentId?: string) =>
     apiFetch<AssessmentReport>(
       `/analytics/student/assessment-reports/${encodeURIComponent(assessmentId)}${studentId ? `?student_id=${studentId}` : ''}`,

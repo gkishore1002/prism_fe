@@ -29,6 +29,7 @@ import { exitExamFullscreen } from '@/lib/examFullscreen'
 import { getExamDeviceId } from '@/lib/examDevice'
 import { useExamProctoring } from '@/modules/student/hooks/useExamProctoring'
 import { cn } from '@/lib/cn'
+import { formatSubjects } from '@/lib/formatSubjects'
 import {
   AccessRequestStatusBadge,
   accessRequestTheme,
@@ -991,7 +992,8 @@ export function StudentTakeAssessmentPage() {
             <div className="text-[10px] uppercase tracking-widest text-accent">Session score</div>
             <div className="font-mono-data text-5xl sm:text-6xl font-bold mt-2">{pct}%</div>
             <p className="text-paper/70 mt-2 text-sm">
-              {correct} of {answers.length} correct · {assessment.subject} · {board} {grade}
+              {correct} of {answers.length} correct ·{' '}
+              {formatSubjects(assessment.subjects, assessment.subject)} · {board} {grade}
             </p>
             {weakTopics.length > 0 && (
               <p className="text-sm text-paper/80 mt-4">Work on: {weakTopics.join(', ')}</p>

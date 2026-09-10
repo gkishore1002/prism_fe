@@ -1,5 +1,6 @@
 import type { TutorCopilotAnalytics } from '@/lib/api/analyticsApi'
 import type { BatchTopicWeakness, StudentSummary, TutorBatch } from '@/types'
+import { formatSubjects } from '@/lib/formatSubjects'
 import { defaultTutorDashboardHeadline, type TutorDashboardHeroSummary } from './dashboardContent'
 
 function normalizeTopic(topic: string) {
@@ -65,7 +66,9 @@ export function buildTutorCopilotSummary(
 
   return {
     headline: buildHeadline(activeBatch, topWeakness, weak, copilot),
-    subject: activeBatch?.subject ?? copilot?.subject ?? 'Mathematics',
+    subject: formatSubjects(activeBatch?.subjects, activeBatch?.subject, '') ||
+      copilot?.subject ||
+      'Mathematics',
     batchName: activeBatch?.name ?? copilot?.batchName ?? 'Batch',
     studentCount: batchStudents.length || copilot?.studentCount || 0,
     avgScore: activeBatch?.avgScore ?? copilot?.avgScore ?? 0,

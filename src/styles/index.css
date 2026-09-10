@@ -861,4 +861,24 @@
     width: 100% !important;
     max-width: none !important;
   }
+
+  body.printing-question-paper main > *:not(.question-paper-print-root):not(:has(.question-paper-print-root)) {
+    display: none !important;
+  }
+
+  body.printing-question-paper .question-paper-print-root,
+  body.printing-question-paper #question-paper-print-root {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  body.printing-question-paper .glass-card {
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    padding: 0 !important;
+  }
 }

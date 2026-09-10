@@ -22,6 +22,7 @@ import { StudentProfileView } from '@/components/academic/StudentProfileView'
 import { ReassignmentReviewModal } from '@/components/academic/ReassignmentReviewModal'
 import { formatCenterLabel, centerLabelById } from '@/lib/centerLabel'
 import { exportStudentsCsv } from '@/lib/api/exportsApi'
+import { reloadAppAfterScopeChange } from '@/lib/reloadAppScope'
 import {
   bulkImportStudents,
   downloadStudentsImportTemplate,
@@ -111,7 +112,8 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
     useCurriculum()
   const { confirm } = useConfirmModal()
   const { centers, activeCenterId, isAllBranches, ensureLoaded: ensureCentersLoaded } = useCenters()
-  const { years, activeYearId, activeYear, setActiveYearId } = useAcademicYears()
+  const { years, activeYearId, activeYear, setActiveYearId, ensureLoaded: ensureYearsLoaded } =
+    useAcademicYears()
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -155,6 +157,10 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
   }, [ensureCurriculumLoaded])
 
   useEffect(() => {
+    void ensureYearsLoaded()
+  }, [ensureYearsLoaded])
+
+  useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 300)
     return () => window.clearTimeout(timer)
   }, [searchInput])
@@ -175,6 +181,13 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
   }, [debouncedSearch, effectiveCenter, activeYearId])
 
   const loadStudents = useCallback(async () => {
+    if (!activeYearId) {
+      setList([])
+      setTotal(0)
+      setPages(1)
+      setLoading(true)
+      return
+    }
     setLoading(true)
     setFetchError(null)
     try {
@@ -243,7 +256,7 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
   async function handleExportStudents() {
     setExporting(true)
     try {
-      await exportStudentsCsv()
+      await exportStudentsCsv(effectiveCenter, activeYearId)
     } catch (e) {
       setFetchError(e instanceof Error ? e.message : 'Export failed')
     } finally {
@@ -273,6 +286,21 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
     if (centers[0] && !formCenter) setFormCenter(centers[0].id)
   }, [centers, formCenter])
 
+  useEffect(() => {
+    if (!tutorBatches.length) {
+      setFormBatch('')
+      return
+    }
+    if (!formBatch || !tutorBatches.some((b) => b.id === formBatch)) {
+      setFormBatch(tutorBatches[0].id)
+    }
+  }, [tutorBatches, formBatch])
+
+  useEffect(() => {
+    if (!showForm) return
+    setFetchError(null)
+  }, [showForm])
+
   const [formPhone, setFormPhone] = useState('')
   const [formPassword, setFormPassword] = useState('')
 
@@ -287,14 +315,35 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
     e.preventDefault()
     if (!isValidPhone(formPhone)) return
     const form = new FormData(e.currentTarget)
+    const name = String(form.get('name') || '').trim()
+    const batchId = (formBatch || String(form.get('batchId') || '')).trim()
+    const centerId = (formCenter || String(form.get('centerId') || '')).trim()
+    if (!name) {
+      setFetchError('Student name is required.')
+      return
+    }
+    if (!batchId) {
+      setFetchError('Select a batch for this student.')
+      return
+    }
+    if (!centerId) {
+      setFetchError('Select a branch / center.')
+      return
+    }
+    if (!activeYearId) {
+      setFetchError('Select an academic year in the header first.')
+      return
+    }
+    const selectedBatch = tutorBatches.find((b) => b.id === batchId)
     setSaving(true)
+    setFetchError(null)
     try {
       await createStudent({
-        name: String(form.get('name') || ''),
-        board: String(form.get('board') || 'CBSE'),
-        grade: `Grade ${String(form.get('grade') || '8')}`,
-        batchId: String(form.get('batchId') || formBatch),
-        centerId: String(form.get('centerId') || formCenter),
+        name,
+        board: selectedBatch?.board || formBoard || 'CBSE',
+        grade: selectedBatch?.grade || `Grade ${formGrade || '8'}`,
+        batchId,
+        centerId,
         academicYear: activeYear?.name || '2025-26',
         academicYearId: activeYearId,
         phone: formPhone.trim(),
@@ -307,6 +356,8 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
       setFormPassword('')
       setPage(1)
       e.currentTarget.reset()
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'Failed to save student')
     } finally {
       setSaving(false)
     }
@@ -426,6 +477,11 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
       {showForm && (
         <AppCard>
           <h3 className="font-display text-lg text-foreground mb-4">Add student</h3>
+          {fetchError && (
+            <p className="mb-4 rounded-md border border-rose/30 bg-rose/5 px-3 py-2 text-sm text-rose">
+              {fetchError}
+            </p>
+          )}
           <form onSubmit={handleAddStudent} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="block md:col-span-2">
               <span className="text-xs text-muted-foreground">Student name *</span>
@@ -478,7 +534,9 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
               value={activeYearId ?? years[0]?.id ?? ''}
               onChange={(id) => {
                 // Keep create form aligned with header year selection.
-                if (id) setActiveYearId(id)
+                if (!id || id === activeYearId) return
+                setActiveYearId(id)
+                reloadAppAfterScopeChange()
               }}
               options={years.map((y) => ({
                 value: y.id,
@@ -508,7 +566,7 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
             <div className="md:col-span-2 flex gap-2">
               <button
                 type="submit"
-                disabled={saving || !isValidPhone(formPhone)}
+                disabled={saving || !isValidPhone(formPhone) || !formBatch || !formCenter || !activeYearId}
                 className="bg-accent text-accent-foreground px-4 py-2 rounded-md text-sm font-medium disabled:opacity-60"
               >
                 {saving ? 'Saving…' : 'Save student'}
@@ -517,6 +575,11 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
                 Cancel
               </button>
             </div>
+            {!tutorBatches.length && (
+              <p className="md:col-span-2 text-xs text-muted-foreground">
+                No batches for {activeYear?.name ?? 'this academic year'}. Create a batch first, then add students.
+              </p>
+            )}
           </form>
         </AppCard>
       )}
@@ -525,7 +588,11 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
         {fetchError ? (
           <p className="text-sm text-rose py-4">{fetchError}</p>
         ) : list.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">No students found.</p>
+          <p className="text-sm text-muted-foreground py-4">
+            {activeYear
+              ? `No students enrolled in ${activeYear.name}. Switch the academic year in the header, or add/promote students into this year.`
+              : 'No students found.'}
+          </p>
         ) : (
           <div className={loading ? 'opacity-60 pointer-events-none' : undefined}>
             <ResponsiveTable minWidth={520}>
@@ -780,14 +847,14 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
         open={bulkUploadOpen}
         onClose={() => setBulkUploadOpen(false)}
         title="Bulk upload students"
-        description="Import many students from a CSV file. Login email will be phone@gmail.com and default password is the phone number."
+        description="Import many students from a CSV or Excel (.xlsx) file. Login email will be phone@gmail.com and default password is the phone number."
         columnsHelp={[
           'name — full name (required)',
           'phone — 10-digit mobile (required)',
           'board — e.g. CBSE (required)',
           'grade — e.g. Grade 8 (required)',
           'batch — batch name (optional)',
-          'center — branch name (optional)',
+          'center — branch name or city (optional; must match an existing branch)',
           'academic_year — default 2025-26',
           'password — optional custom password',
           'school_name — optional',

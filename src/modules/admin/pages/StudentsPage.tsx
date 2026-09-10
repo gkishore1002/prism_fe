@@ -3,19 +3,26 @@ import { PageHeader, AppStat } from '@/components/layout/AppShell'
 import { StudentManagementPanel } from '@/components/academic/StudentManagementPanel'
 import { useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useCenters } from '@/hooks/useCenters'
+import { useAcademicYears } from '@/hooks/useAcademicYears'
 import { fetchStudentsMasterStats, type StudentMasterStats } from '@/lib/api/studentsApi'
 
 export function AdminStudentsPage({ embedded = false }: { embedded?: boolean }) {
   useAnalyticsPage('adminStudents')
   const { centers, activeCenterId, isAllBranches } = useCenters()
+  const { activeYearId } = useAcademicYears()
   const [stats, setStats] = useState<StudentMasterStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const branchCenterId = isAllBranches ? undefined : activeCenterId
 
   useEffect(() => {
+    if (!activeYearId) {
+      setStats(null)
+      setStatsLoading(true)
+      return
+    }
     let cancelled = false
     setStatsLoading(true)
-    void fetchStudentsMasterStats(branchCenterId)
+    void fetchStudentsMasterStats(branchCenterId, activeYearId)
       .then((next) => {
         if (!cancelled) setStats(next)
       })
@@ -25,7 +32,7 @@ export function AdminStudentsPage({ embedded = false }: { embedded?: boolean }) 
     return () => {
       cancelled = true
     }
-  }, [branchCenterId])
+  }, [branchCenterId, activeYearId])
 
   return (
     <>

@@ -27,6 +27,8 @@ import { centerLabelsForIds } from '@/lib/centerLabel'
 import { DEFAULT_PAGE_LIMIT, pageCount, paginateItems } from '@/lib/pagination'
 import type { InstitutionCenter, TutorAssessmentSchedule } from '@/types'
 import { AppModal, useConfirmModal } from '@/components/ui/AppModal'
+import { formatSubjects } from '@/lib/formatSubjects'
+import { useAcademicYears } from '@/hooks/useAcademicYears'
 
 const statusStyles: Record<string, string> = {
   draft: 'bg-secondary text-muted-foreground',
@@ -61,6 +63,7 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
   const canManage = role === 'tutor' || role === 'admin'
   const portalBase = `/${role}`
   const { assessments, addAssessment, removeAssessment, patchAssessment, refresh } = useAssessments()
+  const { activeYearId } = useAcademicYears()
 
   useEffect(() => {
     void refresh()
@@ -116,12 +119,21 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
   }, [completedPage, completedPages])
 
   async function handleSave(draft: Partial<TutorAssessmentSchedule>) {
+    if (!activeYearId) {
+      setSaveMessage({ type: 'error', text: 'Select an academic year before scheduling an assessment.' })
+      return
+    }
     const newAssessment: TutorAssessmentSchedule = {
       id: `ta-${Date.now()}`,
       title: draft.title ?? 'New assessment',
       board: draft.board ?? 'CBSE',
       grade: draft.grade ?? 'Grade 8',
-      subject: draft.subject ?? 'Mathematics',
+      subject: draft.subject ?? draft.subjects?.[0] ?? 'Mathematics',
+      subjects: draft.subjects?.length
+        ? draft.subjects
+        : draft.subject
+          ? [draft.subject]
+          : ['Mathematics'],
       scope: draft.scope ?? 'topic',
       mode: draft.mode ?? 'assessment',
       batchName: draft.batchName ?? '',
@@ -140,6 +152,7 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
       shuffleQuestions: draft.shuffleQuestions ?? false,
       topic: draft.topic,
       createdAt: new Date().toISOString(),
+      academicYearId: activeYearId,
     }
     try {
       await addAssessment(newAssessment)
@@ -242,7 +255,7 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                    {assessment.subject}
+                    {formatSubjects(assessment.subjects, assessment.subject)}
                     {assessment.batchName ? ` · ${assessment.batchName}` : ''}
                     {assessment.scheduledAt ? ` · ${assessment.scheduledAt}` : ''}
                   </p>
@@ -335,7 +348,7 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                    {assessment.subject}
+                    {formatSubjects(assessment.subjects, assessment.subject)}
                     {assessment.batchName ? ` · ${assessment.batchName}` : ''}
                     {assessment.classAvg != null ? ` · avg ${assessment.classAvg}%` : ''}
                   </p>
@@ -395,7 +408,7 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
         title={infoAssessment?.title ?? 'Assessment details'}
         description={
           infoAssessment
-            ? `${infoAssessment.board} · ${infoAssessment.grade} · ${infoAssessment.subject}`
+            ? `${infoAssessment.board} · ${infoAssessment.grade} · ${formatSubjects(infoAssessment.subjects, infoAssessment.subject)}`
             : undefined
         }
         size="md"

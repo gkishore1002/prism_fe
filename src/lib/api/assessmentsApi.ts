@@ -22,9 +22,16 @@ function unwrapAssessments(data: ApiAssessment[] | PaginatedAssessments): ApiAss
   return data.items ?? []
 }
 
-export async function fetchAssessments(centerId?: string): Promise<TutorAssessmentSchedule[]> {
+export async function fetchAssessments(
+  centerId?: string,
+  academicYearId?: string,
+): Promise<TutorAssessmentSchedule[]> {
+  const params = new URLSearchParams()
+  if (centerId) params.set('center_id', centerId)
+  if (academicYearId) params.set('academic_year_id', academicYearId)
+  const qs = params.toString()
   const data = await apiFetch<ApiAssessment[] | PaginatedAssessments>(
-    `/assessments${centerId ? `?center_id=${encodeURIComponent(centerId)}` : ''}`,
+    `/assessments${qs ? `?${qs}` : ''}`,
   )
   return unwrapAssessments(data).map(mapAssessment)
 }
@@ -38,6 +45,7 @@ export interface StudentAssessmentQuery {
   studentId: string
   board?: string
   grade?: string
+  academicYearId?: string
 }
 
 export async function fetchAssessmentsForStudent(
@@ -46,6 +54,7 @@ export async function fetchAssessmentsForStudent(
   const params = new URLSearchParams()
   if (query.board) params.set('board', query.board)
   if (query.grade) params.set('grade', query.grade)
+  if (query.academicYearId) params.set('academic_year_id', query.academicYearId)
   const qs = params.toString()
   const path = `/assessments/student/${encodeURIComponent(query.studentId)}${qs ? `?${qs}` : ''}`
   const data = await apiFetch<ApiAssessment[]>(path)
@@ -62,6 +71,11 @@ export async function createAssessment(
       board: assessment.board,
       grade: assessment.grade,
       subject: assessment.subject,
+      subjects: assessment.subjects?.length
+        ? assessment.subjects
+        : assessment.subject
+          ? [assessment.subject]
+          : [],
       scope: assessment.scope,
       mode: assessment.mode,
       batchName: assessment.batchName,
@@ -79,6 +93,7 @@ export async function createAssessment(
       paperCoverage: assessment.paperCoverage,
       selectedTopics: assessment.selectedTopics,
       shuffleQuestions: assessment.shuffleQuestions ?? false,
+      academicYearId: assessment.academicYearId,
     }),
   })
   return mapAssessment(data)
@@ -291,9 +306,13 @@ export async function createAccessRequest(
 
 export async function fetchAccessRequests(
   status?: 'pending' | 'approved' | 'rejected',
+  academicYearId?: string,
 ): Promise<AssessmentAccessRequest[]> {
-  const qs = status ? `?status=${status}` : ''
-  return apiFetch<AssessmentAccessRequest[]>(`/assessments/access-requests${qs}`)
+  const params = new URLSearchParams()
+  if (status) params.set('status', status)
+  if (academicYearId) params.set('academic_year_id', academicYearId)
+  const qs = params.toString()
+  return apiFetch<AssessmentAccessRequest[]>(`/assessments/access-requests${qs ? `?${qs}` : ''}`)
 }
 
 export async function fetchAccessRequestReviewContext(

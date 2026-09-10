@@ -18,6 +18,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { StudentProfileModal } from '@/components/academic/StudentProfileModal'
 import { ReassignmentReviewModal } from '@/components/academic/ReassignmentReviewModal'
 import { fetchAccessRequests } from '@/lib/api/assessmentsApi'
+import { useAcademicYears } from '@/hooks/useAcademicYears'
 import {
   AccessRequestLegend,
   AccessRequestStatusBadge,
@@ -214,6 +215,7 @@ function RequestRow({
 }
 
 export function AccessRequestsPanel({ scope = 'tutor' }: { scope?: 'tutor' | 'admin' }) {
+  const { activeYearId } = useAcademicYears()
   const [loading, setLoading] = useState(true)
   const [requests, setRequests] = useState<AssessmentAccessRequest[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -226,13 +228,18 @@ export function AccessRequestsPanel({ scope = 'tutor' }: { scope?: 'tutor' | 'ad
   const [exporting, setExporting] = useState(false)
 
   async function load() {
+    if (!activeYearId) {
+      setRequests([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     try {
       const [pending, approved, rejected] = await Promise.all([
-        fetchAccessRequests('pending'),
-        fetchAccessRequests('approved'),
-        fetchAccessRequests('rejected'),
+        fetchAccessRequests('pending', activeYearId),
+        fetchAccessRequests('approved', activeYearId),
+        fetchAccessRequests('rejected', activeYearId),
       ])
       setRequests([...pending, ...approved, ...rejected])
     } catch (e) {
@@ -245,7 +252,8 @@ export function AccessRequestsPanel({ scope = 'tutor' }: { scope?: 'tutor' | 'ad
 
   useEffect(() => {
     void load()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeYearId])
 
   useEffect(() => {
     setPage(1)

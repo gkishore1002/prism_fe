@@ -15,12 +15,14 @@ import { DEFAULT_PAGE_LIMIT } from '@/lib/pagination'
 import { exportCscComplianceCsv, exportStudentsCsv } from '@/lib/api/exportsApi'
 import { useCenters } from '@/hooks/useCenters'
 import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
+import { useAcademicYears } from '@/hooks/useAcademicYears'
 import type { InstitutionCenter, StudentMasterProfile } from '@/types'
 
 export function AdminCenterDetailPage() {
   const { centerId = '' } = useParams()
   const { canManageTenant, loading: centersLoading, ensureLoaded } = useCenters()
   const { organizationScoped } = useAdminPortalContext()
+  const { activeYearId, activeYear } = useAcademicYears()
   useAnalyticsPage('adminCenters')
   const { centerAnalytics, refresh: refreshAnalytics } = useAnalytics()
   const { policies } = useInstitutionPolicies()
@@ -79,7 +81,7 @@ export function AdminCenterDetailPage() {
   }, [centerId])
 
   const loadStudents = useCallback(async () => {
-    if (!centerId) return
+    if (!centerId || !activeYearId) return
     setStudentsLoading(true)
     try {
       const data = await fetchStudentsMasterPaginated({
@@ -87,6 +89,7 @@ export function AdminCenterDetailPage() {
         limit: DEFAULT_PAGE_LIMIT,
         center: centerId,
         search: debouncedSearch || undefined,
+        academicYearId: activeYearId,
       })
       setStudents(data.items)
       setTotal(data.total)
@@ -96,7 +99,7 @@ export function AdminCenterDetailPage() {
     } finally {
       setStudentsLoading(false)
     }
-  }, [centerId, page, debouncedSearch])
+  }, [centerId, page, debouncedSearch, activeYearId])
 
   useEffect(() => {
     void loadCenter()
@@ -133,7 +136,7 @@ export function AdminCenterDetailPage() {
     setExporting(kind)
     setError(null)
     try {
-      if (kind === 'students') await exportStudentsCsv(centerId)
+      if (kind === 'students') await exportStudentsCsv(centerId, activeYearId)
       else await exportCscComplianceCsv(centerId)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Export failed')
@@ -316,7 +319,11 @@ export function AdminCenterDetailPage() {
         {studentsLoading && students.length === 0 ? (
           <p className="text-sm text-muted-foreground p-5">Loading students…</p>
         ) : students.length === 0 ? (
-          <p className="text-sm text-muted-foreground p-5">No students at this center yet.</p>
+          <p className="text-sm text-muted-foreground p-5">
+            {activeYear
+              ? `No students enrolled at this center for ${activeYear.name}.`
+              : 'No students at this center yet.'}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

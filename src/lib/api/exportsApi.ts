@@ -20,9 +20,12 @@ export async function downloadCsvExport(path: string, filename: string): Promise
   URL.revokeObjectURL(url)
 }
 
-export function exportStudentsCsv(centerId?: string) {
-  const qs = centerId ? `?center_id=${encodeURIComponent(centerId)}` : ''
-  return downloadCsvExport(`/exports/students.csv${qs}`, 'students.csv')
+export function exportStudentsCsv(centerId?: string, academicYearId?: string) {
+  const qs = new URLSearchParams()
+  if (centerId) qs.set('center_id', centerId)
+  if (academicYearId) qs.set('academic_year_id', academicYearId)
+  const query = qs.toString()
+  return downloadCsvExport(`/exports/students.csv${query ? `?${query}` : ''}`, 'students.csv')
 }
 
 export function exportCscComplianceCsv(centerId?: string) {

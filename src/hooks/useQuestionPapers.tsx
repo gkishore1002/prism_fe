@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import * as questionsApi from '@/lib/api/questionsApi'
 import type { QuestionBankEntry, QuestionPaper, QuestionUploadRow } from '@/types'
 import { boardsMatch, gradesMatch } from '@/lib/academicScope'
+import { normalizeSubjectsList, subjectsOverlap } from '@/lib/formatSubjects'
 
 interface QuestionPaperContextValue {
   questions: QuestionBankEntry[]
@@ -29,8 +30,8 @@ interface QuestionPaperContextValue {
     createdBy?: string,
   ) => Promise<QuestionPaper | null>
   getPaper: (id: string) => QuestionPaper | undefined
-  getPapersForScope: (board: string, grade: string, subject: string) => QuestionPaper[]
-  papersForAssessment: (board: string, grade: string, subject: string) => QuestionPaper[]
+  getPapersForScope: (board: string, grade: string, subjects: string | string[]) => QuestionPaper[]
+  papersForAssessment: (board: string, grade: string, subjects: string | string[]) => QuestionPaper[]
   getQuestionsByIds: (ids: string[]) => QuestionBankEntry[]
   removePaper: (paperId: string) => Promise<void>
   removeQuestion: (questionId: string) => Promise<void>
@@ -118,19 +119,21 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
   const getPaper = useCallback((id: string) => questionPapers.find((p) => p.id === id), [questionPapers])
 
   const getPapersForScope = useCallback(
-    (board: string, grade: string, subject: string) =>
-      questionPapers.filter(
-        (p) =>
-          boardsMatch(p.board, board) &&
-          gradesMatch(p.grade, grade) &&
-          p.subject.trim().toLowerCase() === subject.trim().toLowerCase(),
-      ),
+    (board: string, grade: string, subjects: string | string[]) => {
+      const want = normalizeSubjectsList(Array.isArray(subjects) ? subjects : [subjects])
+      return questionPapers.filter((p) => {
+        if (!boardsMatch(p.board, board) || !gradesMatch(p.grade, grade)) return false
+        if (!want.length) return true
+        const paperSubjects = normalizeSubjectsList(p.subjects, p.subject)
+        return subjectsOverlap(want, paperSubjects)
+      })
+    },
     [questionPapers],
   )
 
   const papersForAssessment = useCallback(
-    (board: string, grade: string, subject: string) => {
-      const scoped = getPapersForScope(board, grade, subject)
+    (board: string, grade: string, subjects: string | string[]) => {
+      const scoped = getPapersForScope(board, grade, subjects)
       const scopedIds = new Set(scoped.map((p) => p.id))
       const rest = questionPapers.filter((p) => !scopedIds.has(p.id))
       return [...scoped, ...rest]

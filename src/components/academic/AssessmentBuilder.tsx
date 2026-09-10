@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Clock, MapPin, CheckSquare, Square, Users, Search, Shuffle } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
-import { AppDropdown } from '@/components/ui/AppDropdown'
+import { AppDropdown, AppSelectMulti } from '@/components/ui/AppDropdown'
 import { InlineLoader } from '@/components/ui/PrismLoader'
 import { AppModal } from '@/components/ui/AppModal'
 import { AssessmentPaperPreview } from '@/components/academic/AssessmentPaperPreview'
@@ -17,6 +17,7 @@ import { questionsForPaper, totalMarksForQuestions, topicCounts } from '@/lib/qu
 import type { TutorAssessmentSchedule } from '@/types'
 import { cn } from '@/lib/cn'
 import { gradesMatch, boardsMatch, scopeLabel, studentFitsScope } from '@/lib/academicScope'
+import { formatSubjects, normalizeSubjectsList } from '@/lib/formatSubjects'
 
 interface AssessmentBuilderProps {
   open: boolean
@@ -42,7 +43,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
   const [title, setTitle] = useState('')
   const [board, setBoard] = useState('')
   const [grade, setGrade] = useState('')
-  const [subject, setSubject] = useState('')
+  const [subject, setSubject] = useState<string[]>([])
   const [mode, setMode] = useState<'practice' | 'assessment' | ''>('')
   const [batchName, setBatchName] = useState('')
   const [durationMinutes, setDurationMinutes] = useState(0)
@@ -68,7 +69,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     setTitle('')
     setBoard('')
     setGrade('')
-    setSubject('')
+    setSubject([])
     setMode('')
     setBatchName('')
     setDurationMinutes(0)
@@ -110,7 +111,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     [boardData, grade],
   )
   const scopedBatches = getBatchesForScope(board, grade)
-  const scopeReady = Boolean(board && grade && subject)
+  const scopeReady = Boolean(board && grade && subject.length > 0)
   const availablePapers = scopeReady ? getPapersForScope(board, grade, subject) : []
   const selectedPaper = selectedPaperId ? getPaper(selectedPaperId) : undefined
 
@@ -132,7 +133,9 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
   const batchOptions = useMemo(
     () =>
       scopedBatches.map((b) => {
-        const meta = [b.subject, b.scheduleTiming].filter(Boolean).join(' · ')
+        const meta = [formatSubjects(b.subjects, b.subject, ''), b.scheduleTiming]
+          .filter(Boolean)
+          .join(' · ')
         return {
           value: b.name,
           label: b.name,
@@ -308,7 +311,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     if (!data) return
     setBoard(data.board)
     setGrade('')
-    setSubject('')
+    setSubject([])
     setBatchName('')
   }
 
@@ -316,11 +319,11 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     const data = boardData?.grades.find((g) => gradesMatch(g.grade, next))
     if (!data) return
     setGrade(data.grade)
-    setSubject('')
+    setSubject([])
     setBatchName('')
   }
 
-  function onSubjectChange(next: string) {
+  function onSubjectChange(next: string[]) {
     setSubject(next)
   }
 
@@ -372,8 +375,8 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
   }
 
   async function handlePublish() {
-    if (!board.trim() || !grade.trim() || !subject.trim()) {
-      setPublishError('Select board, grade, and subject before scheduling.')
+    if (!board.trim() || !grade.trim() || subject.length === 0) {
+      setPublishError('Select board, grade, and at least one subject before scheduling.')
       return
     }
     if (!batchName.trim()) {
@@ -387,12 +390,14 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     setPublishing(true)
     setPublishError(null)
     const scope = paperCoverage === 'full' ? 'subject' : 'topic'
+    const subjects = normalizeSubjectsList(subject)
     try {
       await onSave?.({
         title: title || 'Untitled assessment',
         board,
         grade,
-        subject,
+        subject: subjects[0] ?? '',
+        subjects,
         scope,
         mode,
         batchName,
@@ -521,13 +526,14 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                     placeholder={board ? 'Select grade' : 'Select board first'}
                     emptyMessage="Select a board to see grades"
                   />
-                  <AppDropdown
-                    label="Subject"
-                    value={subject || null}
+                  <AppSelectMulti
+                    label="Subjects"
+                    values={subject}
                     onChange={onSubjectChange}
                     options={subjectOptions}
-                    placeholder={grade ? 'Select subject' : 'Select grade first'}
+                    placeholder={grade ? 'Select subjects' : 'Select grade first'}
                     emptyMessage="Select a grade to see subjects"
+                    searchable
                   />
                   <AppDropdown
                     label="Batch"

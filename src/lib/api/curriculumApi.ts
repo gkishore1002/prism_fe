@@ -163,7 +163,7 @@ export async function renameTopic(
 
 export async function updateBatch(
   batchId: string,
-  patch: { name?: string; subject?: string; scheduleTiming?: string },
+  patch: { name?: string; subject?: string; subjects?: string[]; scheduleTiming?: string },
 ): Promise<void> {
   await apiFetch(`/batches/${batchId}`, {
     method: 'PATCH',
@@ -176,8 +176,11 @@ export async function createBatch(batch: {
   board: string
   grade: string
   subject?: string
+  subjects?: string[]
   scheduleTiming?: string
   studentIds?: string[]
+  academicYearId?: string
+  academicYear?: string
 }): Promise<TutorBatch> {
   const data = await apiFetch<ApiTutorBatch>('/batches', {
     method: 'POST',

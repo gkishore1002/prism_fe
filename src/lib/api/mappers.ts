@@ -85,21 +85,27 @@ export interface ApiTutorBatch {
   board: string
   grade: string
   subject?: string | null
+  subjects?: string[] | null
   scheduleTiming?: string | null
   studentIds: string[]
   avgScore?: number | null
+  academicYearId?: string | null
 }
 
 export function mapBatch(b: ApiTutorBatch): TutorBatch {
+  const subjects = (b.subjects ?? []).filter(Boolean)
+  const subject = b.subject ?? subjects[0] ?? undefined
   return {
     id: b.id,
     name: b.name,
     board: b.board,
     grade: b.grade,
-    subject: b.subject ?? undefined,
+    subject,
+    subjects: subjects.length ? subjects : subject ? [subject] : [],
     scheduleTiming: b.scheduleTiming ?? undefined,
     studentIds: b.studentIds,
     avgScore: b.avgScore ?? undefined,
+    academicYearId: b.academicYearId ?? undefined,
   }
 }
 
@@ -171,6 +177,7 @@ export interface ApiQuestionPaper {
   board: string
   grade: string
   subject: string
+  subjects?: string[] | null
   questionIds: string[]
   topics: string[]
   totalMarks: number
@@ -181,12 +188,15 @@ export interface ApiQuestionPaper {
 }
 
 export function mapQuestionPaper(p: ApiQuestionPaper): QuestionPaper {
+  const subjects = (p.subjects ?? []).filter(Boolean)
+  const subject = p.subject || subjects[0] || ''
   return {
     id: p.id,
     name: p.name,
     board: p.board,
     grade: p.grade,
-    subject: p.subject,
+    subject,
+    subjects: subjects.length ? subjects : subject ? [subject] : [],
     questionIds: p.questionIds,
     topics: p.topics,
     totalMarks: p.totalMarks,
@@ -205,6 +215,7 @@ export interface ApiAssessment {
   board: string
   grade: string
   subject: string
+  subjects?: string[] | null
   scope: TutorAssessmentSchedule['scope']
   mode: TutorAssessmentSchedule['mode']
   batchName: string
@@ -230,15 +241,19 @@ export interface ApiAssessment {
   accessRequestStatus?: TutorAssessmentSchedule['accessRequestStatus']
   canAttend?: boolean
   createdAt?: string
+  academicYearId?: string | null
 }
 
 export function mapAssessment(a: ApiAssessment): TutorAssessmentSchedule {
+  const subjects = (a.subjects ?? []).filter(Boolean)
+  const subject = a.subject || subjects[0] || ''
   return {
     id: a.id,
     title: a.title,
     board: a.board,
     grade: a.grade,
-    subject: a.subject,
+    subject,
+    subjects: subjects.length ? subjects : subject ? [subject] : [],
     scope: a.scope,
     mode: a.mode,
     batchName: a.batchName,
@@ -264,6 +279,7 @@ export function mapAssessment(a: ApiAssessment): TutorAssessmentSchedule {
     accessRequestStatus: a.accessRequestStatus ?? undefined,
     canAttend: a.canAttend,
     createdAt: a.createdAt || undefined,
+    academicYearId: a.academicYearId ?? undefined,
   }
 }
 

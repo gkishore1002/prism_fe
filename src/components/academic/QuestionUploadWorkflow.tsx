@@ -524,38 +524,51 @@ export function QuestionUploadWorkflow({
                   <td className="px-4 py-2.5 max-w-sm">
                     <div className="space-y-2">
                       <p className="line-clamp-2 text-foreground">{row.text || (row.textImagePreviewUrl ? 'Image question' : '—')}</p>
-                      {(row.textImagePreviewUrl ||
-                        row.optionAImagePreviewUrl ||
-                        row.optionBImagePreviewUrl ||
-                        row.optionCImagePreviewUrl ||
-                        row.optionDImagePreviewUrl) && (
+                      {row.textImagePreviewUrl && (
+                        <img
+                          src={row.textImagePreviewUrl}
+                          alt="Question"
+                          className="h-14 w-auto max-w-[7rem] rounded-md border border-border object-contain bg-secondary/40"
+                        />
+                      )}
+                      {(
+                        [
+                          ['A', row.optionA, row.optionAImagePreviewUrl],
+                          ['B', row.optionB, row.optionBImagePreviewUrl],
+                          ['C', row.optionC, row.optionCImagePreviewUrl],
+                          ['D', row.optionD, row.optionDImagePreviewUrl],
+                        ] as const
+                      ).some(([, text, url]) => Boolean(text?.trim()) || Boolean(url)) && (
                         <div className="flex flex-wrap gap-1.5">
-                          {row.textImagePreviewUrl && (
-                            <img
-                              src={row.textImagePreviewUrl}
-                              alt="Question"
-                              className="h-14 w-auto max-w-[7rem] rounded-md border border-border object-contain bg-secondary/40"
-                            />
-                          )}
                           {(
                             [
-                              ['A', row.optionAImagePreviewUrl],
-                              ['B', row.optionBImagePreviewUrl],
-                              ['C', row.optionCImagePreviewUrl],
-                              ['D', row.optionDImagePreviewUrl],
+                              ['A', row.optionA, row.optionAImagePreviewUrl],
+                              ['B', row.optionB, row.optionBImagePreviewUrl],
+                              ['C', row.optionC, row.optionCImagePreviewUrl],
+                              ['D', row.optionD, row.optionDImagePreviewUrl],
                             ] as const
                           )
-                            .filter(([, url]) => Boolean(url))
-                            .map(([label, url]) => (
-                              <div key={label} className="relative">
-                                <img
-                                  src={url!}
-                                  alt={`Option ${label}`}
-                                  className="h-12 w-auto max-w-[5.5rem] rounded-md border border-border object-contain bg-secondary/40"
-                                />
+                            .filter(([, text, url]) => Boolean(text?.trim()) || Boolean(url))
+                            .map(([label, text, url]) => (
+                              <div
+                                key={label}
+                                className="relative max-w-[7.5rem] rounded-md border border-border bg-secondary/40 px-1.5 py-1"
+                              >
                                 <span className="absolute -top-1 -left-1 text-[9px] font-semibold bg-ink text-paper rounded px-1 leading-4">
                                   {label}
                                 </span>
+                                {url ? (
+                                  <img
+                                    src={url}
+                                    alt={`Option ${label}`}
+                                    className="mt-1 h-12 w-auto max-w-full object-contain"
+                                  />
+                                ) : null}
+                                {text?.trim() ? (
+                                  <p className={cn('text-[11px] text-foreground leading-snug break-words', url && 'mt-1')}>
+                                    {text.trim()}
+                                  </p>
+                                ) : null}
                               </div>
                             ))}
                         </div>

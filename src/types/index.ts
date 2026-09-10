@@ -121,6 +121,8 @@ export interface AssessmentResult {
   weakTopics: string[]
   strongTopics: string[]
   insight: string
+  academicYearId?: string
+  enrollmentId?: string
 }
 
 export interface StudentWiseReport {
@@ -512,10 +514,13 @@ export interface TutorBatch {
   name: string
   board: string
   grade: string
+  /** Primary / legacy single subject. Prefer `subjects`. */
   subject?: string
+  subjects?: string[]
   scheduleTiming?: string
   studentIds: string[]
   avgScore?: number
+  academicYearId?: string
 }
 
 export interface TutorCopilotSummary {
@@ -537,6 +542,7 @@ export interface TutorAssessmentSchedule {
   board: string
   grade: string
   subject: string
+  subjects?: string[]
   scope: 'subject' | 'chapter' | 'topic'
   mode: 'practice' | 'assessment'
   batchName: string
@@ -566,6 +572,7 @@ export interface TutorAssessmentSchedule {
   canAttend?: boolean
   /** ISO timestamp when the assessment was created (newest-first lists). */
   createdAt?: string
+  academicYearId?: string
 }
 
 export interface QuestionBankEntry {
@@ -603,6 +610,7 @@ export interface QuestionPaper {
   board: string
   grade: string
   subject: string
+  subjects?: string[]
   questionIds: string[]
   topics: string[]
   totalMarks: number

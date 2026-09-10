@@ -33,7 +33,7 @@ interface CurriculumContextValue {
   addBatch: (
     batch: Omit<TutorBatch, 'id' | 'studentIds'> & { studentIds?: string[] },
   ) => Promise<string>
-  updateBatch: (batchId: string, patch: { name?: string; subject?: string; scheduleTiming?: string }) => Promise<void>
+  updateBatch: (batchId: string, patch: { name?: string; subject?: string; subjects?: string[]; scheduleTiming?: string }) => Promise<void>
   addStudentToBatch: (batchId: string, name: string) => Promise<void>
   assignStudentToBatch: (studentId: string, batchId: string) => Promise<void>
   removeStudentFromBatch: (studentId: string, batchId: string) => Promise<void>
@@ -77,6 +77,7 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated || role === 'student') return
+    if (!activeYearId) return
     const isInitialLoad = curriculum.length === 0 && batches.length === 0
     if (isInitialLoad) setLoading(true)
     setError(null)
@@ -96,6 +97,7 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
 
   const ensureLoaded = useCallback(async () => {
     if (!isAuthenticated || role === 'student') return
+    if (!activeYearId) return
     if (curriculum.length > 0 || batches.length > 0) return
     if (!loadPromiseRef.current) {
       loadPromiseRef.current = refresh().finally(() => {
@@ -103,7 +105,7 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
       })
     }
     await loadPromiseRef.current
-  }, [isAuthenticated, role, curriculum.length, batches.length, refresh])
+  }, [isAuthenticated, role, curriculum.length, batches.length, activeYearId, refresh])
 
   useEffect(() => {
     if (!isAuthenticated || role === 'student') {
@@ -115,9 +117,9 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isAuthenticated || role === 'student') return
-    if (curriculum.length === 0 && batches.length === 0) return
+    if (!activeYearId) return
     void refresh()
-    // Reload when header branch or academic year changes.
+    // Reload when header branch or academic year changes (including first year resolve).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchCenterId, activeYearId])
 
@@ -172,21 +174,31 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
 
   const addBatch = useCallback(
     async (batch: Omit<TutorBatch, 'id' | 'studentIds'> & { studentIds?: string[] }) => {
-      const { studentIds = [], subject, scheduleTiming, ...rest } = batch
+      if (!activeYearId) {
+        throw new Error('Select an academic year before creating a batch')
+      }
+      const { studentIds = [], subject, subjects, scheduleTiming, ...rest } = batch
+      const subjectList = (subjects ?? []).map((s) => s.trim()).filter(Boolean)
+      const primary = subjectList[0] ?? (subject?.trim() || undefined)
       const created = await curriculumApi.createBatch({
         ...rest,
-        subject: subject?.trim() || undefined,
+        subject: primary,
+        subjects: subjectList.length ? subjectList : primary ? [primary] : [],
         scheduleTiming: scheduleTiming?.trim() || undefined,
         studentIds,
+        academicYearId: activeYearId,
       })
       await refresh()
       return created.id
     },
-    [refresh],
+    [activeYearId, refresh],
   )
 
   const updateBatch = useCallback(
-    async (batchId: string, patch: { name?: string; subject?: string; scheduleTiming?: string }) => {
+    async (
+      batchId: string,
+      patch: { name?: string; subject?: string; subjects?: string[]; scheduleTiming?: string },
+    ) => {
       await curriculumApi.updateBatch(batchId, patch)
       await refresh()
     },
@@ -205,15 +217,19 @@ export function CurriculumProvider({ children }: { children: ReactNode }) {
     async (batchId: string, name: string) => {
       const batch = batches.find((b) => b.id === batchId)
       if (!batch) return
+      if (!activeYearId) {
+        throw new Error('Select an academic year before adding a student')
+      }
       await curriculumApi.createStudent({
         name: name.trim(),
         board: batch.board,
         grade: batch.grade,
         batch: batch.name,
+        academicYearId: activeYearId,
       })
       await refresh()
     },
-    [batches, refresh],
+    [batches, activeYearId, refresh],
   )
 
   const removeStudentFromBatch = useCallback(
