@@ -119,7 +119,7 @@ export function OrgSwitcher({ className }: { className?: string }) {
         ) : (
           <Building2 className="w-3.5 h-3.5 text-accent" />
         )}
-        <span className="max-w-[180px] truncate">{label}</span>
+        <span className="max-w-[9rem] sm:max-w-[180px] truncate">{label}</span>
         <ChevronDown className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', open && 'rotate-180')} />
       </button>
       {open &&

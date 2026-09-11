@@ -13,6 +13,7 @@ import {
 import { AppCard } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { btnClass } from '@/components/ui/Button'
+import { ToolbarButton } from '@/components/ui/ListToolbar'
 import { AppModal } from '@/components/ui/AppModal'
 import { Pagination } from '@/components/ui/Pagination'
 import { StudentProfileModal } from '@/components/academic/StudentProfileModal'
@@ -306,24 +307,19 @@ export function AccessRequestsPanel({ scope = 'tutor' }: { scope?: 'tutor' | 'ad
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => void handleExport()}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <ToolbarButton
+              icon={<Download className="w-3.5 h-3.5" />}
+              label={exporting ? 'Exporting…' : 'Export CSV'}
+              shortLabel="CSV"
               disabled={exporting}
-              className={`${btnClass.secondary} text-sm px-3 py-1.5 inline-flex items-center gap-1.5 shrink-0`}
-            >
-              <Download className="w-3.5 h-3.5" />
-              {exporting ? 'Exporting…' : 'Export CSV'}
-            </button>
-            <button
-              type="button"
+              onClick={() => void handleExport()}
+            />
+            <ToolbarButton
+              icon={<RefreshCw className="w-3.5 h-3.5" />}
+              label="Refresh"
               onClick={() => void load()}
-              className={`${btnClass.secondary} text-sm px-3 py-1.5 inline-flex items-center gap-1.5 shrink-0`}
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Refresh
-            </button>
+            />
           </div>
         </div>
 

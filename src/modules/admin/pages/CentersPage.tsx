@@ -20,6 +20,7 @@ import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { AnalyticsInsightsCard } from '@/components/ui/AnalyticsInsightsCard'
 import { centerInsightBullets } from '@/lib/analyticsInsights'
 import { formatCenterLabel } from '@/lib/centerLabel'
+import { ToolbarButton } from '@/components/ui/ListToolbar'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useCenters } from '@/hooks/useCenters'
 import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
@@ -86,23 +87,22 @@ export function AdminCentersPage({ embedded = false }: { embedded?: boolean }) {
   }
 
   const branchActions = (
-    <div className="flex flex-wrap gap-2">
-      <button
-        type="button"
+    <div className="flex items-center gap-1.5">
+      <ToolbarButton
+        icon={<Download className="w-4 h-4" />}
+        label={exporting ? 'Exporting…' : 'Export CSV'}
+        shortLabel="CSV"
         disabled={exporting}
         onClick={() => void handleExportCenters()}
-        className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary/50"
-      >
-        <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'Export CSV'}
-      </button>
+      />
       {canManageTenant && (
-        <button
-          type="button"
+        <ToolbarButton
+          icon={<Plus className="w-4 h-4" />}
+          label="Add center"
+          shortLabel="Add"
+          variant="primary"
           onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-2 bg-accent text-accent-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90"
-        >
-          <Plus className="w-4 h-4" /> Add center
-        </button>
+        />
       )}
     </div>
   )

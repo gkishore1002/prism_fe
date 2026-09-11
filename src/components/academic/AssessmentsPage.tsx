@@ -29,6 +29,7 @@ import type { InstitutionCenter, TutorAssessmentSchedule } from '@/types'
 import { AppModal, useConfirmModal } from '@/components/ui/AppModal'
 import { formatSubjects } from '@/lib/formatSubjects'
 import { useAcademicYears } from '@/hooks/useAcademicYears'
+import { ToolbarButton } from '@/components/ui/ListToolbar'
 
 const statusStyles: Record<string, string> = {
   draft: 'bg-secondary text-muted-foreground',
@@ -189,13 +190,13 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
         }
         actions={
           canManage ? (
-            <button
-              type="button"
+            <ToolbarButton
+              icon={<Plus className="w-4 h-4" />}
+              label="Create assessment"
+              shortLabel="Create"
+              variant="primary"
               onClick={() => setBuilderOpen(true)}
-              className="btn btn-action"
-            >
-              <Plus className="w-4 h-4" /> Create assessment
-            </button>
+            />
           ) : undefined
         }
       />

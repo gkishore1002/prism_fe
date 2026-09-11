@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { Link } from 'react-router-dom'
-import { Plus, Search, FileText, Eye, Pencil, Upload } from 'lucide-react'
+import { Plus, FileText, Eye, Pencil, Upload, Download } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
 import { AppDropdown, AppSelectMulti } from '@/components/ui/AppDropdown'
 import { ActionMenu, ActionMenuItem, ActionMenuLink } from '@/components/ui/ActionMenu'
 import { ResponsiveTable } from '@/components/ui/ResponsiveTable'
 import { Pagination } from '@/components/ui/Pagination'
+import { BranchFilterDropdown, ListToolbar, ToolbarButton } from '@/components/ui/ListToolbar'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useCenters } from '@/hooks/useCenters'
@@ -410,69 +411,44 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 flex-1 max-w-md bg-secondary/40 border border-border rounded-md px-3 py-2">
-          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-          <input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by name or batch..."
-            className="text-sm outline-none bg-transparent w-full"
-          />
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            disabled={exporting}
-            onClick={() => void handleExportStudents()}
-            className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary disabled:opacity-60"
-          >
-            {exporting ? 'Exporting…' : 'Export CSV'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setBulkUploadOpen(true)}
-            className="inline-flex items-center gap-2 border border-border px-4 py-2 rounded-md text-sm font-medium hover:bg-secondary"
-          >
-            <Upload className="w-4 h-4" />
-            Bulk upload
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowForm(!showForm)}
-            className="inline-flex items-center gap-2 bg-accent text-accent-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90"
-          >
-            <Plus className="w-4 h-4" />
-            Add student
-          </button>
-        </div>
-      </div>
-
-      {isAllBranches && (
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setCenterFilter('all')}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium ${
-            centerFilter === 'all' ? 'bg-secondary text-foreground' : 'text-muted-foreground'
-          }`}
-        >
-          All branches
-        </button>
-        {centers.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => setCenterFilter(c.id)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium ${
-              centerFilter === c.id ? 'bg-secondary text-foreground' : 'text-muted-foreground'
-            }`}
-          >
-            {formatCenterLabel(c)}
-          </button>
-        ))}
-      </div>
-      )}
+      <ListToolbar
+        search={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="Search by name or batch..."
+        filter={
+          isAllBranches ? (
+            <BranchFilterDropdown
+              centers={centers}
+              value={centerFilter}
+              onChange={setCenterFilter}
+            />
+          ) : undefined
+        }
+        actions={
+          <>
+            <ToolbarButton
+              icon={<Download className="w-4 h-4" />}
+              label={exporting ? 'Exporting…' : 'Export CSV'}
+              shortLabel="CSV"
+              disabled={exporting}
+              onClick={() => void handleExportStudents()}
+            />
+            <ToolbarButton
+              icon={<Upload className="w-4 h-4" />}
+              label="Bulk upload"
+              shortLabel="Upload"
+              onClick={() => setBulkUploadOpen(true)}
+            />
+            <ToolbarButton
+              icon={<Plus className="w-4 h-4" />}
+              label="Add student"
+              shortLabel="Add"
+              variant="primary"
+              onClick={() => setShowForm(!showForm)}
+            />
+          </>
+        }
+      />
 
       {showForm && (
         <AppCard>

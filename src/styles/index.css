@@ -843,6 +843,7 @@
     display: none !important;
   }
 
+  .topo-texture > .shrink-0.z-ln-sticky,
   .topo-texture > .shrink-0.h-14,
   .topo-texture aside {
     display: none !important;

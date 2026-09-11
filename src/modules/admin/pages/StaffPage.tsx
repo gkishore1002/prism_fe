@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Mail, Plus, Upload, Users, Search, Edit3, User, TrendingUp, BookOpen, Award, ShieldCheck } from 'lucide-react'
+import { Mail, Plus, Upload, Users, Edit3, User, TrendingUp, BookOpen, Award, ShieldCheck } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { AppModal } from '@/components/ui/AppModal'
 import { ResponsiveTable } from '@/components/ui/ResponsiveTable'
 import { ActionMenu, ActionMenuItem } from '@/components/ui/ActionMenu'
 import { btnClass } from '@/components/ui/Button'
+import { ListToolbar, ToolbarButton } from '@/components/ui/ListToolbar'
 import { PhoneCredentialFields } from '@/components/auth/PhoneCredentialFields'
 import { useCenters } from '@/hooks/useCenters'
 import { useAuth } from '@/hooks/useAuth'
@@ -344,35 +345,29 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       <AppCard className="mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-2 flex-1 max-w-md bg-secondary/40 border border-border rounded-md px-3 py-2">
-            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-            <input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search by name or email..."
-              className="text-sm outline-none bg-transparent w-full"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setBulkUploadOpen(true)}
-              className={`${btnClass.secondary} text-sm px-4 py-2 inline-flex items-center gap-2`}
-            >
-              <Upload className="w-4 h-4" />
-              Bulk upload
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAddForm((open) => !open)}
-              className={`${btnClass.primary} text-sm px-4 py-2 inline-flex items-center gap-2`}
-            >
-              <Plus className="w-4 h-4" />
-              Add staff
-            </button>
-          </div>
-        </div>
+        <ListToolbar
+          className="mb-4"
+          search={searchInput}
+          onSearchChange={setSearchInput}
+          searchPlaceholder="Search by name or email..."
+          actions={
+            <>
+              <ToolbarButton
+                icon={<Upload className="w-4 h-4" />}
+                label="Bulk upload"
+                shortLabel="Upload"
+                onClick={() => setBulkUploadOpen(true)}
+              />
+              <ToolbarButton
+                icon={<Plus className="w-4 h-4" />}
+                label="Add staff"
+                shortLabel="Add"
+                variant="primary"
+                onClick={() => setShowAddForm((open) => !open)}
+              />
+            </>
+          }
+        />
 
         {showAddForm && (
           <form onSubmit={(e) => void handleCreate(e)} className="grid sm:grid-cols-2 gap-4 mb-6 pb-6 border-b border-border">

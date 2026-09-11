@@ -5,6 +5,7 @@ import { PageLoader } from '@/components/ui/PrismLoader'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { Pagination } from '@/components/ui/Pagination'
 import { btnClass } from '@/components/ui/Button'
+import { ToolbarButton } from '@/components/ui/ListToolbar'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { fetchCenter, updateCenter } from '@/lib/api/institutionsApi'
 import { fetchStudentsMasterPaginated } from '@/lib/api/studentsApi'
@@ -289,24 +290,20 @@ export function AdminCenterDetailPage() {
             <span className="text-xs text-muted-foreground">({total})</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
+            <ToolbarButton
+              icon={<Download className="w-3.5 h-3.5" />}
+              label={exporting === 'students' ? 'Exporting…' : 'Students CSV'}
+              shortLabel="Students"
               disabled={exporting != null}
               onClick={() => void handleExport('students')}
-              className={`${btnClass.secondary} text-xs px-3 py-1.5 inline-flex items-center gap-1.5`}
-            >
-              <Download className="w-3.5 h-3.5" />
-              {exporting === 'students' ? 'Exporting…' : 'Students CSV'}
-            </button>
-            <button
-              type="button"
+            />
+            <ToolbarButton
+              icon={<Download className="w-3.5 h-3.5" />}
+              label={exporting === 'csc' ? 'Exporting…' : 'CSC CSV'}
+              shortLabel="CSC"
               disabled={exporting != null}
               onClick={() => void handleExport('csc')}
-              className={`${btnClass.secondary} text-xs px-3 py-1.5 inline-flex items-center gap-1.5`}
-            >
-              <Download className="w-3.5 h-3.5" />
-              {exporting === 'csc' ? 'Exporting…' : 'CSC CSV'}
-            </button>
+            />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}

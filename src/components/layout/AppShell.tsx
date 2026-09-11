@@ -204,58 +204,64 @@ export function AppShell({ module }: AppShellProps) {
   )
 
   return (
-    <div className="relative h-dvh overflow-hidden text-foreground flex flex-col bg-background topo-texture safe-top">
-      {/* Unified top row: sidebar brand + navbar */}
-      <div className="shrink-0 h-14 flex items-stretch border-b border-border bg-card z-ln-sticky">
-        <div
-          className={cn(
-            'hidden lg:flex items-center shrink-0 border-r border-[rgba(255,255,255,0.08)] bg-navy-900 px-2 transition-[width] duration-200 ease-out',
-            collapsed ? 'w-[72px] justify-center' : 'w-[260px] justify-end',
-          )}
-        >
-          <button
-            type="button"
-            onClick={() => setCollapsed((v) => !v)}
-            className="btn btn-ghost size-9 text-navy-200 hover:text-white hover:bg-navy-700/60 shrink-0"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <Menu className="w-[18px] h-[18px]" />
-          </button>
-        </div>
-
-        <header className="flex-1 min-w-0 flex items-center px-3 sm:px-5 gap-2 sm:gap-3 bg-card">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden btn btn-secondary p-2 text-muted-foreground shrink-0"
-            aria-label="Open menu"
-          >
-            <Menu className="w-4 h-4" />
-          </button>
-
-          <PrismLogo
-            size="sm"
-            showWordmark
-            showTagline={false}
-            href={homePath}
-            className="min-w-0"
-          />
-
-          <div className="ml-auto flex items-center gap-1.5">
-            {(moduleId === 'admin' || moduleId === 'tutor') && (
-              <>
-                {role === 'super_user' && <OrgSwitcher />}
-                {((moduleId === 'admin' && role !== 'super_user') || moduleId === 'tutor') && (
-                  <div className="inline-flex items-center gap-0.5">
-                    <AcademicYearSwitcher />
-                    <BranchSwitcher />
-                  </div>
-                )}
-              </>
+    <div className="relative h-dvh overflow-hidden text-foreground flex flex-col bg-background topo-texture">
+      {/* Unified top chrome: safe-area + navbar (+ mobile scope filters) */}
+      <div className="shrink-0 border-b border-border bg-card z-ln-sticky safe-top">
+        <div className="h-14 flex items-stretch">
+          <div
+            className={cn(
+              'hidden lg:flex items-center shrink-0 border-r border-[rgba(255,255,255,0.08)] bg-navy-900 px-2 transition-[width] duration-200 ease-out',
+              collapsed ? 'w-[72px] justify-center' : 'w-[260px] justify-end',
             )}
-            <NotificationBell moduleId={moduleId} />
+          >
+            <button
+              type="button"
+              onClick={() => setCollapsed((v) => !v)}
+              className="btn btn-ghost size-9 text-navy-200 hover:text-white hover:bg-navy-700/60 shrink-0"
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <Menu className="w-[18px] h-[18px]" />
+            </button>
           </div>
-        </header>
+
+          <header className="flex-1 min-w-0 flex items-center gap-2 px-2.5 sm:px-5 bg-card">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden btn btn-secondary size-9 p-0 text-muted-foreground shrink-0 inline-grid place-items-center"
+              aria-label="Open menu"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+
+            <PrismLogo
+              size="sm"
+              showWordmark
+              showTagline={false}
+              href={homePath}
+              className="min-w-0 shrink"
+            />
+
+            <div className="ml-auto flex items-center gap-1 sm:gap-1.5 min-w-0 shrink-0">
+              {(moduleId === 'admin' || moduleId === 'tutor') && (
+                <>
+                  {role === 'super_user' && <OrgSwitcher />}
+                  {((moduleId === 'admin' && role !== 'super_user') || moduleId === 'tutor') && (
+                    <>
+                      <AcademicYearSwitcher compact className="sm:hidden shrink-0" />
+                      <BranchSwitcher compact className="sm:hidden shrink-0" />
+                      <div className="hidden sm:inline-flex items-center gap-1 min-w-0">
+                        <AcademicYearSwitcher />
+                        <BranchSwitcher />
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+              <NotificationBell moduleId={moduleId} />
+            </div>
+          </header>
+        </div>
       </div>
 
       <div className="relative flex flex-1 min-h-0 overflow-hidden">
@@ -284,18 +290,18 @@ export function AppShell({ module }: AppShellProps) {
                 aria-label="Close menu"
               />
               <motion.aside
-                className="relative w-[min(100%,300px)] h-full csc-sidebar flex flex-col overflow-hidden shadow-lg"
+                className="relative w-[min(100%,300px)] h-full csc-sidebar flex flex-col overflow-hidden shadow-lg safe-top"
                 variants={slideFromLeft}
                 initial="hidden"
                 animate="visible"
                 exit="exit"
               >
-                <div className="flex items-center justify-between gap-2 h-14 px-4 border-b border-[rgba(255,255,255,0.08)] shrink-0">
-                  <PrismLogo size="sm" showWordmark href={homePath} />
+                <div className="flex items-center justify-between gap-2 h-14 px-3 border-b border-[rgba(255,255,255,0.08)] shrink-0">
+                  <PrismLogo size="sm" showWordmark href={homePath} className="min-w-0" />
                   <button
                     type="button"
                     onClick={() => setSidebarOpen(false)}
-                    className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground shrink-0"
+                    className="size-9 inline-grid place-items-center rounded-md text-navy-200 hover:bg-navy-700/60 hover:text-white shrink-0"
                     aria-label="Close menu"
                   >
                     <X className="w-4 h-4" />
@@ -330,12 +336,12 @@ function PageBackBar({ moduleId }: { moduleId: ModuleId }) {
     <button
       type="button"
       onClick={() => navigate(back.href)}
-      className="hidden md:inline-flex items-center gap-2.5 text-sm text-muted-foreground hover:text-foreground mb-6 -mt-1 transition-colors group print:hidden"
+      className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4 sm:mb-6 -mt-0.5 transition-colors group print:hidden"
     >
-      <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-border bg-card group-hover:border-accent/30 group-hover:bg-secondary transition-colors">
+      <span className="inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-border bg-card group-hover:border-accent/30 group-hover:bg-secondary transition-colors shrink-0">
         <ArrowLeft className="w-4 h-4" />
       </span>
-      <span>{back.label}</span>
+      <span className="truncate">{back.label}</span>
     </button>
   )
 }
@@ -456,7 +462,7 @@ export function PageHeader({
 }) {
   return (
     <motion.div
-      className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6 pb-6 mb-6 border-b border-border"
+      className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-6 pb-5 sm:pb-6 mb-5 sm:mb-6 border-b border-border"
       variants={fadeUp}
       initial="hidden"
       animate="visible"
@@ -467,11 +473,13 @@ export function PageHeader({
             {eyebrow}
           </div>
         )}
-        <h1 className="font-display text-[28px] sm:text-[34px] font-semibold text-ink tracking-tight leading-[1.15]">
+        <h1 className="font-display text-[24px] sm:text-[34px] font-semibold text-ink tracking-tight leading-[1.15]">
           {title}
         </h1>
         {sub && (
-          <p className="text-muted-foreground mt-2.5 max-w-2xl text-[15px] leading-relaxed font-sans">{sub}</p>
+          <p className="text-muted-foreground mt-2 max-w-2xl text-sm sm:text-[15px] leading-relaxed font-sans">
+            {sub}
+          </p>
         )}
       </div>
       {actions && <div className="page-actions sm:shrink-0">{actions}</div>}

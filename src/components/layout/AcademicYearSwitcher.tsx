@@ -6,7 +6,14 @@ import { cn } from '@/lib/cn'
 import { reloadAppAfterScopeChange } from '@/lib/reloadAppScope'
 
 /** Lightweight navbar filter — portals the panel, never dims/blurs the page. */
-export function AcademicYearSwitcher({ className }: { className?: string }) {
+export function AcademicYearSwitcher({
+  className,
+  compact = false,
+}: {
+  className?: string
+  /** Icon-only trigger (calendar) for tight mobile chrome. */
+  compact?: boolean
+}) {
   const { years, activeYearId, setActiveYearId, loading } = useAcademicYears()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -68,17 +75,36 @@ export function AcademicYearSwitcher({ className }: { className?: string }) {
 
   return (
     <div ref={rootRef} className={cn('inline-flex items-center gap-1 min-w-0', className)}>
-      <CalendarRange className="w-3.5 h-3.5 text-muted-foreground shrink-0 hidden sm:block" />
+      {!compact && (
+        <CalendarRange className="w-3.5 h-3.5 text-muted-foreground shrink-0 hidden sm:block" />
+      )}
       <button
         type="button"
         disabled={loading}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-secondary/50 disabled:opacity-50"
+        aria-label={`Academic year${active?.name ? `: ${active.name}` : ''}`}
+        title={active?.name ?? 'Academic year'}
+        className={cn(
+          'inline-flex items-center justify-center rounded-md border border-border bg-background text-xs font-medium hover:bg-secondary/50 disabled:opacity-50',
+          compact ? 'size-9 p-0' : 'gap-1.5 px-2.5 py-1.5',
+          open && 'bg-secondary/50',
+        )}
       >
-        <span className="max-w-[9rem] truncate">{active?.name ?? 'Academic year'}</span>
-        <ChevronDown className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', open && 'rotate-180')} />
+        {compact ? (
+          <CalendarRange className="w-4 h-4 text-muted-foreground" />
+        ) : (
+          <>
+            <span className="max-w-[9rem] truncate">{active?.name ?? 'Year'}</span>
+            <ChevronDown
+              className={cn(
+                'w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform',
+                open && 'rotate-180',
+              )}
+            />
+          </>
+        )}
       </button>
       {open &&
         createPortal(
@@ -104,7 +130,7 @@ export function AcademicYearSwitcher({ className }: { className?: string }) {
                   reloadAppAfterScopeChange()
                 }}
                 className={cn(
-                  'block w-full px-3 py-2 text-left text-xs hover:bg-secondary/50',
+                  'block w-full px-3 py-2.5 text-left text-xs hover:bg-secondary/50',
                   y.id === activeYearId && 'bg-accent/10 text-accent font-medium',
                 )}
               >

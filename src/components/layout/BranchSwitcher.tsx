@@ -7,7 +7,14 @@ import { cn } from '@/lib/cn'
 import { reloadAppAfterScopeChange } from '@/lib/reloadAppScope'
 
 /** Lightweight navbar menu — portals the panel, never dims/blurs the page. */
-export function BranchSwitcher({ className }: { className?: string }) {
+export function BranchSwitcher({
+  className,
+  compact = false,
+}: {
+  className?: string
+  /** Icon-only trigger (location pin) for tight mobile chrome. */
+  compact?: boolean
+}) {
   const {
     centers,
     loading,
@@ -30,7 +37,7 @@ export function BranchSwitcher({ className }: { className?: string }) {
     const root = rootRef.current
     if (!root) return
     const rect = root.getBoundingClientRect()
-    const width = Math.min(220, window.innerWidth - 16)
+    const width = Math.min(240, window.innerWidth - 16)
     const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8)
     setPanelStyle({
       position: 'fixed',
@@ -76,7 +83,19 @@ export function BranchSwitcher({ className }: { className?: string }) {
   }, [open])
 
   if (loading && centers.length === 0) {
-    return <span className={cn('text-xs text-muted-foreground', className)}>Loading branches…</span>
+    return compact ? (
+      <span
+        className={cn(
+          'inline-grid size-9 place-items-center rounded-md border border-border text-muted-foreground',
+          className,
+        )}
+        aria-hidden
+      >
+        <MapPin className="w-4 h-4 opacity-50" />
+      </span>
+    ) : (
+      <span className={cn('text-xs text-muted-foreground', className)}>Branches…</span>
+    )
   }
 
   if (centers.length === 0) return null
@@ -90,26 +109,60 @@ export function BranchSwitcher({ className }: { className?: string }) {
         : formatCenterLabel(centers[0])
 
   if (centers.length === 1 && !canSelectAllBranches) {
+    if (compact) {
+      return (
+        <span
+          className={cn(
+            'inline-grid size-9 place-items-center rounded-md border border-border text-muted-foreground',
+            className,
+          )}
+          title={label}
+          aria-label={label}
+        >
+          <MapPin className="w-4 h-4" />
+        </span>
+      )
+    }
     return (
-      <div className={cn('inline-flex items-center gap-1.5 text-xs text-muted-foreground', className)}>
-        <MapPin className="w-3.5 h-3.5" />
-        <span>{label}</span>
+      <div
+        className={cn('inline-flex items-center gap-1.5 text-xs text-muted-foreground min-w-0', className)}
+        title={label}
+      >
+        <MapPin className="w-3.5 h-3.5 shrink-0" />
+        <span className="max-w-[10rem] truncate">{label}</span>
       </div>
     )
   }
 
   return (
-    <div ref={rootRef} className={cn('relative', className)}>
+    <div ref={rootRef} className={cn('relative min-w-0', className)}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-secondary/50"
+        aria-label={`Branch: ${label}`}
+        title={label}
+        className={cn(
+          'inline-flex items-center justify-center rounded-md border border-border bg-background text-xs font-medium hover:bg-secondary/50 max-w-full',
+          compact ? 'size-9 p-0' : 'gap-1.5 px-2.5 py-1.5',
+          open && 'bg-secondary/50',
+        )}
       >
-        <MapPin className="w-3.5 h-3.5 text-accent" />
-        <span className="max-w-[160px] truncate">{label}</span>
-        <ChevronDown className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', open && 'rotate-180')} />
+        {compact ? (
+          <MapPin className="w-4 h-4 text-accent" />
+        ) : (
+          <>
+            <MapPin className="w-3.5 h-3.5 text-accent shrink-0" />
+            <span className="max-w-[10rem] truncate">{label}</span>
+            <ChevronDown
+              className={cn(
+                'w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform',
+                open && 'rotate-180',
+              )}
+            />
+          </>
+        )}
       </button>
       {open &&
         createPortal(
@@ -117,7 +170,7 @@ export function BranchSwitcher({ className }: { className?: string }) {
             ref={panelRef}
             role="listbox"
             style={panelStyle}
-            className="rounded-md border border-border bg-background py-1 shadow-lg"
+            className="rounded-md border border-border bg-background py-1 shadow-lg max-h-[min(60dvh,320px)] overflow-y-auto"
           >
             {canSelectAllBranches && (
               <button
@@ -134,7 +187,7 @@ export function BranchSwitcher({ className }: { className?: string }) {
                   reloadAppAfterScopeChange()
                 }}
                 className={cn(
-                  'block w-full px-3 py-2 text-left text-xs hover:bg-secondary/50',
+                  'block w-full px-3 py-2.5 text-left text-xs hover:bg-secondary/50',
                   isAllBranches && 'bg-accent/10 text-accent font-medium',
                 )}
               >
@@ -157,7 +210,7 @@ export function BranchSwitcher({ className }: { className?: string }) {
                   reloadAppAfterScopeChange()
                 }}
                 className={cn(
-                  'block w-full px-3 py-2 text-left text-xs hover:bg-secondary/50',
+                  'block w-full px-3 py-2.5 text-left text-xs hover:bg-secondary/50',
                   activeBranch === center.id && 'bg-accent/10 text-accent font-medium',
                 )}
               >

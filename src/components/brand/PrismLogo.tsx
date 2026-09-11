@@ -243,7 +243,7 @@ export function PrismLogo({
 
   if (href) {
     return (
-      <Link to={href} className="block hover:opacity-90 transition-opacity">
+      <Link to={href} className={cn('min-w-0 hover:opacity-90 transition-opacity', className)}>
         {content}
       </Link>
     )
