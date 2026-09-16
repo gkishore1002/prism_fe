@@ -23,6 +23,7 @@ import { topicCounts, totalMarksForQuestions } from '@/lib/questionPaperUtils'
 import { cn } from '@/lib/cn'
 import { useConfirmModal } from '@/components/ui/AppModal'
 import { formatSubjects } from '@/lib/formatSubjects'
+import { MathContent } from '@/components/math/MathContent'
 
 interface QuestionBankPageProps {
   role?: 'tutor' | 'admin'
@@ -407,7 +408,9 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                                           ) : (
                                             <Square className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
                                           )}
-                                          <span className="text-sm line-clamp-2">{q.text}</span>
+                                          <span className="text-sm line-clamp-2">
+                                            <MathContent text={q.text} />
+                                          </span>
                                         </button>
                                       )
                                     })}

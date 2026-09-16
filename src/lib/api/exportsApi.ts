@@ -20,10 +20,11 @@ export async function downloadCsvExport(path: string, filename: string): Promise
   URL.revokeObjectURL(url)
 }
 
-export function exportStudentsCsv(centerId?: string, academicYearId?: string) {
+export function exportStudentsCsv(centerId?: string, academicYearId?: string, search?: string) {
   const qs = new URLSearchParams()
   if (centerId) qs.set('center_id', centerId)
   if (academicYearId) qs.set('academic_year_id', academicYearId)
+  if (search?.trim()) qs.set('search', search.trim())
   const query = qs.toString()
   return downloadCsvExport(`/exports/students.csv${query ? `?${query}` : ''}`, 'students.csv')
 }

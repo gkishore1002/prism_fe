@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Plus, PenLine, Trash2, Save, FileStack, RotateCcw } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
 import { AppDropdown } from '@/components/ui/AppDropdown'
@@ -12,6 +12,11 @@ import {
   type ManualPaperDraftQuestion,
 } from '@/lib/manualPaperDraftStorage'
 import { QuestionImagePicker } from '@/components/academic/QuestionImagePicker'
+import { MathFieldInput } from '@/components/math/MathFieldInput'
+import { MathHelpButton } from '@/components/math/MathHelpButton'
+import { PrismMathKeyboard } from '@/components/math/PrismMathKeyboard'
+import { isMathematicsSubject } from '@/lib/mathSubject'
+import type { MathInsertTarget } from '@/lib/mathlive/mathTarget'
 
 type DraftQuestion = Omit<QuestionBankEntry, 'id' | 'status'>
 
@@ -128,6 +133,12 @@ function QuestionBlock({
   const boardData = curriculum.find((b) => b.board === question.board) ?? curriculum[0]
   const gradeData = boardData?.grades.find((g) => g.grade === question.grade) ?? boardData?.grades[0]
   const subjects = gradeData?.subjects.map((s) => s.name) ?? ['Mathematics']
+  const mathMode = isMathematicsSubject(question.subject)
+  const activeMathTargetRef = useRef<MathInsertTarget | null>(null)
+
+  function activateMathTarget(target: MathInsertTarget) {
+    activeMathTargetRef.current = target
+  }
 
   return (
     <div className="rounded-xl border border-border bg-secondary/20 p-4 sm:p-5 space-y-4">
@@ -216,18 +227,34 @@ function QuestionBlock({
             ]}
           />
         </div>
-        <label className="block md:col-span-2">
-          <span className="text-xs text-muted-foreground">
-            Question text {question.textImageKey ? '(optional with photo)' : '*'}
-          </span>
-          <textarea
-            value={question.text}
-            onChange={(e) => onChange({ text: e.target.value })}
-            rows={3}
-            className={inputClass}
-            placeholder="Enter the question, or upload a photo of the formula…"
-          />
-        </label>
+        <div className="block md:col-span-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">
+              Question text {question.textImageKey ? '(optional with photo)' : '*'}
+            </span>
+            {mathMode ? <MathHelpButton align="start" /> : null}
+          </div>
+          {mathMode ? (
+            <div className="mt-1 space-y-2">
+              <MathFieldInput
+                value={question.text}
+                onChange={(text) => onChange({ text })}
+                placeholder="Formula box — type here, then tap keys below for √, x², fractions, and more."
+                aria-label={`Question ${index + 1} math editor`}
+                onActivate={activateMathTarget}
+              />
+              <PrismMathKeyboard getTarget={() => activeMathTargetRef.current} />
+            </div>
+          ) : (
+            <textarea
+              value={question.text}
+              onChange={(e) => onChange({ text: e.target.value })}
+              rows={3}
+              className={inputClass}
+              placeholder="Enter the question, or upload a photo of the formula…"
+            />
+          )}
+        </div>
         <div className="md:col-span-2">
           <QuestionImagePicker
             label="Stem photo (formulas / diagrams)"
@@ -247,15 +274,28 @@ function QuestionBlock({
               ['optionD', 'optionDImageKey', 'optionDImageUrl', 'D'],
             ] as const).map(([textKey, imageKey, imageUrl, letter]) => (
               <div key={textKey} className="space-y-2">
-                <label className="block">
+                <div className="block">
                   <span className="text-xs text-muted-foreground">Option {letter}</span>
-                  <input
-                    value={question[textKey] ?? ''}
-                    onChange={(e) => onChange({ [textKey]: e.target.value })}
-                    className={inputClass}
-                    placeholder={`Text or leave blank if using photo`}
-                  />
-                </label>
+                  {mathMode ? (
+                    <div className="mt-1">
+                      <MathFieldInput
+                        value={question[textKey] ?? ''}
+                        onChange={(next) => onChange({ [textKey]: next })}
+                        placeholder="Expression or leave blank if using photo"
+                        compact
+                        aria-label={`Question ${index + 1} option ${letter}`}
+                        onActivate={activateMathTarget}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      value={question[textKey] ?? ''}
+                      onChange={(e) => onChange({ [textKey]: e.target.value })}
+                      className={inputClass}
+                      placeholder="Text or leave blank if using photo"
+                    />
+                  )}
+                </div>
                 <QuestionImagePicker
                   label={`Option ${letter} photo`}
                   imageKey={question[imageKey]}
@@ -399,8 +439,10 @@ export function ManualQuestionEntry() {
               Build question paper
             </h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-              Add questions with text and/or photos (formulas, diagrams). For each stem or option,
-              upload a JPEG/PNG/WebP. Your work auto-saves as a local draft — publish when ready.
+              Add questions with text and/or photos (formulas, diagrams). When the subject is
+              Mathematics, a math editor and on-screen keyboard appear so you can insert fractions,
+              roots, and symbols without writing LaTeX. Your work auto-saves as a local draft —
+              publish when ready.
             </p>
           </div>
           {draftSavedAt && (

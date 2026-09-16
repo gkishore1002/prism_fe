@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { PageLoader } from '@/components/ui/PrismLoader'
@@ -17,7 +17,7 @@ import {
   Radio,
   UserCheck,
   GraduationCap,
-  Activity,
+  Trophy,
 } from 'lucide-react'
 import {
   PieChart,
@@ -39,6 +39,8 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
+import { Pagination } from '@/components/ui/Pagination'
+import { pageCount, paginateItems } from '@/lib/pagination'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
 import { useCenters } from '@/hooks/useCenters'
@@ -59,6 +61,8 @@ const CHART = {
 }
 
 const SUBJECT_LINE_COLORS = [CHART.ink, CHART.gold, CHART.leaf, CHART.sky, CHART.rose, CHART.sand]
+const STAFF_LEADERBOARD_LIMIT = 5
+const STAFF_LEADERBOARD_LIMIT_OPTIONS = [5, 10, 20] as const
 
 function MetricTile({
   label,
@@ -107,6 +111,8 @@ function MetricTile({
 
 export function AdminDashboardPage() {
   useAnalyticsPage(['adminDashboard', 'adminDashboardHeavy'])
+  const [staffPage, setStaffPage] = useState(1)
+  const [staffLimit, setStaffLimit] = useState(STAFF_LEADERBOARD_LIMIT)
   const {
     activeCenterId,
     isAllBranches,
@@ -357,6 +363,40 @@ export function AdminDashboardPage() {
     }
   }, [branchHealthRows, teachers, ops])
 
+  const staffLeaderboard = useMemo(() => {
+    return [...teachers]
+      .map((row) => ({
+        ...row,
+        score: Math.round(row.growth * 0.4 + row.improved * 0.35 + row.readiness * 0.25),
+      }))
+      .sort(
+        (a, b) =>
+          b.growth - a.growth || b.improved - a.improved || b.students - a.students || b.score - a.score,
+      )
+      .map((row, index) => ({ ...row, rank: index + 1 }))
+  }, [teachers])
+
+  const staffLeaderboardSummary = useMemo(() => {
+    if (staffLeaderboard.length === 0) {
+      return { avgGrowth: 0, avgImproved: 0, totalStudents: 0, leader: null as (typeof staffLeaderboard)[0] | null }
+    }
+    const avgGrowth = Math.round(
+      staffLeaderboard.reduce((sum, row) => sum + row.growth, 0) / staffLeaderboard.length,
+    )
+    const avgImproved = Math.round(
+      staffLeaderboard.reduce((sum, row) => sum + row.improved, 0) / staffLeaderboard.length,
+    )
+    const totalStudents = staffLeaderboard.reduce((sum, row) => sum + row.students, 0)
+    return { avgGrowth, avgImproved, totalStudents, leader: staffLeaderboard[0] }
+  }, [staffLeaderboard])
+
+  const staffLeaderboardPages = pageCount(staffLeaderboard.length, staffLimit)
+  const staffLeaderboardRows = paginateItems(staffLeaderboard, staffPage, staffLimit)
+
+  useEffect(() => {
+    if (staffPage > staffLeaderboardPages) setStaffPage(staffLeaderboardPages)
+  }, [staffPage, staffLeaderboardPages])
+
   if (loading && !inst) {
     return <PageLoader />
   }
@@ -573,9 +613,134 @@ export function AdminDashboardPage() {
         />
       </div>
 
-      {/* Branch + student activity */}
+      {/* Leaderboard + student activity (second row); branch spans below */}
       <div className="grid lg:grid-cols-5 gap-4 mb-6">
-        <AppCard className="lg:col-span-3">
+        <AppCard className="order-1 lg:col-span-3">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
+                Staff leaderboard
+              </p>
+              <h3 className="font-display text-xl text-foreground mt-1">Who is moving students forward</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Ranked by score growth, then share of students improving
+              </p>
+            </div>
+            <Link to="/admin/manage/staff" className="text-xs text-accent hover:underline shrink-0">
+              Staff →
+            </Link>
+          </div>
+
+          {staffLeaderboard.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              Staff progress appears here after assessments are marked.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="rounded-xl border border-leaf/25 bg-leaf/8 px-3 py-2.5">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Leading</p>
+                  <p className="font-medium text-sm truncate mt-0.5" title={staffLeaderboardSummary.leader?.name}>
+                    {staffLeaderboardSummary.leader?.name}
+                  </p>
+                  <p className="font-mono-data text-xs text-leaf">
+                    {staffLeaderboardSummary.leader && staffLeaderboardSummary.leader.growth > 0 ? '+' : ''}
+                    {staffLeaderboardSummary.leader?.growth}% growth
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-secondary/30 px-3 py-2.5">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Avg growth</p>
+                  <p className="font-display text-xl tabular-nums mt-0.5">
+                    {staffLeaderboardSummary.avgGrowth > 0 ? '+' : ''}
+                    {staffLeaderboardSummary.avgGrowth}%
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-secondary/30 px-3 py-2.5">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Students taught</p>
+                  <p className="font-display text-xl tabular-nums mt-0.5">
+                    {staffLeaderboardSummary.totalStudents}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {staffLeaderboardSummary.avgImproved}% improving
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto -mx-1">
+                <table className="w-full text-sm min-w-[560px]">
+                  <thead className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    <tr>
+                      <th className="text-left font-medium pb-2 pr-2 w-12">Rank</th>
+                      <th className="text-left font-medium pb-2 pr-2">Staff</th>
+                      <th className="text-left font-medium pb-2 pr-2">Focus</th>
+                      <th className="text-right font-medium pb-2 pr-2">Students</th>
+                      <th className="text-right font-medium pb-2 pr-2">Improved</th>
+                      <th className="text-right font-medium pb-2 pr-2">Growth</th>
+                      <th className="text-right font-medium pb-2">Readiness</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staffLeaderboardRows.map((row) => (
+                      <tr key={row.id} className="border-t border-border/80">
+                        <td className="py-2.5 pr-2">
+                          <span
+                            className={cn(
+                              'inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold tabular-nums',
+                              row.rank === 1
+                                ? 'bg-accent/25 text-foreground'
+                                : row.rank === 2
+                                  ? 'bg-secondary text-foreground'
+                                  : row.rank === 3
+                                    ? 'bg-gold-100 text-foreground'
+                                    : 'text-muted-foreground',
+                            )}
+                          >
+                            {row.rank === 1 ? <Trophy className="w-3.5 h-3.5" /> : row.rank}
+                          </span>
+                        </td>
+                        <td className="py-2.5 pr-2 font-medium text-foreground">
+                          <p className="truncate max-w-[10rem]">{row.name}</p>
+                          {row.email ? (
+                            <p className="text-[11px] text-muted-foreground truncate max-w-[10rem]">{row.email}</p>
+                          ) : null}
+                        </td>
+                        <td className="py-2.5 pr-2 text-muted-foreground">{row.subject || '—'}</td>
+                        <td className="py-2.5 pr-2 text-right font-mono-data">{row.students}</td>
+                        <td className="py-2.5 pr-2 text-right font-mono-data">{row.improved}%</td>
+                        <td
+                          className={cn(
+                            'py-2.5 pr-2 text-right font-mono-data',
+                            row.growth >= 0 ? 'text-leaf' : 'text-rose',
+                          )}
+                        >
+                          {row.growth > 0 ? '+' : ''}
+                          {row.growth}%
+                        </td>
+                        <td className="py-2.5 text-right font-mono-data">{row.readiness}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <Pagination
+                page={staffPage}
+                pages={staffLeaderboardPages}
+                total={staffLeaderboard.length}
+                limit={staffLimit}
+                onPageChange={setStaffPage}
+                onLimitChange={(limit) => {
+                  setStaffLimit(limit)
+                  setStaffPage(1)
+                }}
+                limitOptions={STAFF_LEADERBOARD_LIMIT_OPTIONS}
+                itemLabel="staff"
+              />
+            </>
+          )}
+        </AppCard>
+
+        <AppCard className="order-3 lg:col-span-5">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
               <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
@@ -749,7 +914,7 @@ export function AdminDashboardPage() {
           )}
         </AppCard>
 
-        <AppCard className="lg:col-span-2">
+        <AppCard className="order-2 lg:col-span-2">
           <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
             Student activity
           </p>
@@ -860,87 +1025,36 @@ export function AdminDashboardPage() {
         </AppCard>
       </div>
 
-      {/* Assessments + staff */}
-      <div className="grid lg:grid-cols-2 gap-4 mb-6">
-        <AppCard>
-          <div className="flex items-center gap-2 mb-1">
-            <Radio className="w-4 h-4 text-leaf" />
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
-              Assessment pipeline
-            </p>
-          </div>
-          <h3 className="font-display text-xl text-foreground mb-4">How exams are moving</h3>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={assessmentPipeline} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
-                <XAxis type="number" allowDecimals={false} fontSize={11} />
-                <YAxis type="category" dataKey="stage" width={80} fontSize={12} tickLine={false} />
-                <Tooltip />
-                <Bar dataKey="count" radius={[0, 6, 6, 0]}>
-                  {assessmentPipeline.map((entry) => (
-                    <Cell key={entry.stage} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <Link
-            to="/admin/assessments"
-            className="text-xs text-accent hover:underline inline-flex items-center gap-1 mt-2"
-          >
-            Open assessment console <ArrowRight className="w-3 h-3" />
-          </Link>
-        </AppCard>
-
-        <AppCard>
-          <div className="flex items-center gap-2 mb-1">
-            <Activity className="w-4 h-4 text-accent" />
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
-              Staff activity
-            </p>
-          </div>
-          <h3 className="font-display text-xl text-foreground mb-4">Who is driving impact</h3>
-          {teachers.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">No staff metrics yet.</p>
-          ) : (
-            <ul className="space-y-3 max-h-64 overflow-y-auto scrollbar-thin pr-1">
-              {teachers.slice(0, 6).map((t) => (
-                <li key={t.id} className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-ink text-paper grid place-items-center text-sm font-display shrink-0">
-                    {t.name.split(' ').pop()?.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{t.name}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">
-                      {t.subject} · {t.students} students
-                    </p>
-                    <div className="mt-1.5 h-1.5 rounded-full bg-secondary overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-leaf"
-                        style={{ width: `${Math.min(100, Math.max(8, t.improved))}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className={cn('font-mono-data text-sm', t.growth >= 0 ? 'text-leaf' : 'text-rose')}>
-                      {t.growth > 0 ? '+' : ''}
-                      {t.growth}%
-                    </p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">growth</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link
-            to="/admin/manage/staff"
-            className="text-xs text-accent hover:underline inline-flex items-center gap-1 mt-3"
-          >
-            Staff directory <ArrowRight className="w-3 h-3" />
-          </Link>
-        </AppCard>
-      </div>
+      <AppCard className="mb-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Radio className="w-4 h-4 text-leaf" />
+          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
+            Assessment pipeline
+          </p>
+        </div>
+        <h3 className="font-display text-xl text-foreground mb-4">How exams are moving</h3>
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={assessmentPipeline} layout="vertical" margin={{ left: 8, right: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
+              <XAxis type="number" allowDecimals={false} fontSize={11} />
+              <YAxis type="category" dataKey="stage" width={80} fontSize={12} tickLine={false} />
+              <Tooltip />
+              <Bar dataKey="count" radius={[0, 6, 6, 0]}>
+                {assessmentPipeline.map((entry) => (
+                  <Cell key={entry.stage} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <Link
+          to="/admin/assessments"
+          className="text-xs text-accent hover:underline inline-flex items-center gap-1 mt-2"
+        >
+          Open assessment console <ArrowRight className="w-3 h-3" />
+        </Link>
+      </AppCard>
 
       {/* Subject × branch charts */}
       <div className="grid lg:grid-cols-5 gap-4 mb-6">
@@ -1478,7 +1592,7 @@ export function AdminDashboardPage() {
           {(branchScopedAdminPortal
             ? [
                 { to: '/admin/manage/students', icon: Users, label: 'Student management' },
-                { to: '/admin/manage/staff', icon: Users, label: 'Staff & tutor impact' },
+                { to: '/admin/manage/staff', icon: Users, label: 'Staff' },
                 { to: '/admin/reports', icon: BarChart3, label: 'Learning Genome reports' },
                 { to: '/admin/curriculum', icon: Network, label: 'Curriculum setup' },
                 { to: '/admin/question-bank', icon: Database, label: 'Question bank' },

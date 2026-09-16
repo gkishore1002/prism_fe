@@ -1,33 +1,44 @@
 import { useEffect, useState } from 'react'
 import { apiFetchBlob } from '@/lib/apiClient'
 import { cn } from '@/lib/cn'
+import { toQuestionMediaFetchPath } from '@/lib/questionMedia'
 
 /** Loads auth-protected question media into an object URL for <img>. */
 export function AuthImage({
   mediaPath,
+  mediaKey,
   alt,
   className,
 }: {
-  /** API path like `/question-media/{institution}/{file}` */
-  mediaPath: string | null | undefined
+  /** API path like `/question-media/{institution}/{file}` or a stored media key. */
+  mediaPath?: string | null
+  mediaKey?: string | null
   alt?: string
   className?: string
 }) {
+  const resolvedPath = toQuestionMediaFetchPath(mediaPath, mediaKey)
   const [src, setSrc] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    if (!mediaPath) {
+    if (!resolvedPath) {
       setSrc(null)
+      setFailed(false)
       return
     }
     let revoked = false
     let objectUrl: string | undefined
     setFailed(false)
-    void apiFetchBlob(mediaPath)
+    setSrc(null)
+    void apiFetchBlob(resolvedPath)
       .then((blob) => {
+        if (revoked) return
+        if (blob.type.includes('json') || blob.type.includes('text/html')) {
+          setFailed(true)
+          return
+        }
         objectUrl = URL.createObjectURL(blob)
-        if (!revoked) setSrc(objectUrl)
+        setSrc(objectUrl)
       })
       .catch(() => {
         if (!revoked) {
@@ -39,9 +50,9 @@ export function AuthImage({
       revoked = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [mediaPath])
+  }, [resolvedPath])
 
-  if (!mediaPath) return null
+  if (!resolvedPath) return null
   if (failed) {
     return (
       <span className="text-xs text-muted-foreground italic">Image unavailable</span>

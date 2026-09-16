@@ -46,7 +46,8 @@ export function QuestionImagePicker({
       {imageKey || imageUrl ? (
         <div className="relative inline-block max-w-full">
           <AuthImage
-            mediaPath={imageUrl || (imageKey ? `/question-media/${imageKey}` : undefined)}
+            mediaPath={imageUrl}
+            mediaKey={imageKey}
             className="max-h-36"
             alt={label}
           />

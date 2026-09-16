@@ -27,6 +27,7 @@ import { shuffleQuestionsForStudent, mcqOptionsForDisplay } from '@/lib/shuffleP
 import { clearExamProgress, loadExamProgress, saveExamProgress } from '@/lib/examProgress'
 import { exitExamFullscreen } from '@/lib/examFullscreen'
 import { getExamDeviceId } from '@/lib/examDevice'
+import { MathContent } from '@/components/math/MathContent'
 import { useExamProctoring } from '@/modules/student/hooks/useExamProctoring'
 import { cn } from '@/lib/cn'
 import { formatSubjects } from '@/lib/formatSubjects'
@@ -1079,15 +1080,20 @@ export function StudentTakeAssessmentPage() {
         onToggleFlag={toggleFlag}
       >
         <p className="text-base sm:text-lg lg:text-xl text-foreground font-semibold leading-relaxed mb-5 sm:mb-7 text-left w-full">
-          {q.text && q.text !== '(image)' ? q.text : null}
+          {q.text && q.text !== '(image)' ? <MathContent text={q.text} /> : null}
         </p>
-        {q.textImageUrl && (
+        {(q.textImageUrl || q.textImageKey) && (
           <div className="mb-5 sm:mb-6 w-full">
-            <AuthImage mediaPath={q.textImageUrl} className="max-h-[min(50vh,28rem)]" alt="Question" />
+            <AuthImage
+              mediaPath={q.textImageUrl}
+              mediaKey={q.textImageKey}
+              className="max-h-[min(50vh,28rem)]"
+              alt="Question"
+            />
           </div>
         )}
 
-        {showScienceVisual && !q.textImageUrl && (
+        {showScienceVisual && !q.textImageUrl && !q.textImageKey && (
           <div className="mb-5 sm:mb-6 rounded-xl overflow-hidden border border-border bg-gradient-to-br from-teal-50 to-cyan-100 aspect-[16/7] sm:aspect-[16/6] flex items-center justify-center">
             <div className="text-center px-4">
               <FlaskConical className="w-10 h-10 sm:w-12 sm:h-12 text-teal-600/70 mx-auto mb-2" />
@@ -1124,7 +1130,7 @@ export function StudentTakeAssessmentPage() {
                   {opt.displayKey}
                 </span>
                 <span className="text-sm sm:text-base text-foreground font-medium text-left flex-1 space-y-2">
-                  {opt.label}
+                  {opt.label ? <MathContent text={opt.label} /> : null}
                   {opt.imageUrl && (
                     <AuthImage mediaPath={opt.imageUrl} className="max-h-40 mt-2" alt={`Option ${opt.displayKey}`} />
                   )}

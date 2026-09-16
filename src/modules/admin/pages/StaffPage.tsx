@@ -68,7 +68,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const { organizationScoped } = useAdminPortalContext()
   const { centers, isPlatformSuperUser, ensureLoaded, refresh: refreshCenters, activeCenterId, isAllBranches } = useCenters()
   const { activeYearId, activeYear, ensureLoaded: ensureYearsLoaded } = useAcademicYears()
-  const { teachers, loading: analyticsLoading, refresh } = useAnalytics()
+  const { teachers, refresh } = useAnalytics()
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -578,50 +578,6 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
         )}
       </AppCard>
 
-      {tutorRows.length > 0 && (
-        <AppCard>
-          <div className="px-1 pb-4 border-b border-border mb-4">
-            <h3 className="font-display text-lg text-foreground">Tutor impact</h3>
-            <p className="text-sm text-muted-foreground mt-1">Outcomes from assessments and student improvement.</p>
-          </div>
-          {analyticsLoading && teachers.length === 0 ? (
-            <PageLoader label="Loading analytics…" />
-          ) : (
-            <ResponsiveTable minWidth={720}>
-              <table className="w-full text-sm">
-                <thead className="bg-secondary/50 text-xs uppercase tracking-widest text-muted-foreground">
-                  <tr>
-                    <th className="text-left px-5 py-3">Tutor</th>
-                    <th className="text-left px-5 py-3">Focus</th>
-                    <th className="text-right px-5 py-3">Students</th>
-                    <th className="text-right px-5 py-3">Improved %</th>
-                    <th className="text-right px-5 py-3">Avg growth</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tutorRows.map((row) => (
-                    <tr key={row.id} className="border-t border-border hover:bg-secondary/20">
-                      <td className="px-5 py-4 font-medium">{row.name}</td>
-                      <td className="px-5 py-4 text-muted-foreground">{row.subject}</td>
-                      <td className="px-5 py-4 text-right font-mono-data">
-                        <span className="inline-flex items-center gap-1 justify-end">
-                          <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                          {row.students}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-right font-mono-data">{row.improved}%</td>
-                      <td className="px-5 py-4 text-right font-mono-data text-leaf">
-                        {row.growth > 0 ? '+' : ''}{row.growth}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ResponsiveTable>
-          )}
-        </AppCard>
-      )}
-
       {/* Staff profile modal */}
       <AppModal
         open={Boolean(viewingProfile)}
@@ -729,7 +685,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
               {tutorStats && (
                 <>
                   <p className="text-[11px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                    <BookOpen className="w-3 h-3" /> Tutor impact
+                    <BookOpen className="w-3 h-3" /> Progress metrics
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">

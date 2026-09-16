@@ -822,6 +822,58 @@
   }
 }
 
+/* ─── MathLive (manual maths question editor + rendered formulas) ─── */
+.prism-math-field {
+  width: 100%;
+}
+
+.prism-math-field-el {
+  display: block;
+  width: 100%;
+  min-height: 5.5rem;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #EEEDEA;
+  background: #ffffff;
+  font-size: 16px;
+  color: #0F172A;
+  outline: none;
+}
+
+.prism-math-field-el--compact {
+  min-height: 2.75rem;
+}
+
+.prism-math-field-el:hover {
+  border-color: #E0DFDB;
+}
+
+.prism-math-field-el:focus,
+.prism-math-field-el:focus-within {
+  border-color: #6B89AB;
+  box-shadow: 0 0 0 3px rgba(107, 137, 171, 0.12);
+  background: #ffffff;
+}
+
+.prism-math-field-el::part(virtual-keyboard-toggle) {
+  display: none;
+}
+
+.prism-math-content {
+  display: inline;
+  vertical-align: baseline;
+}
+
+.prism-math-content .ML__base {
+  font-size: 1em;
+}
+
+@media print {
+  .prism-math-field-el::part(virtual-keyboard-toggle) {
+    display: none !important;
+  }
+}
+
 @media print {
   @page {
     size: A4;

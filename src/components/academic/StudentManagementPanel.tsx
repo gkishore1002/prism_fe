@@ -257,7 +257,7 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
   async function handleExportStudents() {
     setExporting(true)
     try {
-      await exportStudentsCsv(effectiveCenter, activeYearId)
+      await exportStudentsCsv(effectiveCenter, activeYearId, debouncedSearch || undefined)
     } catch (e) {
       setFetchError(e instanceof Error ? e.message : 'Export failed')
     } finally {
@@ -315,7 +315,9 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
   async function handleAddStudent(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!isValidPhone(formPhone)) return
-    const form = new FormData(e.currentTarget)
+    // Capture before awaits — React nulls currentTarget after the event handler yields.
+    const formEl = e.currentTarget
+    const form = new FormData(formEl)
     const name = String(form.get('name') || '').trim()
     const batchId = (formBatch || String(form.get('batchId') || '')).trim()
     const centerId = (formCenter || String(form.get('centerId') || '')).trim()
@@ -352,11 +354,11 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
         schoolName: String(form.get('schoolName') || '') || undefined,
       })
       await refreshAfterMutation()
+      formEl.reset()
       setShowForm(false)
       setFormPhone('')
       setFormPassword('')
       setPage(1)
-      e.currentTarget.reset()
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to save student')
     } finally {

@@ -25,6 +25,7 @@ import { useQuestionPapers } from '@/hooks/useQuestionPapers'
 import { boardsMatch, gradesMatch } from '@/lib/academicScope'
 import { formatSubjects, normalizeSubjectsList } from '@/lib/formatSubjects'
 import { cn } from '@/lib/cn'
+import { MathContent } from '@/components/math/MathContent'
 
 interface CurriculumSetupPanelProps {
   role: 'admin' | 'tutor'
@@ -1618,7 +1619,9 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                     <tr key={q.id} className="border-t border-border hover:bg-secondary/30">
                       <td className="px-4 py-3 font-mono-data text-xs text-muted-foreground">{q.id}</td>
                       <td className="px-4 py-3 text-muted-foreground">{q.chapter}</td>
-                      <td className="px-4 py-3 max-w-md">{q.text}</td>
+                      <td className="px-4 py-3 max-w-md">
+                        <MathContent text={q.text} />
+                      </td>
                       <td className="px-4 py-3 uppercase text-xs">{q.questionType}</td>
                       <td className="px-4 py-3 capitalize">{q.difficulty}</td>
                       <td className="px-4 py-3 text-right font-mono-data">{q.marks}</td>

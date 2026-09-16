@@ -1,5 +1,7 @@
 /** Per-student paper shuffle — UI only. Backend question/option keys stay unchanged. */
 
+import { toQuestionMediaFetchPath } from '@/lib/questionMedia'
+
 function hashSeed(input: string): number {
   let h = 1779033703 ^ input.length
   for (let i = 0; i < input.length; i += 1) {
@@ -50,6 +52,10 @@ type McqSource = {
   optionB?: string
   optionC?: string
   optionD?: string
+  optionAImageKey?: string
+  optionBImageKey?: string
+  optionCImageKey?: string
+  optionDImageKey?: string
   optionAImageUrl?: string
   optionBImageUrl?: string
   optionCImageUrl?: string
@@ -70,22 +76,22 @@ function collectMcqOptions(question: McqSource): { originalKey: string; label: s
     {
       originalKey: 'A',
       label: question.optionA || '',
-      imageUrl: question.optionAImageUrl,
+      imageUrl: toQuestionMediaFetchPath(question.optionAImageUrl, question.optionAImageKey),
     },
     {
       originalKey: 'B',
       label: question.optionB || '',
-      imageUrl: question.optionBImageUrl,
+      imageUrl: toQuestionMediaFetchPath(question.optionBImageUrl, question.optionBImageKey),
     },
     {
       originalKey: 'C',
       label: question.optionC || '',
-      imageUrl: question.optionCImageUrl,
+      imageUrl: toQuestionMediaFetchPath(question.optionCImageUrl, question.optionCImageKey),
     },
     {
       originalKey: 'D',
       label: question.optionD || '',
-      imageUrl: question.optionDImageUrl,
+      imageUrl: toQuestionMediaFetchPath(question.optionDImageUrl, question.optionDImageKey),
     },
   ].filter((o) => o.label.trim() || o.imageUrl)
 
@@ -99,13 +105,20 @@ function collectMcqOptions(question: McqSource): { originalKey: string; label: s
   ]
 }
 
-export function mcqOptionsInBankOrder(question: McqSource): ShuffledMcqOption[] {
-  return collectMcqOptions(question).map((opt) => ({
-    displayKey: opt.originalKey,
+function toShuffledOption(
+  opt: { originalKey: string; label: string; imageUrl?: string },
+  displayKey: string,
+): ShuffledMcqOption {
+  return {
+    displayKey,
     originalKey: opt.originalKey,
     label: opt.label,
-    imageUrl: opt.imageUrl,
-  }))
+    ...(opt.imageUrl ? { imageUrl: opt.imageUrl } : {}),
+  }
+}
+
+export function mcqOptionsInBankOrder(question: McqSource): ShuffledMcqOption[] {
+  return collectMcqOptions(question).map((opt) => toShuffledOption(opt, opt.originalKey))
 }
 
 export function mcqOptionsForDisplay(
@@ -122,10 +135,7 @@ export function shuffledMcqOptions(
   studentId: string,
 ): ShuffledMcqOption[] {
   const seed = `o:${paperShuffleSeed(assessmentId, studentId)}:${question.id}`
-  return seededShuffle(collectMcqOptions(question), seed).map((opt, index) => ({
-    displayKey: String.fromCharCode(65 + index),
-    originalKey: opt.originalKey,
-    label: opt.label,
-    imageUrl: opt.imageUrl,
-  }))
+  return seededShuffle(collectMcqOptions(question), seed).map((opt, index) =>
+    toShuffledOption(opt, String.fromCharCode(65 + index)),
+  )
 }

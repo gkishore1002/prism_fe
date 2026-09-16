@@ -163,11 +163,11 @@ export function mapQuestion(q: ApiQuestion): QuestionBankEntry {
     optionBImageKey: q.optionBImageKey ?? undefined,
     optionCImageKey: q.optionCImageKey ?? undefined,
     optionDImageKey: q.optionDImageKey ?? undefined,
-    textImageUrl: q.textImageUrl ?? undefined,
-    optionAImageUrl: q.optionAImageUrl ?? undefined,
-    optionBImageUrl: q.optionBImageUrl ?? undefined,
-    optionCImageUrl: q.optionCImageUrl ?? undefined,
-    optionDImageUrl: q.optionDImageUrl ?? undefined,
+    textImageUrl: q.textImageUrl ?? (q.textImageKey ? `/question-media/${q.textImageKey}` : undefined),
+    optionAImageUrl: q.optionAImageUrl ?? (q.optionAImageKey ? `/question-media/${q.optionAImageKey}` : undefined),
+    optionBImageUrl: q.optionBImageUrl ?? (q.optionBImageKey ? `/question-media/${q.optionBImageKey}` : undefined),
+    optionCImageUrl: q.optionCImageUrl ?? (q.optionCImageKey ? `/question-media/${q.optionCImageKey}` : undefined),
+    optionDImageUrl: q.optionDImageUrl ?? (q.optionDImageKey ? `/question-media/${q.optionDImageKey}` : undefined),
   }
 }
 

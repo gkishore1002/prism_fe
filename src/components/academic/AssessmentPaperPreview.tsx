@@ -2,6 +2,8 @@ import { AppCard } from '@/components/layout/AppShell'
 import { AuthImage } from '@/components/ui/AuthImage'
 import type { QuestionBankEntry } from '@/types'
 import { cn } from '@/lib/cn'
+import { MathContent } from '@/components/math/MathContent'
+import { toQuestionMediaFetchPath } from '@/lib/questionMedia'
 
 interface AssessmentPaperPreviewProps {
   paperName: string
@@ -14,25 +16,25 @@ interface AssessmentPaperPreviewProps {
 
 function PreviewOptions({ q }: { q: QuestionBankEntry }) {
   const opts = [
-    (q.optionA || q.optionAImageUrl) && {
+    (q.optionA || q.optionAImageUrl || q.optionAImageKey) && {
       key: 'A',
       label: q.optionA,
-      imageUrl: q.optionAImageUrl,
+      imageUrl: toQuestionMediaFetchPath(q.optionAImageUrl, q.optionAImageKey),
     },
-    (q.optionB || q.optionBImageUrl) && {
+    (q.optionB || q.optionBImageUrl || q.optionBImageKey) && {
       key: 'B',
       label: q.optionB,
-      imageUrl: q.optionBImageUrl,
+      imageUrl: toQuestionMediaFetchPath(q.optionBImageUrl, q.optionBImageKey),
     },
-    (q.optionC || q.optionCImageUrl) && {
+    (q.optionC || q.optionCImageUrl || q.optionCImageKey) && {
       key: 'C',
       label: q.optionC,
-      imageUrl: q.optionCImageUrl,
+      imageUrl: toQuestionMediaFetchPath(q.optionCImageUrl, q.optionCImageKey),
     },
-    (q.optionD || q.optionDImageUrl) && {
+    (q.optionD || q.optionDImageUrl || q.optionDImageKey) && {
       key: 'D',
       label: q.optionD,
-      imageUrl: q.optionDImageUrl,
+      imageUrl: toQuestionMediaFetchPath(q.optionDImageUrl, q.optionDImageKey),
     },
   ].filter(Boolean) as { key: string; label?: string; imageUrl?: string }[]
 
@@ -47,7 +49,11 @@ function PreviewOptions({ q }: { q: QuestionBankEntry }) {
         >
           <div>
             <span className="font-mono-data text-[10px] text-muted-foreground mr-1.5">{opt.key}.</span>
-            {opt.label ? <span className="text-foreground">{opt.label}</span> : null}
+            {opt.label ? (
+              <span className="text-foreground">
+                <MathContent text={opt.label} />
+              </span>
+            ) : null}
           </div>
           {opt.imageUrl ? (
             <AuthImage mediaPath={opt.imageUrl} className="max-h-24 w-auto rounded border border-border object-contain bg-card" />
@@ -106,17 +112,24 @@ export function AssessmentPaperPreview({
             <li key={q.id} className="text-sm text-foreground pl-3 border-l-2 border-border">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <span className="text-xs text-muted-foreground font-mono-data">Q{i + 1}.</span>
-                <span className={cn(!q.text?.trim() && q.textImageUrl ? 'text-muted-foreground italic' : '')}>
-                  {q.text?.trim() || (q.textImageUrl ? 'Image question' : '—')}
+                <span className={cn(!q.text?.trim() && (q.textImageUrl || q.textImageKey) ? 'text-muted-foreground italic' : '')}>
+                  {q.text?.trim() ? (
+                    <MathContent text={q.text} />
+                  ) : q.textImageUrl || q.textImageKey ? (
+                    'Image question'
+                  ) : (
+                    '—'
+                  )}
                 </span>
                 <span className="text-[10px] text-muted-foreground">
                   · {q.marks} mark{q.marks !== 1 ? 's' : ''}
                 </span>
               </div>
-              {q.textImageUrl ? (
+              {q.textImageUrl || q.textImageKey ? (
                 <div className="mt-2">
                   <AuthImage
                     mediaPath={q.textImageUrl}
+                    mediaKey={q.textImageKey}
                     className="max-h-36 w-auto rounded-md border border-border object-contain bg-secondary/30"
                   />
                 </div>

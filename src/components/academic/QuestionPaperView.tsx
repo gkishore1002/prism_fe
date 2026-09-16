@@ -13,28 +13,30 @@ import {
 } from '@/lib/questionPaperPrint'
 import type { QuestionBankEntry, TutorAssessmentSchedule } from '@/types'
 import { formatSubjects } from '@/lib/formatSubjects'
+import { MathContent } from '@/components/math/MathContent'
+import { toQuestionMediaFetchPath } from '@/lib/questionMedia'
 
 function renderOptions(q: QuestionBankEntry) {
   const opts = [
-    (q.optionA || q.optionAImageUrl) && {
+    (q.optionA || q.optionAImageUrl || q.optionAImageKey) && {
       key: 'A',
       label: q.optionA,
-      imageUrl: q.optionAImageUrl,
+      imageUrl: toQuestionMediaFetchPath(q.optionAImageUrl, q.optionAImageKey),
     },
-    (q.optionB || q.optionBImageUrl) && {
+    (q.optionB || q.optionBImageUrl || q.optionBImageKey) && {
       key: 'B',
       label: q.optionB,
-      imageUrl: q.optionBImageUrl,
+      imageUrl: toQuestionMediaFetchPath(q.optionBImageUrl, q.optionBImageKey),
     },
-    (q.optionC || q.optionCImageUrl) && {
+    (q.optionC || q.optionCImageUrl || q.optionCImageKey) && {
       key: 'C',
       label: q.optionC,
-      imageUrl: q.optionCImageUrl,
+      imageUrl: toQuestionMediaFetchPath(q.optionCImageUrl, q.optionCImageKey),
     },
-    (q.optionD || q.optionDImageUrl) && {
+    (q.optionD || q.optionDImageUrl || q.optionDImageKey) && {
       key: 'D',
       label: q.optionD,
-      imageUrl: q.optionDImageUrl,
+      imageUrl: toQuestionMediaFetchPath(q.optionDImageUrl, q.optionDImageKey),
     },
   ].filter(Boolean) as { key: string; label?: string; imageUrl?: string }[]
 
@@ -49,8 +51,8 @@ function renderOptions(q: QuestionBankEntry) {
       {opts.map((opt) => (
         <div key={opt.key} className="text-sm px-3 py-2 rounded-md border border-border space-y-2">
           <span className="font-mono-data text-xs text-muted-foreground mr-2">{opt.key}.</span>
-          {opt.label}
-          {opt.imageUrl && <AuthImage mediaPath={opt.imageUrl} className="max-h-40 mt-1" />}
+          {opt.label ? <MathContent text={opt.label} /> : null}
+          {opt.imageUrl && <AuthImage mediaPath={opt.imageUrl} className="max-h-40 mt-1" alt={`Option ${opt.key}`} />}
         </div>
       ))}
     </div>
@@ -235,11 +237,18 @@ export function QuestionPaperView(props: QuestionPaperViewProps) {
                     <div>
                       Q{idx + 1}.{' '}
                       {q.text && q.text !== '(image)' && (
-                        <span className="font-normal text-foreground">{q.text}</span>
+                        <span className="font-normal text-foreground">
+                          <MathContent text={q.text} />
+                        </span>
                       )}
                     </div>
-                    {q.textImageUrl && (
-                      <AuthImage mediaPath={q.textImageUrl} className="max-h-64" alt={`Question ${idx + 1}`} />
+                    {(q.textImageUrl || q.textImageKey) && (
+                      <AuthImage
+                        mediaPath={q.textImageUrl}
+                        mediaKey={q.textImageKey}
+                        className="max-h-64"
+                        alt={`Question ${idx + 1}`}
+                      />
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
