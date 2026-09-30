@@ -8,9 +8,11 @@ import {
   printReport,
   scrollToReportSection,
   shareReportPdf,
+  type ShareReportResult,
 } from '@/modules/reports/learningGenome/printReport'
 import { reportLanguageLabel, useReportLanguage } from '@/components/reports/ReportLanguageToggle'
 import { useReportLabels } from '@/lib/useReportLabels'
+import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/cn'
 
 export interface LgReportNavLink {
@@ -49,12 +51,31 @@ export function LgReportToolbar({
   const [shareHint, setShareHint] = useState<string | null>(null)
   const { language } = useReportLanguage()
   const { L } = useReportLabels()
+  const { showToast } = useToast()
   const resolvedBackLabel = backLabel === 'Back' ? L.back : backLabel
   const resolvedExportLabel =
     exportLabel === 'Export PDF' || exportLabel === 'Download PDF' ? L.exportPdf : exportLabel
   const fileTitle = printTitle ?? `${brand} ${L.learningGenomeReport}`
   const exportTitle = bilingual ? `${fileTitle} (${reportLanguageLabel(language)})` : fileTitle
   const busy = pdfBusy || shareBusy
+
+  function notifyShareResult(result: ShareReportResult) {
+    const hint =
+      result === 'downloaded'
+        ? L.shareDownloadedFallback
+        : result === 'failed'
+          ? L.shareFailed
+          : messageForShareResult(result)
+    setShareHint(hint)
+    if (result === 'downloaded' || result === 'failed') {
+      showToast({
+        title: result === 'downloaded' ? L.share : L.shareFailed,
+        message: hint ?? L.shareFailed,
+        variant: result === 'failed' ? 'urgent' : 'info',
+        durationMs: 5000,
+      })
+    }
+  }
 
   const handlePrint = () => {
     printReport({ title: exportTitle, language: bilingual ? language : undefined })
@@ -88,15 +109,7 @@ export function LgReportToolbar({
         title: exportTitle,
         language: bilingual ? language : undefined,
       })
-      setShareHint(
-        result === 'shared-url'
-          ? L.shareUrlFallback
-          : result === 'copied-url'
-            ? L.shareCopiedFallback
-            : result === 'failed'
-              ? L.shareFailed
-              : messageForShareResult(result),
-      )
+      notifyShareResult(result)
     } finally {
       setShareBusy(false)
     }
@@ -236,6 +249,7 @@ export function LgSharePdfButton({
   const [busy, setBusy] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
   const { L } = useReportLabels()
+  const { showToast } = useToast()
 
   return (
     <div className="inline-flex flex-col items-start gap-1">
@@ -258,15 +272,21 @@ export function LgSharePdfButton({
           setHint(null)
           void shareReportPdf({ title: title ?? `${APP_NAME} Learning Genome Report` })
             .then((result) => {
-              setHint(
-                result === 'shared-url'
-                  ? L.shareUrlFallback
-                  : result === 'copied-url'
-                    ? L.shareCopiedFallback
-                    : result === 'failed'
-                      ? L.shareFailed
-                      : messageForShareResult(result),
-              )
+              const next =
+                result === 'downloaded'
+                  ? L.shareDownloadedFallback
+                  : result === 'failed'
+                    ? L.shareFailed
+                    : messageForShareResult(result)
+              setHint(next)
+              if (result === 'downloaded' || result === 'failed') {
+                showToast({
+                  title: result === 'downloaded' ? L.share : L.shareFailed,
+                  message: next ?? L.shareFailed,
+                  variant: result === 'failed' ? 'urgent' : 'info',
+                  durationMs: 5000,
+                })
+              }
             })
             .finally(() => setBusy(false))
         }}

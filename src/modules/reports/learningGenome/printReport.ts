@@ -608,30 +608,17 @@ export async function downloadReportPdf(options?: ReportPdfOptions): Promise<voi
 }
 
 /**
- * Teacher Share — client-side only (Swotify `shareAcademicReportHtml` parity).
- *
- * 1. Build PDF blob from on-screen report HTML (html2canvas + jsPDF)
- * 2. If `navigator.canShare({ files })` → native share sheet with the PDF
- * 3. Else if `navigator.share` → share the current page URL
- * 4. Else → copy the page URL to the clipboard
- *
- * Does not upload to a server or send into the parent portal.
- * Download PDF remains a separate action (`downloadReportPdf`).
+ * Share the report PDF via the device native share sheet (Web Share API).
+ * Reuses `buildReportPdfBlob` — same PDF as Download PDF.
+ * No in-app share modal. AbortError (user dismisses sheet) is silent.
+ * Unsupported browsers: download the PDF and return `'downloaded'`.
  */
-export type ShareReportResult =
-  | 'shared-file'
-  | 'shared-url'
-  | 'copied-url'
-  | 'cancelled'
-  | 'failed'
+export type ShareReportResult = 'shared' | 'downloaded' | 'cancelled' | 'failed'
 
-/** Short status for URL/clipboard fallbacks (file share needs no hint). */
 export function messageForShareResult(result: ShareReportResult): string | null {
   switch (result) {
-    case 'shared-url':
-      return 'Shared the report link (this device can’t attach PDFs).'
-    case 'copied-url':
-      return 'Report link copied to clipboard.'
+    case 'downloaded':
+      return 'Sharing isn’t available here — PDF downloaded instead.'
     case 'failed':
       return 'Couldn’t share this report. Try Download PDF instead.'
     default:
@@ -642,91 +629,37 @@ export function messageForShareResult(result: ShareReportResult): string | null 
 export async function shareReportPdf(
   options?: ReportPdfOptions,
 ): Promise<ShareReportResult> {
-  const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
-  const title = options?.title ?? 'Report'
-
   try {
     const { blob, filename } = await buildReportPdfBlob(options)
-    const file = new File([blob], filename, { type: 'application/pdf' })
-    const filesPayload: ShareData = { files: [file] }
+    const pdfFile = new File([blob], 'student-report.pdf', { type: 'application/pdf' })
 
-    // 1) Native file share when the device accepts PDF files
-    if (
+    const canShareFiles =
       typeof navigator.share === 'function' &&
       typeof navigator.canShare === 'function' &&
-      navigator.canShare(filesPayload)
-    ) {
+      navigator.canShare({ files: [pdfFile] })
+
+    if (canShareFiles) {
       try {
-        await navigator.share(filesPayload)
-        return 'shared-file'
+        await navigator.share({
+          title: 'Student Report',
+          text: 'Student Report',
+          files: [pdfFile],
+        })
+        return 'shared'
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
           return 'cancelled'
         }
-        // Fall through to URL share / clipboard
+        // Share rejected for another reason — fall through to download.
       }
     }
 
-    // 2) Share page URL via the system sheet
-    if (typeof navigator.share === 'function' && pageUrl) {
-      const urlPayload: ShareData = { title, text: title, url: pageUrl }
-      const urlOk =
-        typeof navigator.canShare !== 'function' || navigator.canShare(urlPayload)
-      if (urlOk) {
-        try {
-          await navigator.share(urlPayload)
-          return 'shared-url'
-        } catch (err) {
-          if (err instanceof DOMException && err.name === 'AbortError') {
-            return 'cancelled'
-          }
-          // Fall through to clipboard
-        }
-      }
-    }
-
-    // 3) Copy page URL to clipboard
-    if (pageUrl) {
-      await copyTextToClipboard(pageUrl)
-      return 'copied-url'
-    }
-
-    return 'failed'
+    triggerBlobDownload(blob, filename)
+    return 'downloaded'
   } catch (err) {
     console.error('PDF share failed', err)
-    // Still try URL share / clipboard if PDF build failed
-    try {
-      if (typeof navigator.share === 'function' && pageUrl) {
-        await navigator.share({ title, text: title, url: pageUrl })
-        return 'shared-url'
-      }
-      if (pageUrl) {
-        await copyTextToClipboard(pageUrl)
-        return 'copied-url'
-      }
-    } catch (fallbackErr) {
-      if (fallbackErr instanceof DOMException && fallbackErr.name === 'AbortError') {
-        return 'cancelled'
-      }
-      console.error('Share URL fallback failed', fallbackErr)
-    }
     return 'failed'
   }
-}
-
-async function copyTextToClipboard(text: string): Promise<void> {
-  if (typeof navigator.clipboard?.writeText === 'function') {
-    await navigator.clipboard.writeText(text)
-    return
-  }
-  const ta = document.createElement('textarea')
-  ta.value = text
-  ta.setAttribute('readonly', '')
-  ta.style.cssText = 'position:fixed;left:-9999px;top:0'
-  document.body.appendChild(ta)
-  ta.select()
-  document.execCommand('copy')
-  ta.remove()
 }
 
 export function scrollToReportSection(href: string) {

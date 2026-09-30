@@ -12,6 +12,7 @@ import {
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useCurriculum } from '@/hooks/useCurriculum'
+import { useToast } from '@/components/ui/Toast'
 import {
   downloadReportPdf,
   messageForShareResult,
@@ -27,6 +28,7 @@ export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolea
   const [busy, setBusy] = useState(false)
   const [shareHint, setShareHint] = useState<string | null>(null)
   const [shareBusy, setShareBusy] = useState(false)
+  const { showToast } = useToast()
   const student = studentProfile ?? (students[0] ? {
     name: students[0].name,
     board: students[0].board ?? 'CBSE',
@@ -68,7 +70,16 @@ export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolea
       setShareHint(null)
       try {
         const result = await shareReportPdf({ title: exportTitle, rootId: MEETING_REPORT_ROOT_ID })
-        setShareHint(messageForShareResult(result))
+        const hint = messageForShareResult(result)
+        setShareHint(hint)
+        if ((result === 'downloaded' || result === 'failed') && hint) {
+          showToast({
+            title: result === 'downloaded' ? 'Share' : 'Share failed',
+            message: hint,
+            variant: result === 'failed' ? 'urgent' : 'info',
+            durationMs: 5000,
+          })
+        }
       } finally {
         setShareBusy(false)
       }

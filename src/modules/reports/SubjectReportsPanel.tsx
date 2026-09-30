@@ -17,6 +17,7 @@ import { getHealthStatus } from '@/lib/constants'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { analyticsApi } from '@/lib/api/analyticsApi'
 import { cn } from '@/lib/cn'
+import { useToast } from '@/components/ui/Toast'
 import {
   downloadReportPdf,
   messageForShareResult,
@@ -80,6 +81,7 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
   const [pdfBusy, setPdfBusy] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
   const [shareHint, setShareHint] = useState<string | null>(null)
+  const { showToast } = useToast()
   const exportTitle = `Subject performance — ${subject || 'report'}`
   const actionBusy = pdfBusy || shareBusy
 
@@ -100,7 +102,16 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
     setShareHint(null)
     try {
       const result = await shareReportPdf({ title: exportTitle, rootId: SUBJECT_REPORT_ROOT_ID })
-      setShareHint(messageForShareResult(result))
+      const hint = messageForShareResult(result)
+      setShareHint(hint)
+      if ((result === 'downloaded' || result === 'failed') && hint) {
+        showToast({
+          title: result === 'downloaded' ? 'Share' : 'Share failed',
+          message: hint,
+          variant: result === 'failed' ? 'urgent' : 'info',
+          durationMs: 5000,
+        })
+      }
     } finally {
       setShareBusy(false)
     }
