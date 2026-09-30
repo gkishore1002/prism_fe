@@ -1,11 +1,11 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MapPin, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { PageHeader } from '@/components/layout/AppShell'
+import { SegmentedTabLink, SegmentedTabs } from '@/components/ui/SegmentedTabs'
 import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
 import { pageUnfold } from '@/lib/motion'
-import { cn } from '@/lib/cn'
 
 export function AdminManageLayout() {
   const { pathname } = useLocation()
@@ -35,26 +35,13 @@ export function AdminManageLayout() {
         }
       />
 
-      <nav className="flex flex-wrap gap-2 mb-6 ln-tabs-bar" aria-label="Manage sections">
+      <SegmentedTabs aria-label="Manage sections">
         {tabs.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              cn(
-                'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-accent text-accent-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-[#F0EBE3] hover:text-foreground',
-              )
-            }
-          >
-            <Icon className="w-3.5 h-3.5" />
+          <SegmentedTabLink key={to} to={to} end={end} icon={<Icon className="w-3.5 h-3.5 shrink-0" />}>
             {label}
-          </NavLink>
+          </SegmentedTabLink>
         ))}
-      </nav>
+      </SegmentedTabs>
 
       <AnimatePresence mode="wait">
         <motion.div

@@ -618,6 +618,7 @@ export interface QuestionPaper {
   createdBy?: string
   source: 'upload' | 'custom' | 'manual'
   parentPaperId?: string
+  status?: 'draft' | 'published'
 }
 
 export interface AssessmentAttendanceRecord {

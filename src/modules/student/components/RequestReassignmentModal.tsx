@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { AppModal } from '@/components/ui/AppModal'
 import { btnClass } from '@/components/ui/Button'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { createAccessRequest } from '@/lib/api/assessmentsApi'
 import { accessRequestTheme } from '@/lib/accessRequestTheme'
 
@@ -75,7 +76,7 @@ export function RequestReassignmentModal({
               placeholder="e.g. Was unwell during the scheduled week…"
             />
           </label>
-          {error && <p className="text-xs text-rose">{error}</p>}
+          {error && <FormErrorBanner message={error} size="sm" />}
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={onClose} className={`${btnClass.secondary} text-sm px-4 py-2`}>
               Cancel

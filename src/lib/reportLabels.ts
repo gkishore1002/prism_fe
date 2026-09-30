@@ -76,6 +76,12 @@ export const R = {
   // Toolbar
   exportPdf: { en: 'Export PDF', ta: 'PDF ஏற்றுமதி' },
   print: { en: 'Print', ta: 'அச்சிடு' },
+  share: { en: 'Share', ta: 'பகிர்' },
+  sharingPdf: { en: 'Preparing share…', ta: 'பகிர்வு தயாராகிறது…' },
+  shareDownloadedFallback: {
+    en: 'Share isn’t available here — PDF downloaded instead.',
+    ta: 'பகிர்வு இங்கு கிடைக்கவில்லை — PDF பதிவிறக்கப்பட்டது.',
+  },
   buildingPdf: { en: 'Building PDF…', ta: 'PDF உருவாக்குகிறது…' },
   back: { en: 'Back', ta: 'பின்செல்' },
   reportLoadingAlert: {

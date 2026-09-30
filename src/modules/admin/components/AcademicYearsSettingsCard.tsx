@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Plus } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
 import { btnClass } from '@/components/ui/Button'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { useAcademicYears } from '@/hooks/useAcademicYears'
 import { reloadAppAfterScopeChange } from '@/lib/reloadAppScope'
 
@@ -103,11 +104,7 @@ export function AcademicYearsSettingsCard() {
         </div>
       </form>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-rose/30 bg-rose/5 px-4 py-3 text-sm text-rose">
-          {error}
-        </div>
-      )}
+      {error && <FormErrorBanner message={error} className="mb-4 rounded-lg" />}
       {success && (
         <div className="mb-4 rounded-lg border border-leaf/30 bg-leaf/5 px-4 py-3 text-sm text-foreground">
           {success}

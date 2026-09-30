@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { AppModal } from '@/components/ui/AppModal'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { btnClass } from '@/components/ui/Button'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import {
   fetchAccessRequestReviewContext,
   reviewAccessRequest,
@@ -157,9 +158,7 @@ export function ReassignmentReviewModal({
       }
     >
       {loading && <PageLoader label="Loading request details…" minHeight={false} className="py-8" />}
-      {error && !loading && (
-        <p className="text-sm text-rose py-4">{error}</p>
-      )}
+      {error && !loading && <FormErrorBanner message={error} className="py-4 border-0 bg-transparent px-0" />}
       {ctx && !loading && (
         <div className="space-y-6">
           <div className="flex flex-wrap items-center gap-2">

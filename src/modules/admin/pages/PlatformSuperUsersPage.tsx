@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { Button } from '@/components/ui/Button'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { authTheme } from '@/modules/auth/lib/authTheme'
 import {
   createPlatformSuperAdmin,
@@ -75,11 +76,7 @@ export function PlatformSuperUsersPage() {
         sub="Accounts that sign in with org code SYSTEM to manage organizations on this deployment."
       />
 
-      {error && (
-        <AppCard>
-          <p className="text-sm text-red-600">{error}</p>
-        </AppCard>
-      )}
+      {error && <FormErrorBanner message={error} className="mb-2" />}
 
       <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
         <AppCard>

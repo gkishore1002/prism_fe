@@ -75,16 +75,16 @@ export function StudentProfileCard({ profile, institutionName, linkTo }: Student
       <p className="text-sm text-muted-foreground mt-0.5">
         {studentProfileEyebrow(profile, institutionName)}
       </p>
-      <div className="grid grid-cols-3 gap-3 mt-4 text-center">
-        <div>
+      <div className="metric-chip-grid mt-4 text-center">
+        <div className="min-w-0">
           <p className="text-[10px] uppercase text-muted-foreground">Health</p>
           <p className="font-mono-data text-xl font-bold">{profile.healthScore}</p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] uppercase text-muted-foreground">Readiness</p>
           <p className="font-mono-data text-xl font-bold">{profile.readiness}%</p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] uppercase text-muted-foreground">Improvement</p>
           <p className="font-mono-data text-xl font-bold text-leaf">+{profile.improvement}%</p>
         </div>

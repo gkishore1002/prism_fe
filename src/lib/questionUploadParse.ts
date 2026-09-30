@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import type { QuestionUploadRow } from '@/types'
 import { QUESTION_UPLOAD_TEMPLATE_ROWS } from '@/lib/questionUploadTemplate'
+import { getCurriculumSubjects, mapSubjectLabelToCurriculum } from '@/lib/academicScope'
 
 const QUESTION_FILE_RE = /\.(xlsx|xls|csv|json)$/i
 
@@ -101,6 +102,12 @@ function parseMarks(value: string): number {
 
 export function validateQuestionUploadRow(
   partial: Omit<QuestionUploadRow, 'valid' | 'errors'>,
+  options?: {
+    curriculum?: {
+      board: string
+      grades: { grade: string; subjects: { name: string }[] }[]
+    }[]
+  },
 ): QuestionUploadRow {
   const errors: string[] = []
   if (!partial.board) errors.push('Board is required')
@@ -109,6 +116,25 @@ export function validateQuestionUploadRow(
   if (!partial.chapter) errors.push('Chapter is required')
   if (!partial.text && !partial.textImageBlob && !partial.textImageKey) {
     errors.push('Question text or stem photo is required')
+  }
+
+  let subject = partial.subject
+  if (options?.curriculum && partial.board && partial.grade && partial.subject) {
+    const allowed = getCurriculumSubjects(options.curriculum, partial.board, partial.grade)
+    if (allowed.length === 0) {
+      errors.push(
+        `No subjects in Curriculum setup for ${partial.board} / ${partial.grade}`,
+      )
+    } else {
+      const mapped = mapSubjectLabelToCurriculum(partial.subject, allowed)
+      if (!mapped) {
+        errors.push(
+          `Subject "${partial.subject}" is not in Curriculum setup for ${partial.board} / ${partial.grade}`,
+        )
+      } else {
+        subject = mapped
+      }
+    }
   }
 
   const diff = partial.difficulty.toLowerCase()
@@ -141,9 +167,24 @@ export function validateQuestionUploadRow(
 
   return {
     ...partial,
+    subject,
     valid: errors.length === 0,
     errors,
   }
+}
+
+/** Re-check uploaded rows so subjects must exist in Curriculum setup for that board + grade. */
+export function revalidateUploadRowsAgainstCurriculum(
+  rows: QuestionUploadRow[],
+  curriculum: {
+    board: string
+    grades: { grade: string; subjects: { name: string }[] }[]
+  }[],
+): QuestionUploadRow[] {
+  return rows.map((row) => {
+    const { valid: _v, errors: _e, ...partial } = row
+    return validateQuestionUploadRow(partial, { curriculum })
+  })
 }
 
 function recordToRow(record: RawQuestionRecord, rowNumber: number): QuestionUploadRow {

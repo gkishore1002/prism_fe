@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/apiClient'
+import { DEFAULT_PAGE_LIMIT } from '@/lib/pagination'
 
 export interface StaffMember {
   id: string
@@ -27,15 +28,44 @@ export interface StaffAssignment {
   endDate: string | null
 }
 
+export interface PaginatedStaff {
+  items: StaffMember[]
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export interface StaffListQuery {
+  centerId?: string
+  academicYearId?: string
+  search?: string
+  page?: number
+  limit?: number
+}
+
+export async function fetchStaffPaginated(query: StaffListQuery = {}): Promise<PaginatedStaff> {
+  const params = new URLSearchParams()
+  if (query.centerId) params.set('center_id', query.centerId)
+  if (query.academicYearId) params.set('academic_year_id', query.academicYearId)
+  if (query.search) params.set('search', query.search)
+  params.set('page', String(query.page ?? 1))
+  params.set('limit', String(query.limit ?? DEFAULT_PAGE_LIMIT))
+  return apiFetch<PaginatedStaff>(`/staff?${params.toString()}`)
+}
+
+/** @deprecated Prefer fetchStaffPaginated — kept for callers that need a flat list. */
 export async function fetchStaff(
   centerId?: string,
   academicYearId?: string,
 ): Promise<StaffMember[]> {
-  const params = new URLSearchParams()
-  if (centerId) params.set('center_id', centerId)
-  if (academicYearId) params.set('academic_year_id', academicYearId)
-  const qs = params.toString()
-  return apiFetch<StaffMember[]>(`/staff${qs ? `?${qs}` : ''}`)
+  const data = await fetchStaffPaginated({
+    centerId,
+    academicYearId,
+    page: 1,
+    limit: 100,
+  })
+  return data.items
 }
 
 export async function createStaff(body: {

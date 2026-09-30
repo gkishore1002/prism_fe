@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { btnClass } from '@/components/ui/Button'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { PhoneCredentialFields } from '@/components/auth/PhoneCredentialFields'
 import { useCenters } from '@/hooks/useCenters'
 import {
@@ -119,9 +120,7 @@ export function AdminAdminsPage() {
         </AppCard>
       )}
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-rose/30 bg-rose/5 px-4 py-3 text-sm text-rose">{error}</div>
-      )}
+      {error && <FormErrorBanner message={error} className="mb-4 rounded-lg" />}
 
       <AppCard className="mb-6">
         <h3 className="font-display font-semibold mb-4">Add admin</h3>

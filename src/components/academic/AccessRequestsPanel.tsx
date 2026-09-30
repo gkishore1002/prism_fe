@@ -13,7 +13,9 @@ import {
 import { AppCard } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { btnClass } from '@/components/ui/Button'
+import { useScrollToError } from '@/hooks/useScrollToError'
 import { ToolbarButton } from '@/components/ui/ListToolbar'
+import { SegmentedTab, SegmentedTabs } from '@/components/ui/SegmentedTabs'
 import { AppModal } from '@/components/ui/AppModal'
 import { Pagination } from '@/components/ui/Pagination'
 import { StudentProfileModal } from '@/components/academic/StudentProfileModal'
@@ -33,10 +35,6 @@ import type { AssessmentAccessRequest } from '@/types'
 import { exportReassignmentCsv } from '@/lib/api/exportsApi'
 
 type FilterTab = 'pending' | 'approved' | 'rejected' | 'all'
-
-function tabClass(active: boolean) {
-  return active ? accessRequestTheme.tabActive : accessRequestTheme.tab
-}
 
 function RequestInfoModal({
   open,
@@ -220,6 +218,7 @@ export function AccessRequestsPanel({ scope = 'tutor' }: { scope?: 'tutor' | 'ad
   const [loading, setLoading] = useState(true)
   const [requests, setRequests] = useState<AssessmentAccessRequest[]>([])
   const [error, setError] = useState<string | null>(null)
+  const errorRef = useScrollToError(error)
   const [tab, setTab] = useState<FilterTab>('pending')
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT)
@@ -323,7 +322,7 @@ export function AccessRequestsPanel({ scope = 'tutor' }: { scope?: 'tutor' | 'ad
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-4">
+        <SegmentedTabs aria-label="Access request filters" className="mb-4">
           {(
             [
               ['pending', `Pending (${pendingCount})`],
@@ -332,19 +331,19 @@ export function AccessRequestsPanel({ scope = 'tutor' }: { scope?: 'tutor' | 'ad
               ['all', 'All'],
             ] as const
           ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${tabClass(tab === key)}`}
-            >
+            <SegmentedTab key={key} active={tab === key} onClick={() => setTab(key)}>
               {label}
-            </button>
+            </SegmentedTab>
           ))}
-        </div>
+        </SegmentedTabs>
 
         {error ? (
-          <div className="rounded-xl border border-rose/30 bg-rose/5 px-4 py-3 space-y-2">
+          <div
+            ref={errorRef}
+            role="alert"
+            tabIndex={-1}
+            className="rounded-xl border border-rose/30 bg-rose/5 px-4 py-3 space-y-2 outline-none"
+          >
             <p className="text-sm text-rose">{error}</p>
             <button type="button" onClick={() => void load()} className={`${btnClass.secondary} text-xs px-3 py-1.5`}>
               Try again

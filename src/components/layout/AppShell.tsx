@@ -313,7 +313,7 @@ export function AppShell({ module }: AppShellProps) {
           )}
         </AnimatePresence>
 
-        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto scrollbar-thin safe-bottom">
+        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto scrollbar-thin safe-bottom">
           <PageBackBar moduleId={moduleId} />
           <Outlet />
         </main>

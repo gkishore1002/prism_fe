@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { PhoneCredentialFields } from '@/components/auth/PhoneCredentialFields'
 import { authTheme } from '@/modules/auth/lib/authTheme'
 import { createPlatformOrganization } from '@/lib/api/platformApi'
@@ -55,7 +56,7 @@ export function PlatformOnboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <AppCard>
-          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+          {error && <FormErrorBanner message={error} className="mb-4" />}
           <form className="space-y-5" onSubmit={(e) => void handleCreate(e)}>
             <div>
               <h3 className="mb-3 text-sm font-semibold text-foreground">Organization</h3>

@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, useEffect } from 'react'
+import { Fragment, useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import {
   FileText,
   Eye,
@@ -8,29 +8,39 @@ import {
   PenLine,
   Library,
   CheckCircle2,
+  RotateCcw,
 } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { ActionMenu, ActionMenuItem, ActionMenuLink } from '@/components/ui/ActionMenu'
-import { QuestionUploadWorkflow } from '@/components/academic/QuestionUploadWorkflow'
+import {
+  QuestionUploadWorkflow,
+  type QuestionUploadWorkflowHandle,
+} from '@/components/academic/QuestionUploadWorkflow'
 import { SyllabusBooksPanel } from '@/components/academic/SyllabusBooksPanel'
-import { ManualQuestionEntry } from '@/components/academic/ManualQuestionEntry'
+import {
+  ManualQuestionEntry,
+  type ManualQuestionEntryHandle,
+} from '@/components/academic/ManualQuestionEntry'
 import { EmptyState } from '@/components/design/InsightCard'
 import { Pagination } from '@/components/ui/Pagination'
+import { SegmentedTab, SegmentedTabs } from '@/components/ui/SegmentedTabs'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
 import { useAuth } from '@/hooks/useAuth'
 import { DEFAULT_PAGE_LIMIT } from '@/lib/pagination'
 import { topicCounts, totalMarksForQuestions } from '@/lib/questionPaperUtils'
 import { cn } from '@/lib/cn'
+import { RequiredMark } from '@/components/ui/RequiredMark'
 import { useConfirmModal } from '@/components/ui/AppModal'
 import { formatSubjects } from '@/lib/formatSubjects'
 import { MathContent } from '@/components/math/MathContent'
+import type { QuestionPaper } from '@/types'
 
 interface QuestionBankPageProps {
   role?: 'tutor' | 'admin'
   readOnly?: boolean
 }
 
-type WorkspaceTab = 'library' | 'create' | 'import' | 'books'
+type WorkspaceTab = 'library' | 'drafts' | 'create' | 'import' | 'books'
 
 const SOURCE_LABEL: Record<string, string> = {
   upload: 'Imported',
@@ -40,7 +50,7 @@ const SOURCE_LABEL: Record<string, string> = {
 
 export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionBankPageProps) {
   const { user } = useAuth()
-  const { questionPapers, questions, createCustomPaper, removePaper, ensureLoaded } =
+  const { questionPapers, questions, createCustomPaper, removePaper, ensureLoaded, refresh } =
     useQuestionPapers()
   const { confirm } = useConfirmModal()
 
@@ -56,19 +66,53 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
   const [customQuestionIds, setCustomQuestionIds] = useState<string[]>([])
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT)
+  const [draftPage, setDraftPage] = useState(1)
+  const [resumePaperId, setResumePaperId] = useState<string | null>(null)
+  const [createDirty, setCreateDirty] = useState(false)
+  const [importDirty, setImportDirty] = useState(false)
+
+  const createRef = useRef<ManualQuestionEntryHandle>(null)
+  const importRef = useRef<QuestionUploadWorkflowHandle>(null)
 
   const paperPreviewBase =
     role === 'tutor' ? '/tutor/question-bank/papers' : '/admin/question-bank/papers'
 
-  const libraryPages = Math.max(1, Math.ceil(questionPapers.length / limit))
+  const publishedPapers = useMemo(
+    () => questionPapers.filter((p) => p.status !== 'draft'),
+    [questionPapers],
+  )
+  const draftPapers = useMemo(
+    () => questionPapers.filter((p) => p.status === 'draft'),
+    [questionPapers],
+  )
+
+  const libraryPages = Math.max(1, Math.ceil(publishedPapers.length / limit))
   const pagedPapers = useMemo(() => {
     const start = (page - 1) * limit
-    return questionPapers.slice(start, start + limit)
-  }, [questionPapers, page, limit])
+    return publishedPapers.slice(start, start + limit)
+  }, [publishedPapers, page, limit])
+
+  const draftPages = Math.max(1, Math.ceil(draftPapers.length / limit))
+  const pagedDrafts = useMemo(() => {
+    const start = (draftPage - 1) * limit
+    return draftPapers.slice(start, start + limit)
+  }, [draftPapers, draftPage, limit])
 
   useEffect(() => {
     if (page > libraryPages) setPage(libraryPages)
   }, [page, libraryPages])
+
+  useEffect(() => {
+    if (draftPage > draftPages) setDraftPage(draftPages)
+  }, [draftPage, draftPages])
+
+  useEffect(() => {
+    setPage(1)
+  }, [publishedPapers.length])
+
+  useEffect(() => {
+    setDraftPage(1)
+  }, [draftPapers.length])
 
   const customParent = customPaperId ? questionPapers.find((p) => p.id === customPaperId) : undefined
 
@@ -153,12 +197,60 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
     showFlash('Custom paper published to the library.')
   }
 
-  const selectedForCustom = questions.filter((q) => customQuestionIds.includes(q.id))
-  const totalQuestions = questionPapers.reduce((n, p) => n + p.questionIds.length, 0)
-  const topicCount = [...new Set(questionPapers.flatMap((p) => p.topics))].length
+  const handleTabChange = useCallback(
+    async (next: WorkspaceTab) => {
+      if (next === tab) return
+      if (tab === 'create' && (createDirty || createRef.current?.isDirty)) {
+        const ok = await (createRef.current?.requestLeave() ?? Promise.resolve(true))
+        if (!ok) return
+      }
+      if (tab === 'import' && (importDirty || importRef.current?.isDirty)) {
+        const ok = await (importRef.current?.requestLeave() ?? Promise.resolve(true))
+        if (!ok) return
+      }
+      // Manual tab clicks start fresh; Resume sets paperId then setTab directly.
+      setResumePaperId(null)
+      setTab(next)
+    },
+    [createDirty, importDirty, tab],
+  )
 
-  const tabs: { id: WorkspaceTab; label: string; hide?: boolean }[] = [
+  const handlePublished = useCallback(
+    async (paper: QuestionPaper, source: 'manual' | 'upload') => {
+      await refresh()
+      setResumePaperId(null)
+      setCreateDirty(false)
+      setImportDirty(false)
+      setTab('library')
+      showFlash(
+        source === 'manual'
+          ? `Published "${paper.name}" to the library.`
+          : `Imported "${paper.name}" into the library.`,
+      )
+    },
+    [refresh],
+  )
+
+  function resumeDraft(paper: QuestionPaper) {
+    setResumePaperId(paper.id)
+    if (paper.source === 'upload') {
+      setTab('import')
+      showFlash(`Resuming import draft "${paper.name}".`)
+    } else {
+      setTab('create')
+      showFlash(`Resuming manual draft "${paper.name}".`)
+    }
+  }
+
+  const selectedForCustom = questions.filter((q) => customQuestionIds.includes(q.id))
+  const publishedCount = publishedPapers.length
+  const draftCount = draftPapers.length
+  const totalQuestions = publishedPapers.reduce((n, p) => n + p.questionIds.length, 0)
+  const topicCount = [...new Set(publishedPapers.flatMap((p) => p.topics))].length
+
+  const tabs: { id: WorkspaceTab; label: string; hide?: boolean; count?: number }[] = [
     { id: 'library', label: 'Library' },
+    { id: 'drafts', label: 'Drafts', hide: readOnly, count: draftCount },
     { id: 'create', label: 'Create', hide: readOnly },
     { id: 'import', label: 'Import', hide: readOnly },
     { id: 'books', label: 'Books', hide: readOnly },
@@ -184,40 +276,29 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <AppStat label="Papers" value={questionPapers.length} />
-        <AppStat label="Questions" value={totalQuestions} hint="Inventory" />
-        <AppStat label="Topics" value={topicCount} tone="leaf" />
+        <AppStat label="Papers" value={publishedCount} hint="Published library" />
+        <AppStat label="Drafts" value={draftCount} hint="Saved for later" />
+        <AppStat label="Topics" value={topicCount} tone="leaf" hint={`${totalQuestions} questions`} />
       </div>
 
-      <div
-        className="ln-tabs-bar inline-flex flex-wrap gap-1 mb-6"
-        role="tablist"
-        aria-label="Question bank"
-      >
+      <SegmentedTabs aria-label="Question bank">
         {tabs
           .filter((t) => !t.hide)
           .map((t) => (
-            <button
+            <SegmentedTab
               key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                'px-4 py-2 rounded-[10px] text-sm font-medium transition-colors',
-                tab === t.id
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
+              active={tab === t.id}
+              count={t.count}
+              onClick={() => void handleTabChange(t.id)}
             >
               {t.label}
-            </button>
+            </SegmentedTab>
           ))}
-      </div>
+      </SegmentedTabs>
 
       {tab === 'library' && (
         <section>
-          {questionPapers.length === 0 ? (
+          {publishedPapers.length === 0 ? (
             <EmptyState
               icon={Library}
               title="No papers yet"
@@ -228,14 +309,14 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                     <button
                       type="button"
                       className="btn btn-secondary shrink-0"
-                      onClick={() => setTab('create')}
+                      onClick={() => void handleTabChange('create')}
                     >
                       Create
                     </button>
                     <button
                       type="button"
                       className="btn btn-primary shrink-0"
-                      onClick={() => setTab('import')}
+                      onClick={() => void handleTabChange('import')}
                     >
                       Import
                     </button>
@@ -268,7 +349,9 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                             <td className="px-4 sm:px-5 py-3">
                               <div className="flex items-start gap-2.5 min-w-[180px]">
                                 <FileText className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                                <p className="font-medium text-foreground">{paper.name}</p>
+                                <div>
+                                  <p className="font-medium text-foreground">{paper.name}</p>
+                                </div>
                               </div>
                             </td>
                             <td className="px-4 sm:px-5 py-3 text-muted-foreground whitespace-nowrap">
@@ -339,7 +422,7 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                                 >
                                   <label className="block">
                                     <span className="text-xs text-muted-foreground">
-                                      Custom paper name *
+                                      Custom paper name <RequiredMark />
                                     </span>
                                     <input
                                       required
@@ -440,13 +523,131 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                 <Pagination
                   page={page}
                   pages={libraryPages}
-                  total={questionPapers.length}
+                  total={publishedPapers.length}
                   limit={limit}
                   itemLabel="papers"
                   onPageChange={setPage}
                   onLimitChange={(next) => {
                     setLimit(next)
                     setPage(1)
+                  }}
+                />
+              </div>
+            </AppCard>
+          )}
+        </section>
+      )}
+
+      {tab === 'drafts' && !readOnly && (
+        <section>
+          {draftPapers.length === 0 ? (
+            <EmptyState
+              icon={PenLine}
+              title="No drafts"
+              description="Save a Draft from Create or Import to continue later. Drafts stay here until you publish or delete them."
+              action={
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    className="btn btn-secondary shrink-0"
+                    onClick={() => void handleTabChange('create')}
+                  >
+                    Create
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary shrink-0"
+                    onClick={() => void handleTabChange('import')}
+                  >
+                    Import
+                  </button>
+                </div>
+              }
+            />
+          ) : (
+            <AppCard className="p-0 sm:p-0 overflow-hidden">
+              <div className="px-4 sm:px-5 py-3 border-b border-border">
+                <h2 className="font-display text-lg text-foreground">Question bank drafts</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Resume unfinished papers. Published papers appear under Library.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                      <th className="px-4 sm:px-5 py-3 font-medium">Paper</th>
+                      <th className="px-4 sm:px-5 py-3 font-medium">Curriculum</th>
+                      <th className="px-4 sm:px-5 py-3 font-medium">Source</th>
+                      <th className="px-4 sm:px-5 py-3 font-medium">Questions</th>
+                      <th className="px-4 sm:px-5 py-3 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {pagedDrafts.map((paper) => (
+                      <tr key={paper.id} className="hover:bg-secondary/30 align-top">
+                        <td className="px-4 sm:px-5 py-3">
+                          <div className="flex items-start gap-2.5 min-w-[180px]">
+                            <FileText className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-medium text-foreground">{paper.name}</p>
+                              <span className="mt-1 inline-flex text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
+                                Draft
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 sm:px-5 py-3 text-muted-foreground whitespace-nowrap">
+                          {paper.board} · {paper.grade} ·{' '}
+                          {formatSubjects(paper.subjects, paper.subject)}
+                        </td>
+                        <td className="px-4 sm:px-5 py-3">
+                          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-muted-foreground">
+                            {SOURCE_LABEL[paper.source] ?? paper.source}
+                          </span>
+                        </td>
+                        <td className="px-4 sm:px-5 py-3 font-mono-data">
+                          {paper.questionIds.length}
+                        </td>
+                        <td className="px-4 sm:px-5 py-3">
+                          <ActionMenu label={`Actions for ${paper.name}`}>
+                            <ActionMenuItem onSelect={() => resumeDraft(paper)}>
+                              <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
+                              Resume
+                            </ActionMenuItem>
+                            <ActionMenuItem
+                              className="text-rose"
+                              onSelect={() => {
+                                void confirm({
+                                  title: 'Delete draft?',
+                                  message: `Delete draft "${paper.name}"?`,
+                                  confirmLabel: 'Delete',
+                                  variant: 'danger',
+                                }).then((ok) => {
+                                  if (ok) void removePaper(paper.id)
+                                })
+                              }}
+                            >
+                              Delete
+                            </ActionMenuItem>
+                          </ActionMenu>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-4 sm:px-5 pb-4">
+                <Pagination
+                  page={draftPage}
+                  pages={draftPages}
+                  total={draftPapers.length}
+                  limit={limit}
+                  itemLabel="drafts"
+                  onPageChange={setDraftPage}
+                  onLimitChange={(next) => {
+                    setLimit(next)
+                    setDraftPage(1)
                   }}
                 />
               </div>
@@ -462,7 +663,13 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
               <PenLine className="w-4 h-4 text-accent" />
               <h2 className="font-display text-lg">Author paper</h2>
             </div>
-            <ManualQuestionEntry />
+            <ManualQuestionEntry
+              key={resumePaperId ? `manual-${resumePaperId}` : 'manual-new'}
+              ref={createRef}
+              initialPaperId={resumePaperId ?? undefined}
+              onDirtyChange={setCreateDirty}
+              onPublished={(paper) => void handlePublished(paper, 'manual')}
+            />
           </AppCard>
         </section>
       )}
@@ -470,10 +677,14 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
       {tab === 'import' && !readOnly && (
         <section>
           <QuestionUploadWorkflow
+            key={resumePaperId ? `upload-${resumePaperId}` : 'upload-new'}
+            ref={importRef}
             variant="full"
+            initialPaperId={resumePaperId ?? undefined}
+            onDirtyChange={setImportDirty}
+            onPublished={(paper) => void handlePublished(paper, 'upload')}
             onPaperCreated={() => {
-              showFlash('Paper imported into the library.')
-              setTab('library')
+              /* handled via onPublished for library flash + tab switch */
             }}
           />
         </section>

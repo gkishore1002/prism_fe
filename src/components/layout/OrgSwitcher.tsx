@@ -112,15 +112,15 @@ export function OrgSwitcher({ className }: { className?: string }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-secondary/50"
+        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 sm:px-2.5 text-xs font-medium hover:bg-secondary/50 max-w-[min(100%,11rem)] sm:max-w-none"
       >
         {onPlatformOverview ? (
-          <Crown className="w-3.5 h-3.5 text-accent" />
+          <Crown className="w-3.5 h-3.5 text-accent shrink-0" />
         ) : (
-          <Building2 className="w-3.5 h-3.5 text-accent" />
+          <Building2 className="w-3.5 h-3.5 text-accent shrink-0" />
         )}
-        <span className="max-w-[9rem] sm:max-w-[180px] truncate">{label}</span>
-        <ChevronDown className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', open && 'rotate-180')} />
+        <span className="min-w-0 truncate">{label}</span>
+        <ChevronDown className={cn('w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform', open && 'rotate-180')} />
       </button>
       {open &&
         createPortal(

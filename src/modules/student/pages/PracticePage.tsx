@@ -118,14 +118,14 @@ export function StudentPracticePage() {
           ))}
         </div>
 
-        <AppCard className="p-8">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
+        <AppCard className="p-4 sm:p-8">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-4">
             <span className="px-2 py-0.5 bg-secondary rounded font-display">{q.difficulty}</span>
             <span className="px-2 py-0.5 bg-secondary rounded font-mono-data">{q.marks} mark</span>
           </div>
-          <div className="font-display text-2xl leading-snug text-foreground">{q.q}</div>
+          <div className="font-display text-xl sm:text-2xl leading-snug text-foreground">{q.q}</div>
 
-          <div className="mt-8 space-y-3">
+          <div className="mt-6 sm:mt-8 space-y-3">
             {q.options.map((opt, idx) => {
               const isPicked = picked === idx
               const isCorrect = answered && idx === q.correct
@@ -136,7 +136,7 @@ export function StudentPracticePage() {
                   type="button"
                   disabled={answered}
                   onClick={() => setPicked(idx)}
-                  className={`w-full text-left px-5 py-4 rounded-lg border transition flex items-center gap-3 font-sans ${
+                  className={`w-full text-left px-4 sm:px-5 py-3.5 sm:py-4 rounded-lg border transition flex items-center gap-3 font-sans ${
                     isCorrect
                       ? 'border-emerald-300 bg-emerald-50'
                       : isWrong
@@ -164,13 +164,13 @@ export function StudentPracticePage() {
             </div>
           )}
 
-          <div className="mt-8 flex justify-end gap-2">
+          <div className="mt-6 sm:mt-8 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
             {!answered ? (
               <button
                 type="button"
                 onClick={submit}
                 disabled={picked === null}
-                className="btn btn-primary px-6 py-2.5 disabled:opacity-40 gap-2 font-display font-medium"
+                className="btn btn-primary w-full sm:w-auto px-6 py-2.5 disabled:opacity-40 gap-2 font-display font-medium"
               >
                 Check answer
               </button>
@@ -178,7 +178,7 @@ export function StudentPracticePage() {
               <button
                 type="button"
                 onClick={next}
-                className="bg-accent text-accent-foreground px-6 py-2.5 rounded-md inline-flex items-center gap-2 font-display font-semibold"
+                className="bg-accent text-accent-foreground w-full sm:w-auto px-6 py-2.5 rounded-md inline-flex items-center justify-center gap-2 font-display font-semibold"
               >
                 {i + 1 < practiceQuestions.length ? 'Next question' : 'Finish'}{' '}
                 <ArrowRight className="w-4 h-4" />

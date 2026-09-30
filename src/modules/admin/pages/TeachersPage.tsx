@@ -12,6 +12,8 @@ import type { TeacherRow } from '@/lib/api/analyticsApi'
 import { PhoneCredentialFields } from '@/components/auth/PhoneCredentialFields'
 import { isValidPhone, phoneToLoginEmail, resolvePassword } from '@/lib/phoneAuth'
 import { formatCenterLabel } from '@/lib/centerLabel'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
+import { RequiredMark } from '@/components/ui/RequiredMark'
 
 const inputClass = 'mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background'
 const primaryBtnClass =
@@ -394,7 +396,9 @@ export function AdminTeachersPage() {
       >
         <form id="tutor-form" onSubmit={handleSubmit} className="space-y-4">
           <label className="block">
-            <span className="text-xs text-muted-foreground">Full name *</span>
+            <span className="text-xs text-muted-foreground">
+              Full name <RequiredMark />
+            </span>
             <input
               required
               value={formName}
@@ -405,7 +409,9 @@ export function AdminTeachersPage() {
           </label>
           {editing ? (
             <label className="block">
-              <span className="text-xs text-muted-foreground">Login email *</span>
+              <span className="text-xs text-muted-foreground">
+                Login email <RequiredMark />
+              </span>
               <input
                 required
                 type="email"
@@ -466,7 +472,7 @@ export function AdminTeachersPage() {
               )}
             </>
           )}
-          {error && <p className="text-sm text-rose">{error}</p>}
+          {error && <FormErrorBanner message={error} />}
         </form>
       </AppModal>
     </>

@@ -68,7 +68,7 @@ export function buildTutorCopilotSummary(
     headline: buildHeadline(activeBatch, topWeakness, weak, copilot),
     subject: formatSubjects(activeBatch?.subjects, activeBatch?.subject, '') ||
       copilot?.subject ||
-      'Mathematics',
+      '',
     batchName: activeBatch?.name ?? copilot?.batchName ?? 'Batch',
     studentCount: batchStudents.length || copilot?.studentCount || 0,
     avgScore: activeBatch?.avgScore ?? copilot?.avgScore ?? 0,

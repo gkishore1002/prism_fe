@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { PageLoader } from '@/components/ui/PrismLoader'
+import { PageLoader, DashboardSectionLoader } from '@/components/ui/PrismLoader'
 import {
   ArrowRight,
   Users,
@@ -40,6 +40,7 @@ import {
 } from 'recharts'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { Pagination } from '@/components/ui/Pagination'
+import { SyllabusCompletionChart } from '@/components/academic/SyllabusCompletionChart'
 import { pageCount, paginateItems } from '@/lib/pagination'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useAdminPortalContext } from '@/hooks/useAdminPortalContext'
@@ -124,6 +125,7 @@ export function AdminDashboardPage() {
   const { branchScoped, portalLabel } = useAdminPortalContext()
   const {
     loading,
+    panelsLoading,
     overview: inst,
     operationalStats: ops,
     teachers,
@@ -132,7 +134,9 @@ export function AdminDashboardPage() {
     atRisk,
     centerAnalytics,
     branchSubjectMatrix,
+    syllabusCompletion,
   } = useAnalytics()
+  const analyticsBusy = loading || panelsLoading
 
   useEffect(() => {
     void ensureBranchesLoaded()
@@ -631,13 +635,15 @@ export function AdminDashboardPage() {
             </Link>
           </div>
 
-          {staffLeaderboard.length === 0 ? (
+          {analyticsBusy && staffLeaderboard.length === 0 ? (
+            <DashboardSectionLoader label="Loading staff leaderboard…" />
+          ) : staffLeaderboard.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
               Staff progress appears here after assessments are marked.
             </p>
           ) : (
             <>
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="metric-chip-grid mb-4">
                 <div className="rounded-xl border border-leaf/25 bg-leaf/8 px-3 py-2.5">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Leading</p>
                   <p className="font-medium text-sm truncate mt-0.5" title={staffLeaderboardSummary.leader?.name}>
@@ -756,11 +762,13 @@ export function AdminDashboardPage() {
             </Link>
           </div>
 
-          {branchPerfData.length === 0 ? (
+          {analyticsBusy && branchPerfData.length === 0 ? (
+            <DashboardSectionLoader label="Loading branch metrics…" />
+          ) : branchPerfData.length === 0 ? (
             <p className="text-sm text-muted-foreground py-10 text-center">No branch metrics yet.</p>
           ) : (
             <>
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="metric-chip-grid mb-4">
                 <div className="rounded-xl border border-border bg-secondary/30 px-3 py-2.5">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Network avg</p>
                   <p className="font-display text-xl tabular-nums mt-0.5">{networkBranchAvg}%</p>
@@ -922,7 +930,9 @@ export function AdminDashboardPage() {
           <p className="text-xs text-muted-foreground mt-1 mb-3">
             Active rate and branch participation
           </p>
-          {studentActivityPie.length === 0 ? (
+          {analyticsBusy && studentActivityPie.length === 0 ? (
+            <DashboardSectionLoader label="Loading student activity…" />
+          ) : studentActivityPie.length === 0 ? (
             <p className="text-sm text-muted-foreground py-10 text-center">No student activity data.</p>
           ) : (
             <>
@@ -1056,6 +1066,14 @@ export function AdminDashboardPage() {
         </Link>
       </AppCard>
 
+      <SyllabusCompletionChart
+        className="mb-6"
+        rows={syllabusCompletion}
+        loading={analyticsBusy}
+        linkHref="/admin/curriculum"
+        linkLabel="Curriculum →"
+      />
+
       {/* Subject × branch charts */}
       <div className="grid lg:grid-cols-5 gap-4 mb-6">
         <AppCard className="lg:col-span-3">
@@ -1072,7 +1090,10 @@ export function AdminDashboardPage() {
               </p>
             </div>
           </div>
-          {subjectBranchChart.length === 0 || !branchSubjectMatrix?.subjects?.length ? (
+          {analyticsBusy &&
+          (subjectBranchChart.length === 0 || !branchSubjectMatrix?.subjects?.length) ? (
+            <DashboardSectionLoader label="Loading subject × branch…" />
+          ) : subjectBranchChart.length === 0 || !branchSubjectMatrix?.subjects?.length ? (
             <p className="text-sm text-muted-foreground py-10 text-center">
               Upload assessments to unlock branch–subject trends.
             </p>
@@ -1160,7 +1181,9 @@ export function AdminDashboardPage() {
           <p className="text-xs text-muted-foreground mt-1 mb-2">
             Shape of subject strength · target ring at 70%
           </p>
-          {topBranchRadar.length === 0 ? (
+          {analyticsBusy && topBranchRadar.length === 0 ? (
+            <DashboardSectionLoader label="Loading subject radar…" />
+          ) : topBranchRadar.length === 0 ? (
             <p className="text-sm text-muted-foreground py-10 text-center">No subject health yet.</p>
           ) : (
             <>
@@ -1272,7 +1295,9 @@ export function AdminDashboardPage() {
               )}
             </div>
 
-            {branchHealthRows.length === 0 ? (
+            {analyticsBusy && branchHealthRows.length === 0 ? (
+              <DashboardSectionLoader label="Loading branch health…" />
+            ) : branchHealthRows.length === 0 ? (
               <p className="text-sm text-muted-foreground py-10 text-center">No branch metrics yet.</p>
             ) : (
               <>

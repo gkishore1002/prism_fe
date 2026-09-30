@@ -28,8 +28,8 @@ export const defaultTutorDashboardHeroContent: TutorDashboardHeroContent = {
 }
 
 export const defaultTutorDashboardPageContent = {
-  title: 'Dashboard',
-  subtitle: 'Your command center — batch health, assessments, and what to teach next.',
+  title: 'Command dashboard',
+  subtitle: 'Live pulse across batches, assessments, and what to teach next.',
 }
 
 /** Catchy hero headline — tutors can override via Edit content on the dashboard */

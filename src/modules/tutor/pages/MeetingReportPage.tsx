@@ -1,4 +1,5 @@
-import { Download } from 'lucide-react'
+import { useState } from 'react'
+import { Download, Loader2, Printer, Share2 } from 'lucide-react'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import {
   LineChart,
@@ -11,11 +12,18 @@ import {
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useCurriculum } from '@/hooks/useCurriculum'
+import {
+  downloadReportPdf,
+  shareReportPdf,
+} from '@/modules/reports/learningGenome/printReport'
+
+const MEETING_REPORT_ROOT_ID = 'meeting-report-print-root'
 
 export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolean }) {
   useAnalyticsPage('studentReports')
   const { loading, studentProfile, improvementTrend, studentReport } = useAnalytics()
   const { students } = useCurriculum()
+  const [busy, setBusy] = useState(false)
   const student = studentProfile ?? (students[0] ? {
     name: students[0].name,
     board: students[0].board ?? 'CBSE',
@@ -38,14 +46,60 @@ export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolea
     )
   }
 
-  const exportButton = (
-    <button
-      type="button"
-      onClick={() => window.print()}
-      className="btn btn-primary gap-2 px-4 py-2 text-sm"
-    >
-      <Download className="w-4 h-4" /> Export PDF
-    </button>
+  const exportTitle = `Meeting report — ${student.name}`
+
+  async function runExport(kind: 'print' | 'download' | 'share') {
+    if (busy && kind !== 'print') return
+    if (kind === 'print') {
+      const prev = document.title
+      document.title = exportTitle
+      window.print()
+      window.setTimeout(() => {
+        document.title = prev
+      }, 500)
+      return
+    }
+    setBusy(true)
+    try {
+      if (kind === 'share') {
+        await shareReportPdf({ title: exportTitle, rootId: MEETING_REPORT_ROOT_ID })
+      } else {
+        await downloadReportPdf({ title: exportTitle, rootId: MEETING_REPORT_ROOT_ID })
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const exportActions = (
+    <div className="flex flex-wrap items-center gap-2 print:hidden">
+      <button
+        type="button"
+        onClick={() => void runExport('print')}
+        disabled={busy}
+        className="btn btn-secondary gap-2 px-3 py-2 text-sm disabled:opacity-50"
+      >
+        <Printer className="w-4 h-4" /> Print
+      </button>
+      <button
+        type="button"
+        onClick={() => void runExport('share')}
+        disabled={busy}
+        className="btn btn-secondary gap-2 px-3 py-2 text-sm disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+        Share
+      </button>
+      <button
+        type="button"
+        onClick={() => void runExport('download')}
+        disabled={busy}
+        className="btn btn-primary gap-2 px-4 py-2 text-sm disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+        Download PDF
+      </button>
+    </div>
   )
 
   return (
@@ -55,12 +109,13 @@ export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolea
           eyebrow="Parent–Tutor Meeting"
           title="Meeting report"
           sub="One-click PDF that saves prep time. Everything a parent needs in 30 seconds."
-          actions={exportButton}
+          actions={exportActions}
         />
       ) : (
-        <div className="flex justify-end mb-4">{exportButton}</div>
+        <div className="flex justify-end mb-4">{exportActions}</div>
       )}
 
+      <div id={MEETING_REPORT_ROOT_ID}>
       <AppCard className="max-w-3xl mx-auto p-12">
         <div className="border-b border-ink pb-4 mb-6">
           <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
@@ -72,23 +127,23 @@ export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolea
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          <div>
+        <div className="metric-chip-grid gap-4 sm:gap-6 mb-8">
+          <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
               Current score
             </div>
-            <div className="font-mono-data text-3xl mt-1">{studentReport?.avgAccuracy ?? '—'}%</div>
+            <div className="font-mono-data text-2xl sm:text-3xl mt-1">{studentReport?.avgAccuracy ?? '—'}%</div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
               Health
             </div>
-            <div className="font-mono-data text-3xl mt-1">
+            <div className="font-mono-data text-2xl sm:text-3xl mt-1">
               {'healthScore' in student ? student.healthScore : studentReport?.health ?? '—'}
               <span className="text-base text-muted-foreground">/100</span>
             </div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
               Improvement
             </div>
@@ -153,6 +208,7 @@ export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolea
           </p>
         </div>
       </AppCard>
+      </div>
     </>
   )
 }

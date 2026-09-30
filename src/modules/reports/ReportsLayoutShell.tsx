@@ -1,10 +1,10 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle, BarChart3, BookOpen, LineChart, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { PageHeader } from '@/components/layout/AppShell'
+import { SegmentedTabLink, SegmentedTabs } from '@/components/ui/SegmentedTabs'
 import { fadeUp } from '@/lib/motion'
-import { cn } from '@/lib/cn'
 
 interface ReportsLayoutShellProps {
   insightsTo: string
@@ -36,39 +36,21 @@ export function ReportsLayoutShell({
     tabs.push({ to: atRiskTo, label: 'At-risk', icon: AlertTriangle })
   }
 
-  void pathname
-
   return (
-    <motion.div
-      variants={fadeUp}
-      initial="hidden"
-      animate="visible"
-    >
+    <motion.div variants={fadeUp} initial="hidden" animate="visible">
       <PageHeader
         eyebrow="Prism Spectrum"
         title="Reports"
         sub="Built from in-app assessment results plus marks you enter manually or upload on the Marks page."
       />
 
-      <nav className="flex flex-wrap gap-2 mb-6 ln-tabs-bar" aria-label="Report sections">
+      <SegmentedTabs aria-label="Report sections">
         {tabs.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-accent text-accent-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-[#F0EBE3] hover:text-foreground',
-              )
-            }
-          >
-            <Icon className="w-3.5 h-3.5" />
+          <SegmentedTabLink key={to} to={to} icon={<Icon className="w-3.5 h-3.5 shrink-0" />}>
             {label}
-          </NavLink>
+          </SegmentedTabLink>
         ))}
-      </nav>
+      </SegmentedTabs>
 
       <AnimatePresence mode="wait">
         <motion.div

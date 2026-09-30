@@ -4,6 +4,7 @@ import { Building2, Crown, Users } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { Button } from '@/components/ui/Button'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { authTheme } from '@/modules/auth/lib/authTheme'
 import {
   fetchPlatformOrganizations,
@@ -67,11 +68,7 @@ export function PlatformConsolePage() {
         }
       />
 
-      {error && (
-        <AppCard>
-          <p className="text-sm text-red-600">{error}</p>
-        </AppCard>
-      )}
+      {error && <FormErrorBanner message={error} className="mb-2" />}
 
       {stats && (
         <div className="grid gap-4 sm:grid-cols-3">

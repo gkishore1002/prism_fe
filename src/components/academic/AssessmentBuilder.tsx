@@ -16,8 +16,10 @@ import type { StudentSummary } from '@/types'
 import { questionsForPaper, totalMarksForQuestions, topicCounts } from '@/lib/questionPaperUtils'
 import type { TutorAssessmentSchedule } from '@/types'
 import { cn } from '@/lib/cn'
-import { gradesMatch, boardsMatch, scopeLabel, studentFitsScope } from '@/lib/academicScope'
+import { gradesMatch, boardsMatch, getCurriculumSubjects, scopeLabel, studentFitsScope } from '@/lib/academicScope'
 import { formatSubjects, normalizeSubjectsList } from '@/lib/formatSubjects'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
+import { RequiredMark } from '@/components/ui/RequiredMark'
 
 interface AssessmentBuilderProps {
   open: boolean
@@ -106,10 +108,6 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     () => curriculum.find((b) => boardsMatch(b.board, board)),
     [curriculum, board],
   )
-  const gradeData = useMemo(
-    () => boardData?.grades.find((g) => gradesMatch(g.grade, grade)),
-    [boardData, grade],
-  )
   const scopedBatches = getBatchesForScope(board, grade)
   const scopeReady = Boolean(board && grade && subject.length > 0)
   const availablePapers = scopeReady ? getPapersForScope(board, grade, subject) : []
@@ -126,8 +124,8 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
   )
 
   const subjectOptions = useMemo(
-    () => gradeData?.subjects.map((s) => ({ value: s.name, label: s.name })) ?? [],
-    [gradeData],
+    () => getCurriculumSubjects(curriculum, board, grade).map((name) => ({ value: name, label: name })),
+    [curriculum, board, grade],
   )
 
   const batchOptions = useMemo(
@@ -478,11 +476,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
         </>
       }
     >
-          {publishError && (
-            <div className="rounded-md border border-rose/30 bg-rose/10 px-3 py-2 text-sm text-rose">
-              {publishError}
-            </div>
-          )}
+          {publishError && <FormErrorBanner message={publishError} />}
           {step === 1 && (
             <div className="space-y-6">
               <div className="rounded-md bg-secondary/40 border border-border px-3 py-2 text-xs text-muted-foreground">
@@ -630,7 +624,9 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                     {paperCoverage === 'selected_topics' && (
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-2">
-                          <span className="text-xs font-medium text-foreground">Select topics *</span>
+                          <span className="text-xs font-medium text-foreground">
+                            Select topics <RequiredMark />
+                          </span>
                           <button
                             type="button"
                             onClick={selectAllTopics}
@@ -767,7 +763,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                 )}
               </div>
               {batchStudentsError && (
-                <p className="text-xs text-rose">{batchStudentsError}</p>
+                <FormErrorBanner message={batchStudentsError} size="sm" />
               )}
               <div className="max-h-56 overflow-y-auto space-y-2 border border-border rounded-md p-2">
                 {loadingBatchStudents ? (

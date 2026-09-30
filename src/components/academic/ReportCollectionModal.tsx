@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AppModal } from '@/components/ui/AppModal'
 import { btnClass } from '@/components/ui/Button'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { logReportCollection } from '@/lib/api/cscApi'
 import { todayIsoDate } from '@/lib/academicScope'
 import { useInstitutionPolicies } from '@/hooks/useInstitutionPolicies'
@@ -94,7 +95,7 @@ export function ReportCollectionModal({
             className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
           />
         </label>
-        {error && <p className="text-xs text-rose">{error}</p>}
+        {error && <FormErrorBanner message={error} size="sm" />}
         <div className="flex justify-end gap-2 pt-1">
           <button type="button" className={btnClass.secondary} onClick={handleClose} disabled={saving}>
             Cancel

@@ -26,15 +26,33 @@ export interface CurriculumSubjectScope {
   grade: string
 }
 
+type CurriculumTree = {
+  board: string
+  grades: { grade: string; subjects: { name: string }[] }[]
+}[]
+
+/**
+ * Subjects configured under Curriculum setup for a board + grade.
+ * Empty when board/grade is missing or has no subjects yet — never invents defaults.
+ */
+export function getCurriculumSubjects(
+  curriculum: CurriculumTree,
+  board: string | undefined | null,
+  grade: string | undefined | null,
+): string[] {
+  if (!board?.trim() || !grade?.trim()) return []
+  const boardNode = curriculum.find((c) => boardsMatch(c.board, board))
+  const gradeNode = boardNode?.grades.find((g) => gradesMatch(g.grade, grade))
+  return gradeNode?.subjects.map((s) => s.name) ?? []
+}
+
 /** Subjects configured under Curriculum setup for a batch's board + grade. */
 export function getCurriculumSubjectsForBatch(
-  curriculum: { board: string; grades: { grade: string; subjects: { name: string }[] }[] }[],
+  curriculum: CurriculumTree,
   batch: CurriculumSubjectScope | undefined,
 ): string[] {
   if (!batch) return []
-  const boardNode = curriculum.find((c) => boardsMatch(c.board, batch.board))
-  const gradeNode = boardNode?.grades.find((g) => gradesMatch(g.grade, batch.grade))
-  return gradeNode?.subjects.map((s) => s.name) ?? []
+  return getCurriculumSubjects(curriculum, batch.board, batch.grade)
 }
 
 /** Map a free-text label (e.g. CSV header) to a curriculum subject name. */

@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Search, X } from 'lucide-react'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
+import { LabelWithRequired } from '@/components/ui/RequiredMark'
 
 export interface AppSelectOption {
   value: string
@@ -27,6 +28,8 @@ interface AppSelectProps {
   onChange: (value: string) => void
   options: AppSelectOption[]
   label?: string
+  /** When true, shows a red required asterisk (also auto-detected from trailing `*` in label). */
+  required?: boolean
   placeholder?: string
   searchable?: boolean
   searchPlaceholder?: string
@@ -58,6 +61,7 @@ export function AppSelect({
   onChange,
   options,
   label,
+  required,
   placeholder = 'Select an option',
   searchable = false,
   searchPlaceholder = 'Search…',
@@ -242,9 +246,11 @@ export function AppSelect({
           <div className="flex flex-col items-center pt-2 pb-1 shrink-0 border-b border-border/60">
             <span className="ln-sheet-handle" aria-hidden />
             {(label || placeholder) && (
-              <p className="text-sm font-medium text-foreground px-4 pb-2 truncate max-w-full">
-                {label ?? placeholder}
-              </p>
+              <LabelWithRequired
+                label={label ?? placeholder}
+                required={required}
+                className="text-sm font-medium text-foreground px-4 pb-2 truncate max-w-full"
+              />
             )}
           </div>
         )}
@@ -331,14 +337,14 @@ export function AppSelect({
   return (
     <div className={cn('relative min-w-0', fullWidth && 'w-full', className)}>
       {label && !useMobileSheet && (
-        <span
+        <LabelWithRequired
+          label={label}
+          required={required}
           className={cn(
             'block text-xs mb-1',
             variant === 'on-dark' ? 'text-paper/70' : 'text-muted-foreground',
           )}
-        >
-          {label}
-        </span>
+        />
       )}
       {name && <input type="hidden" name={name} value={value ?? ''} readOnly />}
       <button

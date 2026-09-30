@@ -12,17 +12,26 @@ import type { QuestionBankEntry, QuestionPaper, QuestionUploadRow } from '@/type
 import { boardsMatch, gradesMatch } from '@/lib/academicScope'
 import { normalizeSubjectsList, subjectsOverlap } from '@/lib/formatSubjects'
 
+type PaperWriteOptions = { status?: 'draft' | 'published'; paperId?: string }
+
 interface QuestionPaperContextValue {
   questions: QuestionBankEntry[]
   questionPapers: QuestionPaper[]
   loading: boolean
   error: string | null
   ensureLoaded: () => Promise<void>
-  addPaperFromUpload: (name: string, rows: QuestionUploadRow[], createdBy?: string) => Promise<QuestionPaper>
+  addPaperFromUpload: (
+    name: string,
+    rows: QuestionUploadRow[],
+    createdBy?: string,
+    options?: PaperWriteOptions,
+  ) => Promise<QuestionPaper>
   addPaperFromManualQuestions: (
     name: string,
     questions: questionsApi.ManualQuestionInput[],
+    options?: PaperWriteOptions,
   ) => Promise<QuestionPaper>
+  publishPaper: (paperId: string) => Promise<QuestionPaper>
   createCustomPaper: (
     name: string,
     parentPaperId: string,
@@ -36,6 +45,10 @@ interface QuestionPaperContextValue {
   removePaper: (paperId: string) => Promise<void>
   removeQuestion: (questionId: string) => Promise<void>
   refresh: () => Promise<void>
+}
+
+function isPublishedPaper(p: QuestionPaper) {
+  return p.status !== 'draft'
 }
 
 const QuestionPaperContext = createContext<QuestionPaperContextValue | null>(null)
@@ -56,7 +69,7 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
     try {
       const [qs, papers] = await Promise.all([
         questionsApi.fetchQuestions(),
-        questionsApi.fetchQuestionPapers(),
+        questionsApi.fetchQuestionPapers({ status: 'all' }),
       ])
       setQuestions(qs)
       const newestFirst = [...papers].sort((a, b) => {
@@ -79,8 +92,12 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
   }, [loaded, loading, refresh])
 
   const addPaperFromManualQuestions = useCallback(
-    async (name: string, inputs: questionsApi.ManualQuestionInput[]) => {
-      const paper = await questionsApi.createPaperFromManualQuestions(name, inputs)
+    async (
+      name: string,
+      inputs: questionsApi.ManualQuestionInput[],
+      options?: PaperWriteOptions,
+    ) => {
+      const paper = await questionsApi.createPaperFromManualQuestions(name, inputs, options)
       await refresh()
       return paper
     },
@@ -88,8 +105,22 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
   )
 
   const addPaperFromUpload = useCallback(
-    async (name: string, rows: QuestionUploadRow[], _createdBy = 'tut-1') => {
-      const paper = await questionsApi.createPaperFromUpload(name, rows)
+    async (
+      name: string,
+      rows: QuestionUploadRow[],
+      _createdBy = 'tut-1',
+      options?: PaperWriteOptions,
+    ) => {
+      const paper = await questionsApi.createPaperFromUpload(name, rows, options)
+      await refresh()
+      return paper
+    },
+    [refresh],
+  )
+
+  const publishPaper = useCallback(
+    async (paperId: string) => {
+      const paper = await questionsApi.publishQuestionPaper(paperId)
       await refresh()
       return paper
     },
@@ -122,6 +153,7 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
     (board: string, grade: string, subjects: string | string[]) => {
       const want = normalizeSubjectsList(Array.isArray(subjects) ? subjects : [subjects])
       return questionPapers.filter((p) => {
+        if (!isPublishedPaper(p)) return false
         if (!boardsMatch(p.board, board) || !gradesMatch(p.grade, grade)) return false
         if (!want.length) return true
         const paperSubjects = normalizeSubjectsList(p.subjects, p.subject)
@@ -135,7 +167,7 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
     (board: string, grade: string, subjects: string | string[]) => {
       const scoped = getPapersForScope(board, grade, subjects)
       const scopedIds = new Set(scoped.map((p) => p.id))
-      const rest = questionPapers.filter((p) => !scopedIds.has(p.id))
+      const rest = questionPapers.filter((p) => isPublishedPaper(p) && !scopedIds.has(p.id))
       return [...scoped, ...rest]
     },
     [questionPapers, getPapersForScope],
@@ -155,6 +187,7 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
       ensureLoaded,
       addPaperFromUpload,
       addPaperFromManualQuestions,
+      publishPaper,
       createCustomPaper,
       getPaper,
       getPapersForScope,
@@ -172,6 +205,7 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
       ensureLoaded,
       addPaperFromUpload,
       addPaperFromManualQuestions,
+      publishPaper,
       createCustomPaper,
       getPaper,
       getPapersForScope,

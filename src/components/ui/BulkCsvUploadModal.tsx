@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Download, Upload } from 'lucide-react'
 import { AppModal } from '@/components/ui/AppModal'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { btnClass } from '@/components/ui/Button'
 import { parseSpreadsheetFile } from '@/lib/csvParse'
 
@@ -158,12 +159,8 @@ export function BulkCsvUploadModal<T>({
           </label>
         )}
 
-        {parseError && (
-          <div className="rounded-lg border border-rose/30 bg-rose/5 px-3 py-2 text-sm text-rose">{parseError}</div>
-        )}
-        {importError && (
-          <div className="rounded-lg border border-rose/30 bg-rose/5 px-3 py-2 text-sm text-rose">{importError}</div>
-        )}
+          {parseError && <FormErrorBanner message={parseError} className="rounded-lg" />}
+          {importError && <FormErrorBanner message={importError} className="rounded-lg" />}
 
         {validationErrors.length > 0 && (
           <div className="rounded-lg border border-amber/30 bg-amber/5 px-3 py-2 text-sm">

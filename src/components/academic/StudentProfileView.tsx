@@ -16,6 +16,7 @@ import {
 } from '@/lib/accessRequestTheme'
 import { isCscUrgent, formatCscInactivityLabel } from '@/lib/cscPolicy'
 import { useInstitutionPolicies } from '@/hooks/useInstitutionPolicies'
+import { SegmentedTab, SegmentedTabs } from '@/components/ui/SegmentedTabs'
 import type { StudentMasterProfile, StudentTracking, StudentAccessRequest } from '@/types'
 
 type ProfileTab = 'overview' | 'academic' | 'assessments' | 'csc' | 'activity'
@@ -138,22 +139,13 @@ export function StudentProfileView({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1 border-b border-border pb-1">
+      <SegmentedTabs aria-label="Student profile" className="mb-4">
         {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`px-3 py-2 text-sm rounded-t-md transition ${
-              tab === t.id
-                ? 'bg-secondary text-foreground font-medium'
-                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
-            }`}
-          >
+          <SegmentedTab key={t.id} active={tab === t.id} onClick={() => setTab(t.id)}>
             {t.label}
-          </button>
+          </SegmentedTab>
         ))}
-      </div>
+      </SegmentedTabs>
 
       {tab === 'overview' && (
         <div className="space-y-6">

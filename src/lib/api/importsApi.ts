@@ -37,6 +37,7 @@ export interface StaffBulkRowPayload {
   isTutor?: boolean
   centerIds?: string[]
   centerNames?: string[]
+  academicYear?: string
 }
 
 export function downloadStudentsImportTemplate() {
@@ -67,19 +68,25 @@ export async function bulkImportStudents(rows: StudentBulkRowPayload[]): Promise
   })
 }
 
-export async function bulkImportStaff(rows: StaffBulkRowPayload[]): Promise<BulkImportResult> {
+export async function bulkImportStaff(
+  rows: StaffBulkRowPayload[],
+  options?: { academicYearId?: string; academicYearName?: string },
+): Promise<BulkImportResult> {
   return apiFetch<BulkImportResult>('/imports/staff', {
     method: 'POST',
     body: JSON.stringify({
+      academicYearId: options?.academicYearId,
       rows: rows.map((row) => ({
         name: row.name,
         phone: row.phone,
-        password: row.password,
+        password: row.password?.trim() ? row.password : undefined,
         isOwner: row.isOwner ?? false,
         isBranchAdmin: row.isBranchAdmin ?? false,
         isTutor: row.isTutor ?? false,
         centerIds: row.centerIds ?? [],
         centerNames: row.centerNames ?? [],
+        // Per-row CSV year wins; otherwise default to the header year name.
+        academicYear: row.academicYear?.trim() || options?.academicYearName || '',
       })),
     }),
   })

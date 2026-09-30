@@ -171,6 +171,7 @@ export function staffRowsFromCsv(rows: Record<string, string>[]) {
       isBranchAdmin: parseTruthy(row.branch_admin),
       isTutor: parseTruthy(row.tutor),
       centerNames: splitList(row.branches ?? row.centers ?? row.branch ?? row.center),
+      academicYear: pickRowValue(row, ['academic_year', 'year', 'academic year']) || undefined,
       password: row.password || undefined,
     }))
 }

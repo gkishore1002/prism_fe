@@ -4,6 +4,7 @@ import { Building2 } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { Button } from '@/components/ui/Button'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { authTheme } from '@/modules/auth/lib/authTheme'
 import {
   fetchPlatformOrganization,
@@ -87,11 +88,7 @@ export function PlatformOrganizationPage() {
         sub="Organization settings and admin accounts for this tenant."
       />
 
-      {error && (
-        <AppCard>
-          <p className="text-sm text-red-600">{error}</p>
-        </AppCard>
-      )}
+      {error && <FormErrorBanner message={error} className="mb-2" />}
       {success && (
         <AppCard className="border-leaf/30 bg-leaf/5">
           <p className="text-sm text-foreground">{success}</p>

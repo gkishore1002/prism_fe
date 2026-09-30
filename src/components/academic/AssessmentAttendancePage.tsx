@@ -163,17 +163,19 @@ export function AssessmentAttendancePage({ portal }: AssessmentAttendancePagePro
         }
       />
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4 mb-8">
         <AppStat label="Invited" value={records.length} />
         <AppStat label="Attended" value={attended.length} tone="leaf" />
         <AppStat label="Absent" value={absent.length} tone="rose" />
         <AppStat label="Pending" value={pending.length} hint="Not yet submitted" />
-        <AppStat
-          label="Class avg"
-          value={classAvg ?? assessment.classAvg ?? '—'}
-          unit={classAvg != null || assessment.classAvg != null ? '%' : undefined}
-          tone="accent"
-        />
+        <div className="col-span-2 sm:col-span-3 lg:col-span-1">
+          <AppStat
+            label="Class avg"
+            value={classAvg ?? assessment.classAvg ?? '—'}
+            unit={classAvg != null || assessment.classAvg != null ? '%' : undefined}
+            tone="accent"
+          />
+        </div>
       </div>
 
       <AppCard className="p-0 overflow-hidden">

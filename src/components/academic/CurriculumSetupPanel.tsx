@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect, useMemo, Fragment, type FormEvent } from 'react'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import {
   Plus,
@@ -6,24 +6,23 @@ import {
   BookOpen,
   FileText,
   Check,
-  Upload,
   ChevronRight,
-  Users,
-  Layers,
   Trash2,
-  Clock,
   Pencil,
+  Layers,
+  Clock,
 } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
-import { AppSelectMulti } from '@/components/ui/AppDropdown'
-import { BatchStudentSearchList } from '@/components/academic/BatchStudentSearchList'
-import { BatchStudentPicker } from '@/components/academic/BatchStudentPicker'
-import { SyllabusCompletionSection } from '@/components/academic/SyllabusCompletionSection'
+import { AppDropdown, AppSelectMulti } from '@/components/ui/AppDropdown'
+import { Pagination } from '@/components/ui/Pagination'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
+import { RequiredMark } from '@/components/ui/RequiredMark'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { useConfirmModal } from '@/components/ui/AppModal'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
 import { boardsMatch, gradesMatch } from '@/lib/academicScope'
 import { formatSubjects, normalizeSubjectsList } from '@/lib/formatSubjects'
+import { DEFAULT_PAGE_LIMIT, pageCount, paginateItems } from '@/lib/pagination'
 import { cn } from '@/lib/cn'
 import { MathContent } from '@/components/math/MathContent'
 
@@ -135,7 +134,7 @@ function InlineAddForm({
         disabled={saving || Boolean(prerequisiteMessage)}
         className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background disabled:opacity-60"
       />
-      {localError ? <p className="text-xs text-rose">{localError}</p> : null}
+      {localError ? <FormErrorBanner message={localError} size="sm" /> : null}
       <ExistingItemsHint items={existingItems} label={existingLabel} />
       <div className="flex gap-2">
         <button
@@ -268,7 +267,7 @@ function InlineEditForm({
         disabled={saving}
         className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background disabled:opacity-60"
       />
-      {localError ? <p className="text-xs text-rose">{localError}</p> : null}
+      {localError ? <FormErrorBanner message={localError} size="sm" /> : null}
       <div className="flex gap-2">
         <button
           type="submit"
@@ -294,7 +293,6 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   const {
     curriculum,
     batches,
-    students,
     loading,
     error,
     ensureLoaded: ensureCurriculumLoaded,
@@ -308,17 +306,11 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
     renameTopic,
     addBatch,
     updateBatch,
-    addStudentToBatch,
-    assignStudentToBatch,
-    removeStudentFromBatch,
+    removeBatch,
     removeBoard,
     removeGrade,
     removeSubject,
     removeTopic,
-    removeBatch,
-    getBatchesForScope,
-    getStudentsForBatch,
-    getStudentsNotInBatch,
   } = useCurriculum()
   const { confirm } = useConfirmModal()
   const { questions, ensureLoaded } = useQuestionPapers()
@@ -334,19 +326,58 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
   const [addTarget, setAddTarget] = useState<AddTarget>(null)
   const [editTarget, setEditTarget] = useState<EditTarget>(null)
-  const [batchName, setBatchName] = useState('')
-  const [batchSubject, setBatchSubject] = useState<string[]>([])
-  const [batchScheduleTiming, setBatchScheduleTiming] = useState('')
-  const [createSelectedIds, setCreateSelectedIds] = useState<string[]>([])
-  const [createPendingNames, setCreatePendingNames] = useState<string[]>([])
-  const [createNewStudentName, setCreateNewStudentName] = useState('')
-  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null)
-  const [newStudentName, setNewStudentName] = useState('')
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null,
   )
   const [saving, setSaving] = useState(false)
+
+  // Batch form (listed separately from curriculum tree; board/grade from curriculum)
+  const [batchBoard, setBatchBoard] = useState('')
+  const [batchGrade, setBatchGrade] = useState('')
+  const [batchName, setBatchName] = useState('')
+  const [batchSubjects, setBatchSubjects] = useState<string[]>([])
+  const [batchScheduleTiming, setBatchScheduleTiming] = useState('')
   const [batchFormError, setBatchFormError] = useState<string | null>(null)
+  const [batchPage, setBatchPage] = useState(1)
+  const [batchLimit, setBatchLimit] = useState(DEFAULT_PAGE_LIMIT)
+
+  const curriculumBoards = useMemo(() => curriculum.map((b) => b.board), [curriculum])
+  const batchFormGrades = useMemo(() => {
+    const node = curriculum.find((b) => boardsMatch(b.board, batchBoard))
+    return node?.grades.map((g) => g.grade) ?? []
+  }, [curriculum, batchBoard])
+  const batchFormSubjectOptions = useMemo(() => {
+    const boardNode = curriculum.find((b) => boardsMatch(b.board, batchBoard))
+    const gradeNode = boardNode?.grades.find((g) => gradesMatch(g.grade, batchGrade))
+    return gradeNode?.subjects.map((s) => s.name) ?? []
+  }, [curriculum, batchBoard, batchGrade])
+
+  const batchPages = pageCount(batches.length, batchLimit)
+  const pagedBatches = useMemo(
+    () => paginateItems(batches, batchPage, batchLimit),
+    [batches, batchPage, batchLimit],
+  )
+
+  useEffect(() => {
+    if (batchPage > batchPages) setBatchPage(batchPages)
+  }, [batchPage, batchPages])
+
+  useEffect(() => {
+    if (addTarget !== 'batch') return
+    if (!batchBoard && (board || curriculumBoards[0])) {
+      setBatchBoard(board || curriculumBoards[0])
+    }
+  }, [addTarget, batchBoard, board, curriculumBoards])
+
+  useEffect(() => {
+    if (addTarget !== 'batch') return
+    if (batchGrade && batchFormGrades.some((g) => gradesMatch(g, batchGrade))) return
+    setBatchGrade(batchFormGrades.find((g) => gradesMatch(g, grade)) ?? batchFormGrades[0] ?? '')
+  }, [addTarget, batchGrade, batchFormGrades, grade])
+
+  useEffect(() => {
+    setBatchSubjects((prev) => prev.filter((s) => batchFormSubjectOptions.includes(s)))
+  }, [batchFormSubjectOptions])
 
   async function runAction(
     action: () => Promise<void>,
@@ -418,8 +449,6 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   const subjectData =
     gradeData?.subjects.find((s) => s.name === subject) ?? gradeData?.subjects[0]
 
-  const scopedBatches = boardData && gradeData ? getBatchesForScope(board, grade) : []
-
   const topicQuestions = selectedTopic
     ? questions.filter(
         (q) =>
@@ -456,8 +485,6 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
       setGrade('')
       setSubject('')
     }
-    setBatchSubject([])
-    setSelectedBatchId(null)
     setSelectedTopic(null)
     setAddTarget(null)
   }
@@ -467,8 +494,6 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
     if (!data) return
     setGrade(next)
     setSubject(data.subjects[0]?.name ?? '')
-    setBatchSubject([])
-    setSelectedBatchId(null)
     setSelectedTopic(null)
     setAddTarget(null)
   }
@@ -481,96 +506,58 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
 
   function resetBatchForm() {
     setBatchName('')
-    setBatchSubject([])
+    setBatchSubjects([])
     setBatchScheduleTiming('')
-    setCreateSelectedIds([])
-    setCreatePendingNames([])
-    setCreateNewStudentName('')
     setBatchFormError(null)
     setAddTarget(null)
-  }
-
-  function toggleCreateStudent(studentId: string) {
-    setCreateSelectedIds((prev) =>
-      prev.includes(studentId) ? prev.filter((id) => id !== studentId) : [...prev, studentId],
-    )
-  }
-
-  function addPendingStudentName() {
-    const trimmed = createNewStudentName.trim()
-    if (!trimmed || createPendingNames.includes(trimmed)) return
-    setCreatePendingNames((prev) => [...prev, trimmed])
-    setCreateNewStudentName('')
   }
 
   async function handleAddBatch(e: FormEvent) {
     e.preventDefault()
     setBatchFormError(null)
-    if (!batchName.trim()) {
-      setBatchFormError('Enter a batch name before saving.')
-      return
-    }
-    if (!hasBatchScope) {
-      setBatchFormError('Select a board and grade before creating a batch.')
+    if (!batchBoard || !batchGrade) {
+      setBatchFormError('Select board and grade from Curriculum setup.')
       return
     }
     const trimmed = batchName.trim()
-    if (existingBatchNames.some((n) => n.toLowerCase() === trimmed.toLowerCase())) {
-      reportDuplicate(trimmed)
-      setBatchFormError(`"${trimmed}" already exists — pick a different name.`)
+    if (!trimmed) {
+      setBatchFormError('Enter a batch name before saving.')
+      return
+    }
+    const duplicate = batches.some(
+      (b) =>
+        boardsMatch(b.board, batchBoard) &&
+        gradesMatch(b.grade, batchGrade) &&
+        b.name.toLowerCase() === trimmed.toLowerCase(),
+    )
+    if (duplicate) {
+      setBatchFormError(`"${trimmed}" already exists for ${batchBoard} · ${batchGrade}.`)
       return
     }
     const result = await runAction(async () => {
-      const batchId = await addBatch({
+      await addBatch({
         name: trimmed,
-        board,
-        grade,
-        subjects: batchSubject,
-        subject: batchSubject[0],
+        board: batchBoard,
+        grade: batchGrade,
+        subjects: batchSubjects,
+        subject: batchSubjects[0],
         scheduleTiming: batchScheduleTiming.trim() || undefined,
         avgScore: 0,
-        studentIds: createSelectedIds,
+        studentIds: [],
       })
-      for (const name of createPendingNames) {
-        await addStudentToBatch(batchId, name)
-      }
       resetBatchForm()
-      setSelectedBatchId(batchId)
+      setBatchPage(1)
     }, `Batch "${trimmed}" created`)
     if (!result.success) {
       setBatchFormError(result.error ?? 'Could not create batch.')
     }
   }
 
-  async function handleAddStudentToBatch(e: FormEvent, batchId: string) {
-    e.preventDefault()
-    if (!newStudentName.trim()) {
-      setActionMessage({ type: 'error', text: 'Enter a student name before adding.' })
-      return
-    }
-    const name = newStudentName.trim()
-    await runAction(async () => {
-      await addStudentToBatch(batchId, name)
-      setNewStudentName('')
-    }, `Added ${name} to batch`)
-  }
-
-  const selectedBatch = selectedBatchId
-    ? scopedBatches.find((b) => b.id === selectedBatchId)
-    : undefined
-  const batchStudents = selectedBatchId ? getStudentsForBatch(selectedBatchId) : []
-  const studentsAvailableForBatch = selectedBatchId
-    ? getStudentsNotInBatch(selectedBatchId)
-    : students
-  const createSelectedStudents = students.filter((s) => createSelectedIds.includes(s.id))
-  const createStudentCount = createSelectedIds.length + createPendingNames.length
   const isEmpty = curriculum.length === 0
-  const hasBatchScope = Boolean(boardData && gradeData)
   const existingBoardNames = curriculum.map((b) => b.board)
   const existingGradeNames = boardData?.grades.map((g) => g.grade) ?? []
   const existingSubjectNames = gradeData?.subjects.map((s) => s.name) ?? []
   const existingTopicNames = subjectData?.topics.map((t) => t.name) ?? []
-  const existingBatchNames = scopedBatches.map((b) => b.name)
 
   if (loading) {
     return <PageLoader label="Loading curriculum…" />
@@ -588,33 +575,12 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   return (
     <>
       <PageHeader
-        eyebrow={role === 'admin' ? 'Curriculum · Institute setup' : 'Curriculum · Setup & batches'}
+        eyebrow={role === 'admin' ? 'Curriculum · Institute setup' : 'Curriculum · Setup'}
         title="Board → Grade → Subject → Topic"
         sub={
           role === 'admin'
-            ? 'Define the academic hierarchy, track syllabus completion, and manage batches. Reports and assessments derive from this structure.'
+            ? 'Define the academic hierarchy and batches. Reports and assessments derive from this structure.'
             : 'Select an existing board and grade, then add subjects, topics, and batches. Boards and grades are managed by your admin.'
-        }
-        actions={
-          <>
-            <button
-              type="button"
-              disabled
-              title="Excel import coming soon"
-              className="btn btn-secondary text-xs opacity-50 cursor-not-allowed"
-            >
-              <Upload className="w-3.5 h-3.5" /> Import Excel
-            </button>
-            {canManageBoardGrade && (
-              <button
-                type="button"
-                onClick={() => setAddTarget(addTarget === 'board' ? null : 'board')}
-                className="btn btn-primary text-xs"
-              >
-                <Plus className="w-3.5 h-3.5" /> New board
-              </button>
-            )}
-          </>
         }
       />
 
@@ -687,10 +653,6 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
         </AppCard>
       )}
 
-      {!isEmpty && (
-        <SyllabusCompletionSection curriculum={curriculum} boardFilter={board || undefined} />
-      )}
-
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <AppCard>
           <div className="flex items-center justify-between mb-3">
@@ -701,7 +663,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               <button
                 type="button"
                 onClick={() => setAddTarget(addTarget === 'board' ? null : 'board')}
-                className="text-[10px] text-accent"
+                className="text-xs font-bold text-accent hover:underline inline-flex items-center gap-0.5 shrink-0"
               >
                 + Add
               </button>
@@ -750,7 +712,6 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                               await removeBoard(b.board)
                               if (board === b.board) {
                                 setSelectedTopic(null)
-                                setSelectedBatchId(null)
                               }
                             },
                             `Board "${b.board}" deleted`,
@@ -791,7 +752,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               <button
                 type="button"
                 onClick={() => setAddTarget(addTarget === 'grade' ? null : 'grade')}
-                className="text-[10px] text-accent"
+                className="text-xs font-bold text-accent hover:underline inline-flex items-center gap-0.5 shrink-0"
               >
                 + Add
               </button>
@@ -811,7 +772,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                   if (!board) throw new Error('Select a board first.')
                   await addGrade(board, v)
                   setGrade(v)
-                  setSubject('Mathematics')
+                  setSubject('')
                   setAddTarget(null)
                 }, `Grade "${v}" added`).then((r) => r.success)
               }
@@ -867,7 +828,6 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                               await removeGrade(board, g.grade)
                               if (grade === g.grade) {
                                 setSelectedTopic(null)
-                                setSelectedBatchId(null)
                               }
                             },
                             `Grade "${g.grade}" deleted`,
@@ -908,7 +868,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               <button
                 type="button"
                 onClick={() => setAddTarget(addTarget === 'subject' ? null : 'subject')}
-                className="text-[10px] text-accent"
+                className="text-xs font-bold text-accent hover:underline inline-flex items-center gap-0.5 shrink-0"
               >
                 + Add
               </button>
@@ -1018,7 +978,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
               <button
                 type="button"
                 onClick={() => setAddTarget(addTarget === 'topic' ? null : 'topic')}
-                className="text-[10px] text-accent"
+                className="text-xs font-bold text-accent hover:underline inline-flex items-center gap-0.5 shrink-0"
               >
                 + Add
               </button>
@@ -1135,246 +1095,162 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
         </AppCard>
       </div>
 
-      {/* Batches — scoped to board + grade */}
       <div id="batches">
-      <AppCard className="mt-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <Layers className="w-5 h-5 text-accent" />
-            <div>
-              <h3 className="font-display text-lg">Batches</h3>
-              <p className="text-xs text-muted-foreground">
-                {board && grade
-                  ? `${board} · ${grade} — ${scopedBatches.length} batch${scopedBatches.length !== 1 ? 'es' : ''} · ${batches.length} total`
-                  : canManageBoardGrade
-                    ? 'Add board and grade to create batches'
-                    : 'Select a board and grade to create batches'}
-              </p>
+        <AppCard className="mt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-accent" />
+              <div>
+                <h3 className="font-display text-lg">Batches</h3>
+                <p className="text-xs text-muted-foreground">
+                  {batches.length} batch{batches.length === 1 ? '' : 'es'} this academic year
+                </p>
+              </div>
             </div>
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (addTarget === 'batch') resetBatchForm()
+                  else {
+                    setBatchFormError(null)
+                    setAddTarget('batch')
+                  }
+                }}
+                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-secondary inline-flex items-center gap-1.5 self-start"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add batch
+              </button>
+            )}
           </div>
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => {
-                if (addTarget === 'batch') {
-                  resetBatchForm()
-                } else {
-                  setAddTarget('batch')
-                }
-              }}
-              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-secondary inline-flex items-center gap-1.5 self-start"
+
+          {addTarget === 'batch' && (
+            <form
+              onSubmit={handleAddBatch}
+              className="mb-4 p-4 rounded-lg border border-accent/30 bg-accent/5 space-y-3"
             >
-              <Plus className="w-3.5 h-3.5" /> Add batch
-            </button>
-          )}
-        </div>
-
-        {addTarget === 'batch' && hasBatchScope && (
-          <form
-            onSubmit={handleAddBatch}
-            className="mb-4 p-4 rounded-lg border border-accent/30 bg-accent/5 space-y-4"
-          >
-            <ExistingItemsHint items={existingBatchNames} label={`Existing batches for ${board} · ${grade}`} />
-            {batchFormError ? <p className="text-xs text-rose">{batchFormError}</p> : null}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <label className="block sm:col-span-2 lg:col-span-1">
-                <span className="text-xs text-muted-foreground">Batch name *</span>
-                <input
-                  value={batchName}
-                  onChange={(e) => {
-                    setBatchName(e.target.value)
-                    if (batchFormError) setBatchFormError(null)
+              {batchFormError ? <FormErrorBanner message={batchFormError} size="sm" /> : null}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <AppDropdown
+                  label="Board *"
+                  value={batchBoard}
+                  onChange={(v) => {
+                    setBatchBoard(v)
+                    setBatchGrade('')
+                    setBatchSubjects([])
                   }}
-                  placeholder="e.g. Batch A"
-                  className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                  options={curriculumBoards.map((b) => ({ value: b, label: b }))}
+                  placeholder={curriculumBoards.length ? 'Select board' : 'No boards yet'}
+                  disabled={!curriculumBoards.length}
                 />
-              </label>
-              <AppSelectMulti
-                label="Subjects (optional)"
-                values={batchSubject}
-                onChange={setBatchSubject}
-                options={gradeData.subjects.map((s) => ({ value: s.name, label: s.name }))}
-                placeholder="Select subjects"
-                searchable
-              />
-              <label className="block">
-                <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                  <Clock className="w-3 h-3" /> Class timing (optional)
-                </span>
-                <input
-                  value={batchScheduleTiming}
-                  onChange={(e) => setBatchScheduleTiming(e.target.value)}
-                  placeholder="e.g. Mon/Wed 4–6 PM"
-                  className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                <AppDropdown
+                  label="Grade *"
+                  value={batchGrade}
+                  onChange={(v) => {
+                    setBatchGrade(v)
+                    setBatchSubjects([])
+                  }}
+                  options={batchFormGrades.map((g) => ({ value: g, label: g }))}
+                  placeholder={!batchBoard ? 'Select board first' : 'Select grade'}
+                  disabled={!batchBoard || !batchFormGrades.length}
                 />
-              </label>
-              <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-1">
-                <button type="submit" disabled={saving} className="btn btn-primary px-4 py-2 text-sm disabled:opacity-50">
-                  Save batch
-                  {createStudentCount > 0 ? ` (${createStudentCount} students)` : ''}
-                </button>
-                <button
-                  type="button"
-                  onClick={resetBatchForm}
-                  className="text-sm text-muted-foreground px-2"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-border/60">
-              <p className="text-xs font-medium text-foreground mb-3">
-                Assign students to this batch
-              </p>
-              <p className="text-[11px] text-muted-foreground mb-3">
-                All institution students are listed below. A student can belong to multiple batches.
-              </p>
-              <BatchStudentPicker
-                students={students}
-                selectedIds={createSelectedIds}
-                onToggle={toggleCreateStudent}
-                emptyMessage="No students yet — add new names below or create students in Student Management."
-                dropdownLabel="Quick add — searchable dropdown"
-                listLabel="Full list — search and multi-select"
-              />
-            </div>
-
-            <div className="grid lg:grid-cols-2 gap-4 pt-2 border-t border-border/60">
-              <div className="lg:col-span-2 space-y-4">
-                <div>
-                  <p className="text-xs font-medium text-foreground mb-2">Add new student</p>
-                  <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-                    <label className="flex-1 block">
-                      <input
-                        value={createNewStudentName}
-                        onChange={(e) => setCreateNewStudentName(e.target.value)}
-                        placeholder="Student name"
-                        className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={addPendingStudentName}
-                      disabled={!createNewStudentName.trim()}
-                      className="border border-border px-4 py-2 rounded-md text-sm hover:bg-card disabled:opacity-40 shrink-0"
-                    >
-                      Add to list
-                    </button>
-                  </div>
+                <label className="block">
+                  <span className="text-xs text-muted-foreground">
+                    Batch name <RequiredMark />
+                  </span>
+                  <input
+                    value={batchName}
+                    onChange={(e) => {
+                      setBatchName(e.target.value)
+                      if (batchFormError) setBatchFormError(null)
+                    }}
+                    placeholder="e.g. Batch A"
+                    className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                  />
+                </label>
+                <AppSelectMulti
+                  label="Subjects (optional)"
+                  values={batchSubjects}
+                  onChange={setBatchSubjects}
+                  options={batchFormSubjectOptions.map((s) => ({ value: s, label: s }))}
+                  placeholder={!batchGrade ? 'Select grade first' : 'Select subjects'}
+                  searchable
+                  disabled={!batchGrade}
+                />
+                <label className="block">
+                  <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> Class timing (optional)
+                  </span>
+                  <input
+                    value={batchScheduleTiming}
+                    onChange={(e) => setBatchScheduleTiming(e.target.value)}
+                    placeholder="e.g. Mon/Wed 4–6 PM"
+                    className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                  />
+                </label>
+                <div className="flex items-end gap-2">
+                  <button
+                    type="submit"
+                    disabled={saving || !batchBoard || !batchGrade || !batchName.trim()}
+                    className="btn btn-primary px-4 py-2 text-sm disabled:opacity-50"
+                  >
+                    {saving ? 'Saving…' : 'Save batch'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetBatchForm}
+                    className="text-sm text-muted-foreground px-2"
+                  >
+                    Cancel
+                  </button>
                 </div>
-
-                {(createSelectedStudents.length > 0 || createPendingNames.length > 0) && (
-                  <div>
-                    <p className="text-xs font-medium text-foreground mb-2">
-                      Selected for this batch ({createStudentCount})
-                    </p>
-                    <ul className="space-y-1 max-h-40 overflow-y-auto scrollbar-thin">
-                      {createSelectedStudents.map((student) => (
-                        <li
-                          key={student.id}
-                          className="flex items-center justify-between gap-2 p-2 rounded-md bg-card border border-border text-sm"
-                        >
-                          <span className="truncate">
-                            {student.name}
-                            {student.batch ? (
-                              <span className="text-xs text-muted-foreground ml-1">
-                                (also in {student.batch})
-                              </span>
-                            ) : null}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => toggleCreateStudent(student.id)}
-                            className="text-xs text-muted-foreground hover:text-rose shrink-0"
-                          >
-                            Remove
-                          </button>
-                        </li>
-                      ))}
-                      {createPendingNames.map((name) => (
-                        <li
-                          key={name}
-                          className="flex items-center justify-between gap-2 p-2 rounded-md bg-card border border-border text-sm"
-                        >
-                          <span className="truncate">
-                            {name}
-                            <span className="text-xs text-muted-foreground ml-1">(new)</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCreatePendingNames((prev) => prev.filter((n) => n !== name))
-                            }
-                            className="text-xs text-muted-foreground hover:text-rose shrink-0"
-                          >
-                            Remove
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </div>
-            </div>
-          </form>
-        )}
+            </form>
+          )}
 
-        {addTarget === 'batch' && !hasBatchScope && (
-          <p className="text-sm text-muted-foreground text-center py-4 mb-4">
-            Select a board and grade above before creating a batch.
-          </p>
-        )}
-
-        {!hasBatchScope ? (
-          <p className="text-sm text-muted-foreground text-center py-6">
-            Select a board and grade to create batches and assign students.
-          </p>
-        ) : scopedBatches.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">
-            No batches for {board} · {grade} yet. Add a batch to assign students and schedule assessments.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[480px]">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground border-b border-border">
-                    <th className="pb-3 font-medium">Batch</th>
-                    <th className="pb-3 font-medium">Subject</th>
-                    <th className="pb-3 font-medium">Timing</th>
-                    <th className="pb-3 font-medium">Students</th>
-                    <th className="pb-3 font-medium" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {scopedBatches.map((b) => {
-                    const active = selectedBatchId === b.id
-                    const count = b.studentIds.length
-                    const isEditing = editTarget?.kind === 'batch' && editTarget.id === b.id
-                    return (
-                      <>
-                        <tr
-                          key={b.id}
-                          className={cn('hover:bg-secondary/30', active && 'bg-accent/5')}
-                        >
-                          <td className="py-3 font-medium">{b.name}</td>
-                          <td className="py-3 text-muted-foreground">
-                            {formatSubjects(b.subjects, b.subject)}
-                          </td>
-                          <td className="py-3 text-muted-foreground text-xs">{b.scheduleTiming ?? '—'}</td>
-                          <td className="py-3 font-mono-data">{count}</td>
-                          <td className="py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedBatchId(active ? null : b.id)}
-                                className="text-xs text-accent hover:underline"
-                              >
-                                {active ? 'Close' : 'Manage students'}
-                              </button>
-                              {canManage && (
-                                <>
+          {batches.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No batches yet. Add a batch using board and grade from curriculum above.
+            </p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[560px]">
+                  <thead>
+                    <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                      <th className="pb-3 font-medium">Batch</th>
+                      <th className="pb-3 font-medium">Board · Grade</th>
+                      <th className="pb-3 font-medium">Subject</th>
+                      <th className="pb-3 font-medium">Timing</th>
+                      <th className="pb-3 font-medium">Students</th>
+                      {canManage ? <th className="pb-3 font-medium" /> : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedBatches.map((b) => {
+                      const isEditing = editTarget?.kind === 'batch' && editTarget.id === b.id
+                      const editSubjects =
+                        curriculum
+                          .find((c) => boardsMatch(c.board, b.board))
+                          ?.grades.find((g) => gradesMatch(g.grade, b.grade))
+                          ?.subjects.map((s) => s.name) ?? []
+                      return (
+                        <Fragment key={b.id}>
+                          <tr className="hover:bg-secondary/30 border-b border-border/60">
+                            <td className="py-3 font-medium">{b.name}</td>
+                            <td className="py-3 text-muted-foreground text-xs">
+                              {b.board} · {b.grade}
+                            </td>
+                            <td className="py-3 text-muted-foreground">
+                              {formatSubjects(b.subjects, b.subject)}
+                            </td>
+                            <td className="py-3 text-muted-foreground text-xs">
+                              {b.scheduleTiming ?? '—'}
+                            </td>
+                            <td className="py-3 font-mono-data">{b.studentIds.length}</td>
+                            {canManage ? (
+                              <td className="py-3 text-right">
+                                <div className="flex items-center justify-end gap-1">
                                   <EditButton
                                     label={b.name}
                                     onEdit={() =>
@@ -1394,187 +1270,117 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
                                         `Delete batch "${b.name}"? Students will be unassigned from this batch.`,
                                         async () => {
                                           await removeBatch(b.id)
-                                          if (selectedBatchId === b.id) setSelectedBatchId(null)
+                                          if (editTarget?.kind === 'batch' && editTarget.id === b.id) {
+                                            setEditTarget(null)
+                                          }
                                         },
                                         `Batch "${b.name}" deleted`,
                                       )
                                     }
                                   />
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                        {isEditing && editTarget.kind === 'batch' && (
-                          <tr key={`${b.id}-edit`}>
-                            <td colSpan={5} className="pb-3">
-                              <form
-                                className="p-3 rounded-md border border-accent/30 bg-accent/5 space-y-3"
-                                onSubmit={(e) => {
-                                  e.preventDefault()
-                                  void runAction(async () => {
-                                    await updateBatch(b.id, {
-                                      name: editTarget.name.trim() || undefined,
-                                      subjects: editTarget.subjects,
-                                      subject: editTarget.subjects[0],
-                                      scheduleTiming: editTarget.scheduleTiming.trim() || undefined,
-                                    })
-                                    setEditTarget(null)
-                                  }, `Batch "${editTarget.name}" updated`)
-                                }}
-                              >
-                                <div className="grid sm:grid-cols-3 gap-3">
-                                  <label className="block">
-                                    <span className="text-xs text-muted-foreground">Batch name</span>
-                                    <input
-                                      autoFocus
-                                      value={editTarget.name}
-                                      onChange={(e) => setEditTarget({ ...editTarget, name: e.target.value })}
-                                      className="mt-1 w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
-                                    />
-                                  </label>
-                                  <AppSelectMulti
-                                    label="Subjects (optional)"
-                                    values={editTarget.subjects}
-                                    onChange={(subjects) =>
-                                      setEditTarget({ ...editTarget, subjects })
-                                    }
-                                    options={
-                                      gradeData?.subjects.map((s) => ({
-                                        value: s.name,
-                                        label: s.name,
-                                      })) ?? []
-                                    }
-                                    placeholder="Select subjects"
-                                    searchable
-                                  />
-                                  <label className="block">
-                                    <span className="text-xs text-muted-foreground">Class timing (optional)</span>
-                                    <input
-                                      value={editTarget.scheduleTiming}
-                                      onChange={(e) => setEditTarget({ ...editTarget, scheduleTiming: e.target.value })}
-                                      placeholder="e.g. Mon/Wed 4–6 PM"
-                                      className="mt-1 w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
-                                    />
-                                  </label>
                                 </div>
-                                <div className="flex gap-2">
-                                  <button type="submit" disabled={saving} className="text-xs btn btn-primary px-3 py-1.5 disabled:opacity-50">
-                                    {saving ? 'Saving…' : 'Save changes'}
-                                  </button>
-                                  <button type="button" onClick={() => setEditTarget(null)} className="text-xs text-muted-foreground px-2 py-1">
-                                    Cancel
-                                  </button>
-                                </div>
-                              </form>
-                            </td>
+                              </td>
+                            ) : null}
                           </tr>
-                        )}
-                      </>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {selectedBatch && (
-              <div className="rounded-lg border border-border bg-secondary/20 p-4 sm:p-5 space-y-5">
-                <div>
-                  <h4 className="font-medium text-foreground">
-                    Students in {selectedBatch.name}
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {[
-                      board,
-                      grade,
-                      formatSubjects(selectedBatch.subjects, selectedBatch.subject, ''),
-                      selectedBatch.scheduleTiming,
-                      `${batchStudents.length} enrolled`,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs font-medium text-foreground mb-2">Enrolled students</p>
-                  {batchStudents.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No students in this batch yet.</p>
-                  ) : (
-                    <BatchStudentSearchList
-                      students={batchStudents}
-                      mode="enrolled"
-                      onRemove={(studentId) =>
-                        void runAction(
-                          () => removeStudentFromBatch(studentId, selectedBatch.id),
-                          'Student removed from batch',
-                        )
-                      }
-                      emptyMessage="No students match your search."
-                      searchPlaceholder="Search enrolled students…"
-                    />
-                  )}
-                </div>
-
-                <div className="pt-2 border-t border-border/60">
-                  <p className="text-xs font-medium text-foreground mb-2">
-                    Add students from institution roster
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mb-3">
-                    Students already in this batch are hidden. Others may still belong to different
-                    batches.
-                  </p>
-                  {studentsAvailableForBatch.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Every student is already assigned to this batch.
-                    </p>
-                  ) : (
-                    <BatchStudentPicker
-                      students={studentsAvailableForBatch}
-                      selectedIds={[]}
-                      onToggle={(studentId) =>
-                        void runAction(
-                          () => assignStudentToBatch(studentId, selectedBatch.id),
-                          'Student assigned to batch',
-                        )
-                      }
-                      emptyMessage="No students match your search."
-                      listSearchPlaceholder="Search students by name or batch…"
-                      dropdownLabel="Quick add — searchable dropdown"
-                      listLabel="Full list — search and assign"
-                      assignOnPick
-                    />
-                  )}
-                </div>
-
-                <div>
-                    <p className="text-xs font-medium text-foreground mb-2">Add new student</p>
-                    <form
-                      onSubmit={(e) => handleAddStudentToBatch(e, selectedBatch.id)}
-                      className="flex flex-col sm:flex-row gap-2 sm:items-end"
-                    >
-                      <label className="flex-1 block">
-                        <input
-                          value={newStudentName}
-                          onChange={(e) => setNewStudentName(e.target.value)}
-                          placeholder="Student name"
-                          className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
-                        />
-                      </label>
-                      <button
-                        type="submit"
-                        disabled={!newStudentName.trim()}
-                        className="btn btn-primary px-4 py-2 text-sm disabled:opacity-40 shrink-0"
-                      >
-                        Add to batch
-                      </button>
-                    </form>
-                </div>
+                          {isEditing && editTarget.kind === 'batch' ? (
+                            <tr>
+                              <td colSpan={canManage ? 6 : 5} className="pb-3">
+                                <form
+                                  className="p-3 rounded-md border border-accent/30 bg-accent/5 space-y-3"
+                                  onSubmit={(e) => {
+                                    e.preventDefault()
+                                    void runAction(async () => {
+                                      await updateBatch(b.id, {
+                                        name: editTarget.name.trim() || undefined,
+                                        subjects: editTarget.subjects,
+                                        subject: editTarget.subjects[0],
+                                        scheduleTiming: editTarget.scheduleTiming.trim() || undefined,
+                                      })
+                                      setEditTarget(null)
+                                    }, `Batch "${editTarget.name}" updated`)
+                                  }}
+                                >
+                                  <div className="grid sm:grid-cols-3 gap-3">
+                                    <label className="block">
+                                      <span className="text-xs text-muted-foreground">Batch name</span>
+                                      <input
+                                        autoFocus
+                                        value={editTarget.name}
+                                        onChange={(e) =>
+                                          setEditTarget({ ...editTarget, name: e.target.value })
+                                        }
+                                        className="mt-1 w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+                                      />
+                                    </label>
+                                    <AppSelectMulti
+                                      label="Subjects (optional)"
+                                      values={editTarget.subjects}
+                                      onChange={(subjects) =>
+                                        setEditTarget({ ...editTarget, subjects })
+                                      }
+                                      options={editSubjects.map((s) => ({ value: s, label: s }))}
+                                      placeholder="Select subjects"
+                                      searchable
+                                    />
+                                    <label className="block">
+                                      <span className="text-xs text-muted-foreground">
+                                        Class timing (optional)
+                                      </span>
+                                      <input
+                                        value={editTarget.scheduleTiming}
+                                        onChange={(e) =>
+                                          setEditTarget({
+                                            ...editTarget,
+                                            scheduleTiming: e.target.value,
+                                          })
+                                        }
+                                        placeholder="e.g. Mon/Wed 4–6 PM"
+                                        className="mt-1 w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+                                      />
+                                    </label>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="submit"
+                                      disabled={saving}
+                                      className="text-xs btn btn-primary px-3 py-1.5 disabled:opacity-50"
+                                    >
+                                      {saving ? 'Saving…' : 'Save changes'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditTarget(null)}
+                                      className="text-xs text-muted-foreground px-2 py-1"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </form>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
-        )}
-      </AppCard>
+              <Pagination
+                page={batchPage}
+                pages={batchPages}
+                total={batches.length}
+                limit={batchLimit}
+                onPageChange={setBatchPage}
+                onLimitChange={(limit) => {
+                  setBatchLimit(limit)
+                  setBatchPage(1)
+                }}
+                itemLabel="batches"
+                className="mt-4"
+              />
+            </>
+          )}
+        </AppCard>
       </div>
 
       {selectedTopic && (
@@ -1603,6 +1409,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             </p>
           ) : (
             <div className="overflow-x-auto">
+              <p className="ln-table-scroll-hint sm:hidden">Swipe sideways to see all columns</p>
               <table className="w-full text-sm min-w-[600px]">
                 <thead className="bg-secondary/50 text-xs uppercase tracking-widest text-muted-foreground">
                   <tr>
@@ -1637,8 +1444,8 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
       <AppCard className="mt-6">
         <div className="font-display text-xl mb-2">Why this matters</div>
         <p className="text-sm text-muted-foreground max-w-3xl">
-          Maintain boards, grades, subjects, topics, and batches in one place. Every assessment,
-          report, and batch view derives from this structure. Click a topic to inspect its questions.
+          Maintain boards, grades, subjects, topics, and batches in one place. Every assessment and
+          report derives from this structure. Click a topic to inspect its questions.
         </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-sm">
           <div className="border border-border rounded-md p-3">
@@ -1654,9 +1461,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             <div className="font-mono-data text-2xl mt-1">{totalTopics}</div>
           </div>
           <div className="border border-border rounded-md p-3">
-            <div className="text-[10px] uppercase tracking-widest text-accent flex items-center gap-1">
-              <Users className="w-3 h-3" /> Batches
-            </div>
+            <div className="text-[10px] uppercase tracking-widest text-accent">Batches</div>
             <div className="font-mono-data text-2xl mt-1">{batches.length}</div>
           </div>
         </div>

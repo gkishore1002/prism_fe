@@ -6,6 +6,7 @@ import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { Pagination } from '@/components/ui/Pagination'
 import { btnClass } from '@/components/ui/Button'
 import { ToolbarButton } from '@/components/ui/ListToolbar'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { fetchCenter, updateCenter } from '@/lib/api/institutionsApi'
 import { fetchStudentsMasterPaginated } from '@/lib/api/studentsApi'
@@ -191,9 +192,7 @@ export function AdminCenterDetailPage() {
       {saveMessage && (
         <div className="mb-4 rounded-lg border border-leaf/30 bg-leaf/5 px-4 py-3 text-sm">{saveMessage}</div>
       )}
-      {error && (
-        <div className="mb-4 rounded-lg border border-rose/30 bg-rose/5 px-4 py-3 text-sm text-rose">{error}</div>
-      )}
+      {error && <FormErrorBanner message={error} className="mb-4 rounded-lg" />}
 
       {editing ? (
         <AppCard className="mb-6">

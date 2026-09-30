@@ -29,6 +29,15 @@ export function exportStudentsCsv(centerId?: string, academicYearId?: string, se
   return downloadCsvExport(`/exports/students.csv${query ? `?${query}` : ''}`, 'students.csv')
 }
 
+export function exportStaffCsv(centerId?: string, academicYearId?: string, search?: string) {
+  const qs = new URLSearchParams()
+  if (centerId) qs.set('center_id', centerId)
+  if (academicYearId) qs.set('academic_year_id', academicYearId)
+  if (search?.trim()) qs.set('search', search.trim())
+  const query = qs.toString()
+  return downloadCsvExport(`/exports/staff.csv${query ? `?${query}` : ''}`, 'staff.csv')
+}
+
 export function exportCscComplianceCsv(centerId?: string) {
   const qs = centerId ? `?center_id=${encodeURIComponent(centerId)}` : ''
   return downloadCsvExport(`/exports/csc-compliance.csv${qs}`, 'csc-compliance.csv')

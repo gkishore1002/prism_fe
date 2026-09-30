@@ -21,8 +21,12 @@ export async function fetchQuestions(): Promise<QuestionBankEntry[]> {
   return data.map(mapQuestion)
 }
 
-export async function fetchQuestionPapers(): Promise<QuestionPaper[]> {
-  const data = await apiFetch<ApiQuestionPaper[]>('/question-papers')
+export async function fetchQuestionPapers(
+  options?: { status?: 'draft' | 'published' | 'all' },
+): Promise<QuestionPaper[]> {
+  const status = options?.status ?? 'all'
+  const qs = status === 'all' ? '?status=all' : `?status=${encodeURIComponent(status)}`
+  const data = await apiFetch<ApiQuestionPaper[]>(`/question-papers${qs}`)
   return data.map(mapQuestionPaper)
 }
 
@@ -125,15 +129,92 @@ export async function createPaperBulk(
   name: string,
   questions: Record<string, unknown>[],
   source: 'manual' | 'upload',
+  options?: { status?: 'draft' | 'published'; paperId?: string },
 ): Promise<QuestionPaper> {
-  if (questions.length === 0) {
+  const status = options?.status ?? 'published'
+  if (status === 'published' && questions.length === 0) {
     throw new Error('No questions to save')
   }
   const data = await apiFetch<ApiQuestionPaper>('/question-papers/bulk', {
     method: 'POST',
-    body: JSON.stringify({ name, questions, source }),
+    body: JSON.stringify({
+      name,
+      questions,
+      source,
+      status,
+      paperId: options?.paperId,
+    }),
   })
   return mapQuestionPaper(data)
+}
+
+export async function publishQuestionPaper(paperId: string): Promise<QuestionPaper> {
+  const data = await apiFetch<ApiQuestionPaper>(
+    `/question-papers/${encodeURIComponent(paperId)}/publish`,
+    { method: 'POST' },
+  )
+  return mapQuestionPaper(data)
+}
+
+export async function fetchQuestionPaper(paperId: string): Promise<QuestionPaper> {
+  const data = await apiFetch<ApiQuestionPaper>(
+    `/question-papers/${encodeURIComponent(paperId)}`,
+  )
+  return mapQuestionPaper(data)
+}
+
+export async function createPaperFromManualQuestions(
+  name: string,
+  inputs: ManualQuestionInput[],
+  options?: { status?: 'draft' | 'published'; paperId?: string },
+): Promise<QuestionPaper> {
+  return createPaperBulk(
+    name,
+    inputs.map((input) => manualInputToCreateBody(input)),
+    'manual',
+    options,
+  )
+}
+
+export async function createPaperFromUpload(
+  name: string,
+  rows: QuestionUploadRow[],
+  options?: { status?: 'draft' | 'published'; paperId?: string },
+): Promise<QuestionPaper> {
+  const forDraft = options?.status === 'draft'
+  const valid = forDraft ? rows : rows.filter((r) => r.valid)
+  if (!forDraft && valid.length === 0) {
+    throw new Error('No valid questions to save. Fix errors and re-upload.')
+  }
+
+  const { uploadQuestionMediaBlob } = await import('@/lib/api/questionMediaApi')
+
+  const prepared: QuestionUploadRow[] = []
+  for (const row of valid) {
+    const next = { ...row }
+    const pairs: Array<[keyof QuestionUploadRow, keyof QuestionUploadRow, string]> = [
+      ['textImageBlob', 'textImageKey', 'stem.jpg'],
+      ['optionAImageBlob', 'optionAImageKey', 'option-a.jpg'],
+      ['optionBImageBlob', 'optionBImageKey', 'option-b.jpg'],
+      ['optionCImageBlob', 'optionCImageKey', 'option-c.jpg'],
+      ['optionDImageBlob', 'optionDImageKey', 'option-d.jpg'],
+    ]
+    for (const [blobKey, keyField, filename] of pairs) {
+      const blob = next[blobKey] as Blob | undefined
+      if (blob && !next[keyField]) {
+        const uploaded = await uploadQuestionMediaBlob(blob, filename)
+        ;(next as Record<string, unknown>)[keyField] = uploaded.key
+      }
+    }
+    prepared.push(next)
+  }
+
+  return createPaperBulk(
+    name,
+    prepared.map((row) => uploadRowToCreateBody(row)),
+    'upload',
+    options,
+  )
 }
 
 export async function createQuestionFromRow(row: QuestionUploadRow): Promise<QuestionBankEntry> {
@@ -199,55 +280,6 @@ export async function createQuestionManual(input: ManualQuestionInput): Promise<
     body: JSON.stringify(manualInputToCreateBody(input)),
   })
   return mapQuestion(data)
-}
-
-export async function createPaperFromManualQuestions(
-  name: string,
-  inputs: ManualQuestionInput[],
-): Promise<QuestionPaper> {
-  return createPaperBulk(
-    name,
-    inputs.map((input) => manualInputToCreateBody(input)),
-    'manual',
-  )
-}
-
-export async function createPaperFromUpload(
-  name: string,
-  rows: QuestionUploadRow[],
-): Promise<QuestionPaper> {
-  const valid = rows.filter((r) => r.valid)
-  if (valid.length === 0) {
-    throw new Error('No valid questions to save. Fix errors and re-upload.')
-  }
-
-  const { uploadQuestionMediaBlob } = await import('@/lib/api/questionMediaApi')
-
-  const prepared: QuestionUploadRow[] = []
-  for (const row of valid) {
-    const next = { ...row }
-    const pairs: Array<[keyof QuestionUploadRow, keyof QuestionUploadRow, string]> = [
-      ['textImageBlob', 'textImageKey', 'stem.jpg'],
-      ['optionAImageBlob', 'optionAImageKey', 'option-a.jpg'],
-      ['optionBImageBlob', 'optionBImageKey', 'option-b.jpg'],
-      ['optionCImageBlob', 'optionCImageKey', 'option-c.jpg'],
-      ['optionDImageBlob', 'optionDImageKey', 'option-d.jpg'],
-    ]
-    for (const [blobKey, keyField, filename] of pairs) {
-      const blob = next[blobKey] as Blob | undefined
-      if (blob && !next[keyField]) {
-        const uploaded = await uploadQuestionMediaBlob(blob, filename)
-        ;(next as Record<string, unknown>)[keyField] = uploaded.key
-      }
-    }
-    prepared.push(next)
-  }
-
-  return createPaperBulk(
-    name,
-    prepared.map((row) => uploadRowToCreateBody(row)),
-    'upload',
-  )
 }
 
 export async function createCustomPaperApi(

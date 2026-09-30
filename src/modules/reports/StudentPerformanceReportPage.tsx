@@ -10,6 +10,7 @@ import { fallbackAssessmentSummaryTa } from '@/lib/reportBilingual'
 import { formatReportDate } from '@/lib/reportFormatters'
 import { useReportLabels } from '@/lib/useReportLabels'
 import { cn } from '@/lib/cn'
+import { SegmentedTab, SegmentedTabs } from '@/components/ui/SegmentedTabs'
 import { LgReportLayout } from '@/modules/reports/learningGenome/LearningGenomeShell'
 import { OverallReportContent } from '@/modules/reports/OverallPerformanceReportPage'
 import { AssessmentReportBody } from '@/modules/reports/AssessmentReportPage'
@@ -195,30 +196,18 @@ export function StudentPerformanceReportPage({
       </div>
 
       <div className="rounded-xl border border-border bg-background p-2">
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Report sections">
+        <SegmentedTabs aria-label="Report sections" className="mb-0 border-0 bg-transparent p-0">
           {(
             [
               { id: 'overview' as const, label: L.tabOverview },
               { id: 'academic' as const, label: L.tabAcademicReport },
             ] as const
           ).map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === id}
-              onClick={() => setTab(id)}
-              className={cn(
-                'rounded-lg px-4 py-2.5 text-sm font-medium transition',
-                activeTab === id
-                  ? 'bg-accent text-accent-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-              )}
-            >
+            <SegmentedTab key={id} active={activeTab === id} onClick={() => setTab(id)}>
               {label}
-            </button>
+            </SegmentedTab>
           ))}
-        </div>
+        </SegmentedTabs>
       </div>
 
       {activeTab === 'overview' && (

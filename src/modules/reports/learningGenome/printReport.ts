@@ -482,15 +482,31 @@ export function printReport(options?: { title?: string; language?: 'en' | 'ta' }
   })
 }
 
-export async function downloadReportPdf(options?: {
+export type ReportPdfOptions = {
   title?: string
   rootId?: string
   language?: 'en' | 'ta'
-}): Promise<void> {
+}
+
+function triggerBlobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500)
+}
+
+/** Build a PDF Blob from the on-screen report (same capture path as download). */
+export async function buildReportPdfBlob(
+  options?: ReportPdfOptions,
+): Promise<{ blob: Blob; filename: string }> {
   const root = document.getElementById(options?.rootId ?? 'lg-report-print-root')
   if (!root) {
-    printReport(options)
-    return
+    throw new Error('Report root not found')
   }
 
   if (options?.language) {
@@ -570,13 +586,57 @@ export async function downloadReportPdf(options?: {
       throw new Error('No report content captured')
     }
 
-    pdf.save(`${safeFilename(title)}.pdf`)
-  } catch (err) {
-    console.error('PDF download failed, falling back to print', err)
-    printReport(options)
+    const filename = `${safeFilename(title)}.pdf`
+    const blob = pdf.output('blob')
+    return { blob, filename }
   } finally {
     if (clone?.parentNode) clone.parentNode.removeChild(clone)
     stagingHost?.parentNode?.removeChild(stagingHost)
+  }
+}
+
+export async function downloadReportPdf(options?: ReportPdfOptions): Promise<void> {
+  try {
+    const { blob, filename } = await buildReportPdfBlob(options)
+    triggerBlobDownload(blob, filename)
+  } catch (err) {
+    console.error('PDF download failed, falling back to print', err)
+    printReport(options)
+  }
+}
+
+/**
+ * Share the report as a PDF via the system share sheet when available.
+ * Falls back to downloading the PDF if share/files are unsupported.
+ */
+export async function shareReportPdf(
+  options?: ReportPdfOptions,
+): Promise<'shared' | 'downloaded' | 'cancelled'> {
+  try {
+    const { blob, filename } = await buildReportPdfBlob(options)
+    const file = new File([blob], filename, { type: 'application/pdf' })
+    const shareData: ShareData = {
+      files: [file],
+      title: options?.title ?? 'Prism report',
+      text: options?.title ?? 'Prism report PDF',
+    }
+    if (typeof navigator.canShare === 'function' && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData)
+        return 'shared'
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          return 'cancelled'
+        }
+        // Fall through to download when share fails (permissions, etc.).
+      }
+    }
+    triggerBlobDownload(blob, filename)
+    return 'downloaded'
+  } catch (err) {
+    console.error('PDF share failed, falling back to print', err)
+    printReport(options)
+    return 'downloaded'
   }
 }
 

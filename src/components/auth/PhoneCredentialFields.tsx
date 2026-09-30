@@ -1,4 +1,5 @@
 import { phoneToLoginEmail } from '@/lib/phoneAuth'
+import { RequiredMark } from '@/components/ui/RequiredMark'
 
 const inputClass = 'mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background'
 
@@ -28,7 +29,9 @@ export function PhoneCredentialFields({
   return (
     <>
       <label className="block">
-        <span className="text-xs text-muted-foreground">Phone number{phoneRequired ? ' *' : ''}</span>
+        <span className="text-xs text-muted-foreground">
+          Phone number{phoneRequired ? <> <RequiredMark /></> : null}
+        </span>
         <input
           id={`${idPrefix}-phone`}
           type="tel"

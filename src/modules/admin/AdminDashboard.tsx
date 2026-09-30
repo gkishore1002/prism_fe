@@ -86,6 +86,7 @@ export function AdminDashboard() {
           </Route>
           <Route path="setup" element={<AdminCurriculumSetupPage />} />
           <Route path="curriculum" element={<AdminCurriculumSetupPage />} />
+          <Route path="batches" element={<Navigate to="/admin/curriculum" replace />} />
           <Route path="settings" element={<AdminSettingsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="syllabus" element={<Navigate to="/admin/curriculum" replace />} />

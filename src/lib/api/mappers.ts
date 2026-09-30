@@ -185,6 +185,7 @@ export interface ApiQuestionPaper {
   createdBy?: string | null
   source: QuestionPaper['source']
   parentPaperId?: string | null
+  status?: 'draft' | 'published' | null
 }
 
 export function mapQuestionPaper(p: ApiQuestionPaper): QuestionPaper {
@@ -204,6 +205,7 @@ export function mapQuestionPaper(p: ApiQuestionPaper): QuestionPaper {
     createdBy: p.createdBy ?? undefined,
     source: p.source,
     parentPaperId: p.parentPaperId ?? undefined,
+    status: p.status === 'draft' ? 'draft' : 'published',
   }
 }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Mail, Plus, Upload, Users, Edit3, User, TrendingUp, BookOpen, Award, ShieldCheck } from 'lucide-react'
+import { Mail, Plus, Upload, Download, Users, Edit3, User, TrendingUp, BookOpen, Award, ShieldCheck } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { AppModal } from '@/components/ui/AppModal'
@@ -7,6 +7,8 @@ import { ResponsiveTable } from '@/components/ui/ResponsiveTable'
 import { ActionMenu, ActionMenuItem } from '@/components/ui/ActionMenu'
 import { btnClass } from '@/components/ui/Button'
 import { ListToolbar, ToolbarButton } from '@/components/ui/ListToolbar'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
+import { RequiredMark } from '@/components/ui/RequiredMark'
 import { PhoneCredentialFields } from '@/components/auth/PhoneCredentialFields'
 import { useCenters } from '@/hooks/useCenters'
 import { useAuth } from '@/hooks/useAuth'
@@ -16,7 +18,7 @@ import { useAcademicYears } from '@/hooks/useAcademicYears'
 import type { TeacherRow } from '@/lib/api/analyticsApi'
 import {
   createStaff,
-  fetchStaff,
+  fetchStaffPaginated,
   updateStaff,
   listStaffAssignments,
   upsertStaffAssignment,
@@ -30,8 +32,11 @@ import {
   downloadStaffImportTemplate,
   type StaffBulkRowPayload,
 } from '@/lib/api/importsApi'
+import { exportStaffCsv } from '@/lib/api/exportsApi'
 import { BulkCsvUploadModal } from '@/components/ui/BulkCsvUploadModal'
 import { staffRowsFromCsv } from '@/lib/csvParse'
+import { Pagination } from '@/components/ui/Pagination'
+import { DEFAULT_PAGE_LIMIT } from '@/lib/pagination'
 
 const inputClass = 'mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background'
 
@@ -70,6 +75,10 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const { activeYearId, activeYear, ensureLoaded: ensureYearsLoaded } = useAcademicYears()
   const { teachers, refresh } = useAnalytics()
   const [staff, setStaff] = useState<StaffMember[]>([])
+  const [total, setTotal] = useState(0)
+  const [pages, setPages] = useState(1)
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -97,6 +106,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const [editAssignmentStatus, setEditAssignmentStatus] = useState('active')
   const [editError, setEditError] = useState<string | null>(null)
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [viewingProfile, setViewingProfile] = useState<StaffMember | null>(null)
   const [assignmentHistory, setAssignmentHistory] = useState<StaffAssignment[]>([])
@@ -109,26 +119,49 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
     // Wait for header year so we never flash the unscoped full directory.
     if (!activeYearId) {
       setStaff([])
+      setTotal(0)
+      setPages(1)
       setLoading(true)
       return
     }
     setLoading(true)
     setError(null)
     try {
-      setStaff(await fetchStaff(branchCenterId, activeYearId))
+      const data = await fetchStaffPaginated({
+        centerId: branchCenterId,
+        academicYearId: activeYearId,
+        search: debouncedSearch || undefined,
+        page,
+        limit,
+      })
+      setStaff(data.items)
+      setTotal(data.total)
+      setPages(data.pages)
+      if (data.items.length === 0 && data.total > 0 && page > 1) {
+        setPage(data.pages)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load staff')
       setStaff([])
+      setTotal(0)
+      setPages(1)
     } finally {
       setLoading(false)
     }
-  }, [branchCenterId, activeYearId])
+  }, [branchCenterId, activeYearId, debouncedSearch, page, limit])
 
   useEffect(() => {
     void ensureLoaded()
     void ensureYearsLoaded()
+  }, [ensureLoaded, ensureYearsLoaded])
+
+  useEffect(() => {
     void load()
-  }, [ensureLoaded, ensureYearsLoaded, load])
+  }, [load])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, branchCenterId, activeYearId])
 
   useEffect(() => {
     if (!viewingProfile) {
@@ -156,20 +189,17 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
-  const filteredStaff = useMemo(() => {
-    if (!debouncedSearch) return staff
-    const query = debouncedSearch.toLowerCase()
-    return staff.filter(
-      (s) =>
-        s.name.toLowerCase().includes(query) ||
-        s.email.toLowerCase().includes(query),
-    )
-  }, [staff, debouncedSearch])
-
   const tutorRows = useMemo(() => mergeTutorAnalytics(staff, teachers), [staff, teachers])
-  const totalStudents = useMemo(() => tutorRows.reduce((sum, row) => sum + row.students, 0), [tutorRows])
+  // Analytics roster for org-wide tutor/student metrics (not limited to current page).
+  const tutorsInOrg = teachers.length
+  const totalStudents = useMemo(
+    () => teachers.reduce((sum, row) => sum + (row.students ?? 0), 0),
+    [teachers],
+  )
   const avgGrowth =
-    tutorRows.length > 0 ? Math.round(tutorRows.reduce((sum, row) => sum + row.growth, 0) / tutorRows.length) : null
+    teachers.length > 0
+      ? Math.round(teachers.reduce((sum, row) => sum + (row.growth ?? 0), 0) / teachers.length)
+      : null
 
   const showBranchPicker = isBranchAdmin || isTutor
   const editShowBranchPicker = editIsBranchAdmin || editIsTutor
@@ -186,6 +216,22 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
     setIsTutor(true)
     setSelectedBranches([])
     setAssignmentCenterId('')
+  }
+
+  async function handleExportStaff() {
+    if (!activeYearId) {
+      setError('Select an academic year before exporting staff.')
+      return
+    }
+    setExporting(true)
+    setError(null)
+    try {
+      await exportStaffCsv(branchCenterId, activeYearId, debouncedSearch || undefined)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Export failed')
+    } finally {
+      setExporting(false)
+    }
   }
 
   async function handleCreate(e: FormEvent) {
@@ -293,7 +339,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
     await saveEdit()
   }
 
-  if (loading) return <PageLoader />
+  if (loading && staff.length === 0 && total === 0 && !error) return <PageLoader />
 
   return (
     <>
@@ -319,19 +365,17 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
         </AppCard>
       )}
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-rose/30 bg-rose/5 px-4 py-3 text-sm text-rose">{error}</div>
-      )}
+      {error && <FormErrorBanner message={error} className="mb-4 rounded-lg" />}
 
       <div className="grid sm:grid-cols-3 gap-4 mb-6">
         <AppStat
           label="Staff"
-          value={staff.length}
+          value={total}
           hint={yearHint ? `Assigned in ${yearHint}` : 'Admins and tutors'}
         />
         <AppStat
           label="Tutors"
-          value={tutorRows.length}
+          value={tutorsInOrg}
           tone="leaf"
           hint={yearHint ? yearHint : undefined}
         />
@@ -353,6 +397,13 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
           actions={
             <>
               <ToolbarButton
+                icon={<Download className="w-4 h-4" />}
+                label={exporting ? 'Exporting…' : 'Export CSV'}
+                shortLabel="CSV"
+                disabled={exporting || !activeYearId}
+                onClick={() => void handleExportStaff()}
+              />
+              <ToolbarButton
                 icon={<Upload className="w-4 h-4" />}
                 label="Bulk upload"
                 shortLabel="Upload"
@@ -372,7 +423,9 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
         {showAddForm && (
           <form onSubmit={(e) => void handleCreate(e)} className="grid sm:grid-cols-2 gap-4 mb-6 pb-6 border-b border-border">
             <label className="block">
-              <span className="text-xs text-muted-foreground">Name</span>
+              <span className="text-xs text-muted-foreground">
+                Name <RequiredMark />
+              </span>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -499,7 +552,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
           </form>
         )}
 
-        {filteredStaff.length === 0 ? (
+        {staff.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">
             {debouncedSearch
               ? 'No staff found.'
@@ -522,7 +575,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredStaff.map((member) => (
+                {staff.map((member) => (
                   <tr key={member.id} className="hover:bg-secondary/30">
                     <td className="py-3">
                       <p className="font-medium text-foreground">{member.name}</p>
@@ -576,6 +629,19 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
             </table>
           </ResponsiveTable>
         )}
+
+        <Pagination
+          page={page}
+          pages={pages}
+          total={total}
+          limit={limit}
+          itemLabel="staff"
+          onPageChange={setPage}
+          onLimitChange={(next) => {
+            setLimit(next)
+            setPage(1)
+          }}
+        />
       </AppCard>
 
       {/* Staff profile modal */}
@@ -750,15 +816,17 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
         }
       >
         <form id="staff-edit-form" onSubmit={(e) => void handleEditSubmit(e)} className="space-y-4">
-          {editError && (
-            <div className="rounded-lg border border-rose/30 bg-rose/5 px-3 py-2 text-sm text-rose">{editError}</div>
-          )}
+          {editError && <FormErrorBanner message={editError} className="rounded-lg" />}
           <label className="block">
-            <span className="text-xs text-muted-foreground">Full name</span>
+            <span className="text-xs text-muted-foreground">
+              Full name <RequiredMark />
+            </span>
             <input required value={editName} onChange={(e) => setEditName(e.target.value)} className={inputClass} />
           </label>
           <label className="block">
-            <span className="text-xs text-muted-foreground">Login email</span>
+            <span className="text-xs text-muted-foreground">
+              Login email <RequiredMark />
+            </span>
             <input
               required
               type="email"
@@ -919,7 +987,11 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
         open={bulkUploadOpen}
         onClose={() => setBulkUploadOpen(false)}
         title="Bulk upload staff"
-        description="Import branch admins and tutors from CSV or Excel (.xlsx). Organization owner column appears only in Organization Admin portal."
+        description={
+          activeYear
+            ? `Import branch admins and tutors from CSV or Excel (.xlsx). Assignments use academic_year from each row, or the selected year (${activeYear.name}) when blank.`
+            : 'Import branch admins and tutors from CSV or Excel (.xlsx). Include academic_year on each row (e.g. 2025-26).'
+        }
         columnsHelp={
           organizationScoped
             ? [
@@ -928,7 +1000,8 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
                 'branch_admin — yes/no',
                 'tutor — yes/no',
                 'org_owner — yes/no (Organization Admin only)',
-                'branches — branch names or cities separated by ; or ,',
+                'branches — branch names or cities separated by ; or , (required)',
+                `academic_year — e.g. ${activeYear?.name || '2025-26'} (optional; defaults to selected header year)`,
                 'password — optional custom password',
               ]
             : [
@@ -936,7 +1009,8 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
                 'phone — 10-digit mobile (required)',
                 'branch_admin — yes/no',
                 'tutor — yes/no',
-                'branches — branch names or cities separated by ; or ,',
+                'branches — branch names or cities separated by ; or , (required)',
+                `academic_year — e.g. ${activeYear?.name || '2025-26'} (optional; defaults to selected header year)`,
                 'password — optional custom password',
               ]
         }
@@ -948,6 +1022,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
             isBranchAdmin: row.isBranchAdmin,
             isTutor: row.isTutor,
             centerNames: row.centerNames,
+            academicYear: row.academicYear,
             password: row.password,
           }))
         }
@@ -960,6 +1035,12 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
           if (row.isOwner && !organizationScoped) {
             return 'Organization owner can only be imported from Organization Admin portal'
           }
+          if (!(row.centerNames?.length || row.centerIds?.length)) {
+            return 'At least one branch is required (branches column)'
+          }
+          if (!row.academicYear?.trim() && !activeYearId) {
+            return 'academic_year is required when no year is selected in the header'
+          }
           return null
         }}
         previewRow={(row) => {
@@ -971,10 +1052,17 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
             .filter(Boolean)
             .join(', ')
           const branches = row.centerNames?.length ? ` · ${row.centerNames.join(', ')}` : ''
-          return `${row.name} · ${row.phone} · ${roles || 'No roles'}${branches}`
+          const year = row.academicYear?.trim() || activeYear?.name
+          const yearLabel = year ? ` · ${year}` : ''
+          return `${row.name} · ${row.phone} · ${roles || 'No roles'}${branches}${yearLabel}`
         }}
         onDownloadTemplate={downloadStaffImportTemplate}
-        onImport={bulkImportStaff}
+        onImport={(rows) =>
+          bulkImportStaff(rows, {
+            academicYearId: activeYearId ?? undefined,
+            academicYearName: activeYear?.name,
+          })
+        }
         onComplete={() => void Promise.all([load(), refresh('adminTeachers')])}
       />
     </>

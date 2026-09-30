@@ -39,6 +39,16 @@ export function clearSession() {
   sessionStorage.removeItem(ACTIVE_BRANCH_KEY)
   sessionStorage.removeItem('prism_student_assessment_reminder')
   sessionStorage.removeItem('learnova_student_assessment_reminder')
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith('prism_manual_paper_draft')) keys.push(key)
+    }
+    for (const key of keys) localStorage.removeItem(key)
+  } catch {
+    /* ignore */
+  }
 }
 
 export function dashboardPathForRole(role: UserRole): string {

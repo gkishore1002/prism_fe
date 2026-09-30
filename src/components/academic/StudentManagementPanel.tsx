@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { Link } from 'react-router-dom'
 import { Plus, FileText, Eye, Pencil, Upload, Download } from 'lucide-react'
@@ -24,6 +24,9 @@ import { ReassignmentReviewModal } from '@/components/academic/ReassignmentRevie
 import { formatCenterLabel, centerLabelById } from '@/lib/centerLabel'
 import { exportStudentsCsv } from '@/lib/api/exportsApi'
 import { reloadAppAfterScopeChange } from '@/lib/reloadAppScope'
+import { boardsMatch, gradesMatch } from '@/lib/academicScope'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
+import { RequiredMark } from '@/components/ui/RequiredMark'
 import {
   bulkImportStudents,
   downloadStudentsImportTemplate,
@@ -145,13 +148,43 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
   const [pages, setPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
-  const boards = curriculum.map((b) => b.board)
-  const [formBoard, setFormBoard] = useState(boards[0] ?? 'CBSE')
-  const [formGrade, setFormGrade] = useState('8')
-  const [formBatch, setFormBatch] = useState(tutorBatches[0]?.id ?? '')
+  const boards = useMemo(() => curriculum.map((b) => b.board), [curriculum])
+  const [formBoard, setFormBoard] = useState('')
+  const [formGrade, setFormGrade] = useState('')
+  const [formBatch, setFormBatch] = useState('')
   const [formCenter, setFormCenter] = useState('')
   const [editBatchIds, setEditBatchIds] = useState<string[]>([])
   const [editStatus, setEditStatus] = useState<'active' | 'inactive'>('active')
+
+  const formGrades = useMemo(() => {
+    const boardNode = curriculum.find((b) => boardsMatch(b.board, formBoard))
+    return boardNode?.grades.map((g) => g.grade) ?? []
+  }, [curriculum, formBoard])
+
+  const formBatches = useMemo(
+    () =>
+      tutorBatches.filter(
+        (b) =>
+          (!formBoard || boardsMatch(b.board, formBoard)) &&
+          (!formGrade || gradesMatch(b.grade, formGrade)),
+      ),
+    [tutorBatches, formBoard, formGrade],
+  )
+
+  const promoteGrades = useMemo(() => {
+    const boardNode = curriculum.find((b) => boardsMatch(b.board, promoteBoard))
+    return boardNode?.grades.map((g) => g.grade) ?? []
+  }, [curriculum, promoteBoard])
+
+  const promoteBatches = useMemo(
+    () =>
+      tutorBatches.filter(
+        (b) =>
+          (!promoteBoard || boardsMatch(b.board, promoteBoard)) &&
+          (!promoteGrade || gradesMatch(b.grade, promoteGrade)),
+      ),
+    [tutorBatches, promoteBoard, promoteGrade],
+  )
 
   useEffect(() => {
     void ensureCurriculumLoaded()
@@ -287,15 +320,45 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
     if (centers[0] && !formCenter) setFormCenter(centers[0].id)
   }, [centers, formCenter])
 
+  // Cascading defaults from curriculum + year-scoped batches (Add student).
   useEffect(() => {
-    if (!tutorBatches.length) {
+    if (!formBoard && boards[0]) setFormBoard(boards[0])
+  }, [formBoard, boards])
+
+  useEffect(() => {
+    if (formGrade && formGrades.some((g) => gradesMatch(g, formGrade))) return
+    setFormGrade(formGrades[0] ?? '')
+  }, [formGrade, formGrades])
+
+  useEffect(() => {
+    if (!formBatches.length) {
       setFormBatch('')
       return
     }
-    if (!formBatch || !tutorBatches.some((b) => b.id === formBatch)) {
-      setFormBatch(tutorBatches[0].id)
+    if (!formBatch || !formBatches.some((b) => b.id === formBatch)) {
+      setFormBatch(formBatches[0].id)
     }
-  }, [tutorBatches, formBatch])
+  }, [formBatches, formBatch])
+
+  // Cascading defaults for Promote.
+  useEffect(() => {
+    if (!promotingStudent) return
+    if (promoteBoard && boards.some((b) => boardsMatch(b, promoteBoard))) return
+    if (boards[0]) setPromoteBoard(boards[0])
+  }, [promotingStudent, promoteBoard, boards])
+
+  useEffect(() => {
+    if (!promotingStudent) return
+    if (promoteGrade && promoteGrades.some((g) => gradesMatch(g, promoteGrade))) return
+    setPromoteGrade(promoteGrades[0] ?? '')
+  }, [promotingStudent, promoteGrade, promoteGrades])
+
+  useEffect(() => {
+    if (!promotingStudent) return
+    if (promoteBatchId && !promoteBatches.some((b) => b.id === promoteBatchId)) {
+      setPromoteBatchId(promoteBatches[0]?.id ?? '')
+    }
+  }, [promotingStudent, promoteBatchId, promoteBatches])
 
   useEffect(() => {
     if (!showForm) return
@@ -329,6 +392,10 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
       setFetchError('Select a batch for this student.')
       return
     }
+    if (!formBoard || !formGrade) {
+      setFetchError('Select board and grade from Curriculum setup.')
+      return
+    }
     if (!centerId) {
       setFetchError('Select a branch / center.')
       return
@@ -343,8 +410,8 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
     try {
       await createStudent({
         name,
-        board: selectedBatch?.board || formBoard || 'CBSE',
-        grade: selectedBatch?.grade || `Grade ${formGrade || '8'}`,
+        board: selectedBatch?.board || formBoard,
+        grade: selectedBatch?.grade || formGrade,
         batchId,
         centerId,
         academicYear: activeYear?.name || '2025-26',
@@ -456,45 +523,63 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
         <AppCard>
           <h3 className="font-display text-lg text-foreground mb-4">Add student</h3>
           {fetchError && (
-            <p className="mb-4 rounded-md border border-rose/30 bg-rose/5 px-3 py-2 text-sm text-rose">
-              {fetchError}
-            </p>
+            <FormErrorBanner message={fetchError} className="mb-4" />
           )}
           <form onSubmit={handleAddStudent} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="block md:col-span-2">
-              <span className="text-xs text-muted-foreground">Student name *</span>
+              <span className="text-xs text-muted-foreground">
+                Student name <RequiredMark />
+              </span>
               <input name="name" required className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background" />
             </label>
             <AppDropdown
               label="Board *"
               name="board"
               value={formBoard}
-              onChange={setFormBoard}
+              onChange={(v) => {
+                setFormBoard(v)
+                setFormGrade('')
+                setFormBatch('')
+              }}
               options={boards.map((b) => ({ value: b, label: b }))}
-              placeholder="Select board"
+              placeholder={boards.length ? 'Select board' : 'No boards in curriculum'}
+              disabled={!boards.length}
             />
             <AppDropdown
               label="Grade *"
               name="grade"
               value={formGrade}
-              onChange={setFormGrade}
-              options={[
-                { value: '8', label: 'Grade 8' },
-                { value: '9', label: 'Grade 9' },
-                { value: '10', label: 'Grade 10' },
-              ]}
-              placeholder="Select grade"
+              onChange={(v) => {
+                setFormGrade(v)
+                setFormBatch('')
+              }}
+              options={formGrades.map((g) => ({ value: g, label: g }))}
+              placeholder={
+                !formBoard
+                  ? 'Select board first'
+                  : formGrades.length
+                    ? 'Select grade'
+                    : 'No grades for this board'
+              }
+              disabled={!formBoard || !formGrades.length}
             />
             <AppDropdown
               label="Batch *"
               name="batchId"
               value={formBatch}
               onChange={setFormBatch}
-              options={tutorBatches.map((b) => ({
+              options={formBatches.map((b) => ({
                 value: b.id,
                 label: `${b.name} · ${b.board} · ${b.grade}`,
               }))}
-              placeholder="Select batch"
+              placeholder={
+                !formGrade
+                  ? 'Select grade first'
+                  : formBatches.length
+                    ? 'Select batch'
+                    : 'No batches for this grade / year'
+              }
+              disabled={!formGrade || !formBatches.length}
             />
             <AppDropdown
               label="Branch / center *"
@@ -544,7 +629,15 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
             <div className="md:col-span-2 flex gap-2">
               <button
                 type="submit"
-                disabled={saving || !isValidPhone(formPhone) || !formBatch || !formCenter || !activeYearId}
+                disabled={
+                  saving ||
+                  !isValidPhone(formPhone) ||
+                  !formBoard ||
+                  !formGrade ||
+                  !formBatch ||
+                  !formCenter ||
+                  !activeYearId
+                }
                 className="bg-accent text-accent-foreground px-4 py-2 rounded-md text-sm font-medium disabled:opacity-60"
               >
                 {saving ? 'Saving…' : 'Save student'}
@@ -553,9 +646,20 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
                 Cancel
               </button>
             </div>
-            {!tutorBatches.length && (
+            {!boards.length && (
               <p className="md:col-span-2 text-xs text-muted-foreground">
-                No batches for {activeYear?.name ?? 'this academic year'}. Create a batch first, then add students.
+                No boards in Curriculum setup. Add a board and grades there before enrolling students.
+              </p>
+            )}
+            {boards.length > 0 && formBoard && !formGrades.length && (
+              <p className="md:col-span-2 text-xs text-muted-foreground">
+                No grades under {formBoard} in Curriculum setup.
+              </p>
+            )}
+            {formGrade && !formBatches.length && (
+              <p className="md:col-span-2 text-xs text-muted-foreground">
+                No batches for {formBoard} · {formGrade} in {activeYear?.name ?? 'this academic year'}.
+                Create a matching batch first, then add students.
               </p>
             )}
           </form>
@@ -564,7 +668,7 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
 
       <AppCard>
         {fetchError ? (
-          <p className="text-sm text-rose py-4">{fetchError}</p>
+          <FormErrorBanner message={fetchError} className="py-4 border-0 bg-transparent px-0" />
         ) : list.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">
             {activeYear
@@ -777,11 +881,21 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
               label="Batches"
               values={editBatchIds}
               onChange={setEditBatchIds}
-              options={tutorBatches.map((b) => ({
-                value: b.id,
-                label: b.name,
-                description: `${b.board} · ${b.grade}`,
-              }))}
+              options={tutorBatches
+                .filter((b) => {
+                  if (editBatchIds.includes(b.id)) return true
+                  if (!editingStudent) return true
+                  const boardOk =
+                    !editingStudent.board || boardsMatch(b.board, editingStudent.board)
+                  const gradeOk =
+                    !editingStudent.grade || gradesMatch(b.grade, editingStudent.grade)
+                  return boardOk && gradeOk
+                })
+                .map((b) => ({
+                  value: b.id,
+                  label: b.name,
+                  description: `${b.board} · ${b.grade}`,
+                }))}
               placeholder="Assign batches"
             />
             <AppDropdown
@@ -896,9 +1010,7 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
                     await academicYearsApi.promote(promotingStudent.id, {
                       academicYearId: promoteYearId,
                       board: promoteBoard,
-                      grade: promoteGrade.startsWith('Grade')
-                        ? promoteGrade
-                        : `Grade ${promoteGrade}`,
+                      grade: promoteGrade,
                       batchId: promoteBatchId || null,
                       centerId: promoteCenterId || null,
                       priorStatus: promotePriorStatus,
@@ -933,21 +1045,33 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
             <AppDropdown
               label="Board"
               value={promoteBoard}
-              onChange={setPromoteBoard}
+              onChange={(v) => {
+                setPromoteBoard(v)
+                setPromoteGrade('')
+                setPromoteBatchId('')
+              }}
               options={boards.map((b) => ({ value: b, label: b }))}
+              placeholder={boards.length ? 'Select board' : 'No boards in curriculum'}
+              disabled={!boards.length}
             />
             <AppDropdown
               label="Grade"
-              value={promoteGrade.replace(/^Grade\s+/i, '') || promoteGrade}
-              onChange={setPromoteGrade}
-              options={[
-                { value: '8', label: 'Grade 8' },
-                { value: '9', label: 'Grade 9' },
-                { value: '10', label: 'Grade 10' },
-                { value: '11', label: 'Grade 11' },
-                { value: '12', label: 'Grade 12' },
-              ]}
-              placeholder="Select grade"
+              value={
+                promoteGrades.find((g) => gradesMatch(g, promoteGrade)) ?? promoteGrade
+              }
+              onChange={(v) => {
+                setPromoteGrade(v)
+                setPromoteBatchId('')
+              }}
+              options={promoteGrades.map((g) => ({ value: g, label: g }))}
+              placeholder={
+                !promoteBoard
+                  ? 'Select board first'
+                  : promoteGrades.length
+                    ? 'Select grade'
+                    : 'No grades for this board'
+              }
+              disabled={!promoteBoard || !promoteGrades.length}
             />
             <AppDropdown
               label="Batch"
@@ -955,12 +1079,19 @@ export function StudentManagementPanel({ scope }: StudentManagementPanelProps) {
               onChange={setPromoteBatchId}
               options={[
                 { value: '', label: 'No batch' },
-                ...tutorBatches.map((b) => ({
+                ...promoteBatches.map((b) => ({
                   value: b.id,
                   label: b.name,
                   description: `${b.board} · ${b.grade}`,
                 })),
               ]}
+              placeholder={
+                !promoteGrade
+                  ? 'Select grade first'
+                  : promoteBatches.length
+                    ? 'Select batch'
+                    : 'No batches for this grade / year'
+              }
             />
             <AppDropdown
               label="Center"

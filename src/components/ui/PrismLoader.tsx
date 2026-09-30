@@ -472,6 +472,41 @@ export function InlineLoader({
   )
 }
 
+/** Compact animated loader for dashboard chart / table panels while analytics fetch. */
+export function DashboardSectionLoader({
+  label = 'Loading analytics…',
+  className,
+  minHeight = true,
+}: {
+  label?: string
+  className?: string
+  minHeight?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/80 bg-secondary/15 px-4 py-10',
+        minHeight && 'min-h-[180px]',
+        className,
+      )}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <PrismLoader size="sm" layout="block" label={label} />
+      <div className="flex gap-1.5 mt-1" aria-hidden>
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="h-1.5 w-1.5 rounded-full bg-accent/70 animate-pulse"
+            style={{ animationDelay: `${i * 160}ms` }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /** Report pages — Learning Genome / Swotify heritage aesthetic */
 export function ReportLoader({
   label = 'Composing report…',

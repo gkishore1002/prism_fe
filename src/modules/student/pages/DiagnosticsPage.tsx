@@ -28,7 +28,7 @@ const barColors: Record<string, string> = {
 export function StudentDiagnosticsPage() {
   useAnalyticsPage('studentDiagnostics')
   const { loading, topicBreakdown, readiness, studentProfile } = useAnalytics()
-  const primarySubject = topicBreakdown[0]?.subject ?? 'Mathematics'
+  const primarySubject = topicBreakdown[0]?.subject ?? ''
   const mathTopics = topicBreakdown
     .filter((t) => t.subject === primarySubject)
     .map((t) => ({ ...t, score: t.mastery }))

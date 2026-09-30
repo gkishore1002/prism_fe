@@ -7,13 +7,14 @@ import {
   Eye,
   FileSpreadsheet,
   PenLine,
-  Save,
   Upload,
   X,
 } from 'lucide-react'
 import { PageHeader, AppCard, AppStat } from '@/components/layout/AppShell'
 import { InlineLoader } from '@/components/ui/PrismLoader'
 import { AppDropdown } from '@/components/ui/AppDropdown'
+import { useScrollToError } from '@/hooks/useScrollToError'
+import { SegmentedTab, SegmentedTabs } from '@/components/ui/SegmentedTabs'
 import {
   MarksSpreadsheet,
   createMarksColumn,
@@ -22,6 +23,7 @@ import {
 } from '@/modules/tutor/components/MarksSpreadsheet'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { useCenters } from '@/hooks/useCenters'
+import { useUnsavedWorkGuard } from '@/hooks/useUnsavedWorkGuard'
 import { fetchStudentsForBatch } from '@/lib/api/curriculumApi'
 import {
   getCurriculumSubjectsForBatch,
@@ -45,10 +47,16 @@ import {
   parseMarksUploadFile,
 } from '@/modules/tutor/lib/marksUploadParse'
 import {
+  createMarksDraft,
+  deleteMarksDraft,
   downloadMarksExport,
+  fetchMarksDrafts,
   fetchMarksSessions,
   marksApiAvailable,
   saveMarksBulk,
+  updateMarksDraft,
+  type MarksDraftApi,
+  type MarksDraftPayload,
 } from '@/lib/api/marksApi'
 import { cn } from '@/lib/cn'
 
@@ -61,8 +69,32 @@ function pickNextSubject(columns: MarksColumnConfig[], subjects: string[]): stri
   return subjects.find((s) => !used.has(s.toLowerCase())) ?? ''
 }
 
+function emptyColumns(): MarksColumnConfig[] {
+  return [createMarksColumn()]
+}
+
+function columnsFromDraft(raw: MarksDraftApi['payload']['columns'] | undefined): MarksColumnConfig[] {
+  if (!raw?.length) return emptyColumns()
+  return raw.map((c) => ({
+    id: c.id || createMarksColumn().id,
+    subject: c.subject ?? '',
+    conductedOn: c.conductedOn || todayIso(),
+    maxMarks: typeof c.maxMarks === 'number' && c.maxMarks > 0 ? c.maxMarks : 50,
+  }))
+}
+
+function toDraftColumns(columns: MarksColumnConfig[]) {
+  return columns.map((c) => ({
+    id: c.id,
+    subject: c.subject,
+    conductedOn: c.conductedOn,
+    maxMarks: c.maxMarks,
+  }))
+}
+
 const TABS = [
   { id: 'recent' as const, label: 'Recent activity', icon: Activity },
+  { id: 'drafts' as const, label: 'Drafts', icon: ClipboardCheck },
   { id: 'upload' as const, label: 'Upload & template', icon: Upload },
   { id: 'manual' as const, label: 'Manual entry', icon: PenLine },
 ]
@@ -71,6 +103,9 @@ type MarksTab = (typeof TABS)[number]['id']
 
 export function TutorMarksPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const skipManualBatchResetRef = useRef(false)
+  const skipUploadBatchResetRef = useRef(false)
+  const skipNextTabSetRef = useRef(false)
   const { batches, curriculum, ensureLoaded } = useCurriculum()
   const { activeCenterId, isAllBranches } = useCenters()
   const branchCenterId = isAllBranches ? undefined : activeCenterId
@@ -79,34 +114,17 @@ export function TutorMarksPage() {
     void ensureLoaded()
   }, [ensureLoaded])
 
-  const reloadMarks = useCallback(async () => {
-    if (!marksApiAvailable()) {
-      setOfflineRecords([])
-      setLoadingMarks(false)
-      return
-    }
-    setLoadingMarks(true)
-    try {
-      const sessions = await fetchMarksSessions()
-      setOfflineRecords(sessions.flatMap((s) => s.entries))
-    } catch {
-      setOfflineRecords([])
-    } finally {
-      setLoadingMarks(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void reloadMarks()
-  }, [reloadMarks])
-
   const [tab, setTab] = useState<MarksTab>('recent')
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null)
 
   const [offlineRecords, setOfflineRecords] = useState<MarksRecord[]>([])
+  const [drafts, setDrafts] = useState<MarksDraftApi[]>([])
   const [loadingMarks, setLoadingMarks] = useState(marksApiAvailable())
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null,
+  )
+  const saveMessageRef = useScrollToError(
+    saveMessage?.type === 'error' ? saveMessage.text : null,
   )
 
   // Manual entry state
@@ -115,8 +133,10 @@ export function TutorMarksPage() {
   const [loadingStudents, setLoadingStudents] = useState(false)
   const [manualTitle, setManualTitle] = useState('')
   const [manualDescription, setManualDescription] = useState('')
-  const [manualColumns, setManualColumns] = useState<MarksColumnConfig[]>(() => [createMarksColumn()])
+  const [manualColumns, setManualColumns] = useState<MarksColumnConfig[]>(() => emptyColumns())
   const [manualMarks, setManualMarks] = useState<MarksGrid>({})
+  const [manualDraftId, setManualDraftId] = useState<string | null>(null)
+  const [manualDirty, setManualDirty] = useState(false)
 
   // Upload state
   const [uploadTitle, setUploadTitle] = useState('')
@@ -124,13 +144,46 @@ export function TutorMarksPage() {
   const [uploadFileName, setUploadFileName] = useState<string | null>(null)
   const [uploadStudents, setUploadStudents] = useState<{ id: string; name: string }[]>([])
   const [loadingUploadStudents, setLoadingUploadStudents] = useState(false)
-  const [uploadColumns, setUploadColumns] = useState<MarksColumnConfig[]>(() => [createMarksColumn()])
+  const [uploadColumns, setUploadColumns] = useState<MarksColumnConfig[]>(() => emptyColumns())
   const [uploadMarks, setUploadMarks] = useState<MarksGrid>({})
   const [uploadPreviewLoaded, setUploadPreviewLoaded] = useState(false)
   const [uploadParseError, setUploadParseError] = useState<string | null>(null)
+  const uploadParseErrorRef = useScrollToError(uploadParseError)
+  const [uploadDraftId, setUploadDraftId] = useState<string | null>(null)
+  const [uploadDirty, setUploadDirty] = useState(false)
 
   const selectedBatch = batches.find((b) => b.id === batchId)
   const uploadBatch = batches.find((b) => b.id === uploadBatchId)
+
+  const isDirty =
+    (tab === 'manual' && manualDirty) || (tab === 'upload' && uploadDirty)
+
+  const touchManual = useCallback(() => setManualDirty(true), [])
+  const touchUpload = useCallback(() => setUploadDirty(true), [])
+
+  const reloadMarks = useCallback(async () => {
+    if (!marksApiAvailable()) {
+      setOfflineRecords([])
+      setDrafts([])
+      setLoadingMarks(false)
+      return
+    }
+    setLoadingMarks(true)
+    try {
+      const [sessions, draftRows] = await Promise.all([fetchMarksSessions(), fetchMarksDrafts()])
+      setOfflineRecords(sessions.flatMap((s) => s.entries))
+      setDrafts(draftRows)
+    } catch {
+      setOfflineRecords([])
+      setDrafts([])
+    } finally {
+      setLoadingMarks(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void reloadMarks()
+  }, [reloadMarks])
 
   const manualSubjectOptions = useMemo(
     () => getCurriculumSubjectsForBatch(curriculum, selectedBatch),
@@ -156,7 +209,11 @@ export function TutorMarksPage() {
   useEffect(() => {
     if (!batchId) {
       setBatchStudents([])
-      setManualMarks({})
+      if (!skipManualBatchResetRef.current) {
+        setManualMarks({})
+      } else {
+        skipManualBatchResetRef.current = false
+      }
       return
     }
 
@@ -166,6 +223,10 @@ export function TutorMarksPage() {
       .then((list) => {
         if (cancelled) return
         setBatchStudents(list.map((s) => ({ id: s.id, name: s.name })))
+        if (skipManualBatchResetRef.current) {
+          skipManualBatchResetRef.current = false
+          return
+        }
         setManualMarks({})
         const subjects = getCurriculumSubjectsForBatch(curriculum, selectedBatch)
         setManualColumns([
@@ -195,17 +256,27 @@ export function TutorMarksPage() {
   useEffect(() => {
     if (!uploadBatchId) {
       setUploadStudents([])
-      clearUploadPreview()
+      if (!skipUploadBatchResetRef.current) {
+        clearUploadPreview()
+      } else {
+        skipUploadBatchResetRef.current = false
+      }
       return
     }
 
     let cancelled = false
     setLoadingUploadStudents(true)
-    clearUploadPreview()
+    if (!skipUploadBatchResetRef.current) {
+      clearUploadPreview()
+    }
     void fetchStudentsForBatch(uploadBatchId, branchCenterId)
       .then((list) => {
         if (cancelled) return
         setUploadStudents(list.map((s) => ({ id: s.id, name: s.name })))
+        if (skipUploadBatchResetRef.current) {
+          skipUploadBatchResetRef.current = false
+          return
+        }
         const subjects = getCurriculumSubjectsForBatch(curriculum, uploadBatch)
         setUploadColumns([
           createMarksColumn({ conductedOn: todayIso(), subject: subjects[0] ?? '' }),
@@ -233,6 +304,16 @@ export function TutorMarksPage() {
 
   const activitySessions = useMemo(() => groupMarksBySession(marksLog), [marksLog])
 
+  const sortedDrafts = useMemo(
+    () =>
+      [...drafts].sort(
+        (a, b) =>
+          new Date(b.updatedAt || b.createdAt).getTime() -
+          new Date(a.updatedAt || a.createdAt).getTime(),
+      ),
+    [drafts],
+  )
+
   const manualCount = offlineRecords.filter((r) => r.source === 'manual').length
   const uploadCount = offlineRecords.filter((r) => r.source === 'upload').length
 
@@ -240,6 +321,29 @@ export function TutorMarksPage() {
     setSaveMessage({ type, text })
     window.setTimeout(() => setSaveMessage(null), 5000)
   }, [])
+
+  const resetManualForm = useCallback(() => {
+    skipManualBatchResetRef.current = false
+    setManualDraftId(null)
+    setManualTitle('')
+    setManualDescription('')
+    setBatchId('')
+    setBatchStudents([])
+    setManualColumns(emptyColumns())
+    setManualMarks({})
+    setManualDirty(false)
+  }, [])
+
+  const resetUploadForm = useCallback(() => {
+    skipUploadBatchResetRef.current = false
+    setUploadDraftId(null)
+    setUploadTitle('')
+    setUploadBatchId('')
+    setUploadStudents([])
+    setUploadColumns(emptyColumns())
+    clearUploadPreview()
+    setUploadDirty(false)
+  }, [clearUploadPreview])
 
   function buildRecordsFromGrid(
     students: { id: string; name: string }[],
@@ -362,19 +466,14 @@ export function TutorMarksPage() {
 
     try {
       const result = await saveMarksBulk({
-          batchId: meta.batchId,
-          assessmentTitle: meta.title,
-          description: meta.description || undefined,
-          source: meta.source,
-          columns: columns.map((c) => ({
-            id: c.id,
-            subject: c.subject,
-            conductedOn: c.conductedOn,
-            maxMarks: c.maxMarks,
-          })),
-          marks,
-          studentIds: students.map((s) => s.id),
-        })
+        batchId: meta.batchId,
+        assessmentTitle: meta.title,
+        description: meta.description || undefined,
+        source: meta.source,
+        columns: toDraftColumns(columns),
+        marks,
+        studentIds: students.map((s) => s.id),
+      })
       await reloadMarks()
       return { ok: true, count: result.count }
     } catch (e) {
@@ -382,26 +481,269 @@ export function TutorMarksPage() {
     }
   }
 
-  async function handleSaveManual() {
-    if (!selectedBatch) {
-      flash('error', 'Select a batch first.')
-      return
-    }
-    const result = await persistMarks(batchStudents, manualColumns, manualMarks, {
-      title: manualTitle,
-      description: manualDescription,
-      batchId: selectedBatch.id,
-      batchName: selectedBatch.name,
+  const buildManualDraftPayload = useCallback((): MarksDraftPayload => {
+    return {
+      batchId: batchId || null,
+      assessmentTitle: manualTitle,
+      description: manualDescription || undefined,
       source: 'manual',
-    })
-    if (!result.ok) {
-      flash('error', result.error)
+      columns: toDraftColumns(manualColumns),
+      marks: manualMarks,
+      studentIds: batchStudents.map((s) => s.id),
+    }
+  }, [batchId, batchStudents, manualColumns, manualDescription, manualMarks, manualTitle])
+
+  const buildUploadDraftPayload = useCallback((): MarksDraftPayload => {
+    return {
+      batchId: uploadBatchId || null,
+      assessmentTitle: uploadTitle,
+      description: undefined,
+      source: 'upload',
+      columns: toDraftColumns(uploadColumns),
+      marks: uploadMarks,
+      studentIds: uploadStudents.map((s) => s.id),
+    }
+  }, [uploadBatchId, uploadColumns, uploadMarks, uploadStudents, uploadTitle])
+
+  const saveActiveDraft = useCallback(async () => {
+    if (!marksApiAvailable()) {
+      flash('error', 'Marks require a connection to the Prism API.')
+      throw new Error('API unavailable')
+    }
+
+    if (tab === 'manual') {
+      const payload = buildManualDraftPayload()
+      try {
+        if (manualDraftId) {
+          await updateMarksDraft(manualDraftId, payload)
+        } else {
+          const created = await createMarksDraft(payload)
+          setManualDraftId(created.id)
+        }
+        setManualDirty(false)
+        await reloadMarks()
+        flash('success', 'Draft saved.')
+      } catch (e) {
+        flash('error', e instanceof Error ? e.message : 'Failed to save draft.')
+        throw e
+      }
       return
     }
-    setManualMarks({})
-    flash('success', `Entry added · ${manualTitle.trim() || 'Untitled assessment'}`)
-    setTab('recent')
-  }
+
+    if (tab === 'upload') {
+      const payload = buildUploadDraftPayload()
+      try {
+        if (uploadDraftId) {
+          await updateMarksDraft(uploadDraftId, payload)
+        } else {
+          const created = await createMarksDraft(payload)
+          setUploadDraftId(created.id)
+        }
+        setUploadDirty(false)
+        await reloadMarks()
+        flash('success', 'Draft saved.')
+      } catch (e) {
+        flash('error', e instanceof Error ? e.message : 'Failed to save draft.')
+        throw e
+      }
+    }
+  }, [
+    buildManualDraftPayload,
+    buildUploadDraftPayload,
+    flash,
+    manualDraftId,
+    reloadMarks,
+    tab,
+    uploadDraftId,
+  ])
+
+  const publishActive = useCallback(async () => {
+    if (tab === 'manual') {
+      if (!selectedBatch) {
+        flash('error', 'Select a batch first.')
+        throw new Error('No batch')
+      }
+      const result = await persistMarks(batchStudents, manualColumns, manualMarks, {
+        title: manualTitle,
+        description: manualDescription,
+        batchId: selectedBatch.id,
+        batchName: selectedBatch.name,
+        source: 'manual',
+      })
+      if (!result.ok) {
+        flash('error', result.error)
+        throw new Error(result.error)
+      }
+      if (manualDraftId) {
+        try {
+          await deleteMarksDraft(manualDraftId)
+        } catch {
+          /* published; draft cleanup best-effort */
+        }
+      }
+      resetManualForm()
+      skipNextTabSetRef.current = true
+      setTab('recent')
+      flash('success', `Published · ${manualTitle.trim() || 'Untitled assessment'}`)
+      await reloadMarks()
+      return
+    }
+
+    if (tab === 'upload') {
+      if (!uploadBatch) {
+        flash('error', 'Select a batch for this upload.')
+        throw new Error('No batch')
+      }
+      if (uploadStudents.length === 0) {
+        flash('error', 'Select a batch with students first.')
+        throw new Error('No students')
+      }
+      const savedTitle = uploadTitle.trim() || 'Untitled assessment'
+      const result = await persistMarks(uploadStudents, uploadColumns, uploadMarks, {
+        title: uploadTitle,
+        description: '',
+        batchId: uploadBatch.id,
+        batchName: uploadBatch.name,
+        source: 'upload',
+      })
+      if (!result.ok) {
+        flash('error', result.error)
+        throw new Error(result.error)
+      }
+      if (uploadDraftId) {
+        try {
+          await deleteMarksDraft(uploadDraftId)
+        } catch {
+          /* published; draft cleanup best-effort */
+        }
+      }
+      resetUploadForm()
+      skipNextTabSetRef.current = true
+      setTab('recent')
+      flash('success', `Published · ${savedTitle}`)
+      await reloadMarks()
+    }
+  }, [
+    batchStudents,
+    flash,
+    manualColumns,
+    manualDescription,
+    manualDraftId,
+    manualMarks,
+    manualTitle,
+    reloadMarks,
+    resetManualForm,
+    resetUploadForm,
+    selectedBatch,
+    tab,
+    uploadBatch,
+    uploadColumns,
+    uploadDraftId,
+    uploadMarks,
+    uploadStudents,
+    uploadTitle,
+  ])
+
+  const cancelActive = useCallback(async () => {
+    if (tab === 'manual') {
+      if (manualDraftId && marksApiAvailable()) {
+        try {
+          await deleteMarksDraft(manualDraftId)
+        } catch (e) {
+          flash('error', e instanceof Error ? e.message : 'Failed to delete draft.')
+          throw e
+        }
+      }
+      resetManualForm()
+      await reloadMarks()
+      flash('success', 'Form reset.')
+      return
+    }
+
+    if (tab === 'upload') {
+      if (uploadDraftId && marksApiAvailable()) {
+        try {
+          await deleteMarksDraft(uploadDraftId)
+        } catch (e) {
+          flash('error', e instanceof Error ? e.message : 'Failed to delete draft.')
+          throw e
+        }
+      }
+      resetUploadForm()
+      await reloadMarks()
+      flash('success', 'Form reset.')
+    }
+  }, [flash, manualDraftId, reloadMarks, resetManualForm, resetUploadForm, tab, uploadDraftId])
+
+  const { requestLeave, confirmDraft, confirmPublish, confirmCancel, markClean } =
+    useUnsavedWorkGuard({
+      isDirty,
+      onDraft: saveActiveDraft,
+      onPublish: publishActive,
+      onCancel: cancelActive,
+      modalOptions: {
+        title: 'Unsaved marks',
+        message: 'You have unsaved marks. Save a draft, publish, or discard before leaving.',
+      },
+    })
+
+  const handleTabChange = useCallback(
+    async (next: MarksTab) => {
+      if (next === tab) return
+      if ((tab === 'manual' || tab === 'upload') && isDirty) {
+        const ok = await requestLeave()
+        if (!ok) return
+        if (skipNextTabSetRef.current) {
+          skipNextTabSetRef.current = false
+          markClean()
+          return
+        }
+      }
+      // Tab clicks start blank; Resume fills the form then setTab directly.
+      if (next === 'manual') resetManualForm()
+      if (next === 'upload') resetUploadForm()
+      setTab(next)
+    },
+    [isDirty, markClean, requestLeave, resetManualForm, resetUploadForm, tab],
+  )
+
+  const resumeDraft = useCallback(
+    (draft: MarksDraftApi) => {
+      const payload = draft.payload ?? { columns: [], marks: {}, studentIds: [] }
+      const columns = columnsFromDraft(payload.columns)
+      const marks = payload.marks ?? {}
+
+      if (draft.source === 'upload') {
+        skipUploadBatchResetRef.current = true
+        setUploadDraftId(draft.id)
+        setUploadTitle(draft.assessmentTitle ?? '')
+        setUploadColumns(columns)
+        setUploadMarks(marks)
+        setUploadFileName(null)
+        setUploadParseError(null)
+        setUploadPreviewLoaded(Object.keys(marks).length > 0)
+        setUploadBatchId(draft.batchId ?? '')
+        setUploadDirty(false)
+        markClean()
+        setTab('upload')
+        flash('success', 'Draft resumed — continue editing, then Draft or Publish.')
+        return
+      }
+
+      skipManualBatchResetRef.current = true
+      setManualDraftId(draft.id)
+      setManualTitle(draft.assessmentTitle ?? '')
+      setManualDescription(draft.description ?? '')
+      setManualColumns(columns)
+      setManualMarks(marks)
+      setBatchId(draft.batchId ?? '')
+      setManualDirty(false)
+      markClean()
+      setTab('manual')
+      flash('success', 'Draft resumed — continue editing, then Draft or Publish.')
+    },
+    [flash, markClean],
+  )
 
   function handleDownloadTemplate(format: 'csv' | 'xlsx') {
     if (!uploadBatch) {
@@ -506,6 +848,7 @@ export function TutorMarksPage() {
     setUploadFileName(file.name)
     setUploadPreviewLoaded(true)
     setUploadParseError(null)
+    touchUpload()
     if (parsed.title && !uploadTitle.trim()) {
       setUploadTitle(parsed.title)
     }
@@ -515,34 +858,6 @@ export function TutorMarksPage() {
       message += ` Skipped ${unmatched.length} row${unmatched.length === 1 ? '' : 's'} not in batch.`
     }
     flash('success', message)
-  }
-
-  async function handleSaveUpload() {
-    if (!uploadBatch) {
-      flash('error', 'Select a batch for this upload.')
-      return
-    }
-    if (uploadStudents.length === 0) {
-      flash('error', 'Select a batch with students first.')
-      return
-    }
-
-    const savedTitle = uploadTitle.trim() || 'Untitled assessment'
-    const result = await persistMarks(uploadStudents, uploadColumns, uploadMarks, {
-      title: uploadTitle,
-      description: '',
-      batchId: uploadBatch.id,
-      batchName: uploadBatch.name,
-      source: 'upload',
-    })
-    if (!result.ok) {
-      flash('error', result.error)
-      return
-    }
-    clearUploadPreview()
-    setUploadTitle('')
-    flash('success', `Entry added · ${savedTitle}`)
-    setTab('recent')
   }
 
   async function handleExportAll() {
@@ -555,7 +870,10 @@ export function TutorMarksPage() {
         flash('error', 'No saved marks to export.')
         return
       }
-      flash('success', `Exported ${activitySessions.length} assessment${activitySessions.length === 1 ? '' : 's'} to one Excel file (separate sheets).`)
+      flash(
+        'success',
+        `Exported ${activitySessions.length} assessment${activitySessions.length === 1 ? '' : 's'} to one Excel file (separate sheets).`,
+      )
     } catch {
       flash('error', 'Could not export marks.')
     }
@@ -582,6 +900,44 @@ export function TutorMarksPage() {
     }
   }
 
+  const entryFooter = (source: 'manual' | 'upload') => {
+    const canPublish =
+      source === 'manual'
+        ? Boolean(batchId && batchStudents.length > 0)
+        : Boolean(uploadPreviewLoaded && uploadBatchId && uploadStudents.length > 0)
+    const canCancel =
+      source === 'manual' ? manualDirty || Boolean(manualDraftId) : uploadDirty || Boolean(uploadDraftId)
+
+    return (
+      <div className="flex flex-wrap items-center justify-end gap-2 pt-4 shrink-0">
+        <button
+          type="button"
+          disabled={!marksApiAvailable()}
+          onClick={() => void confirmDraft()}
+          className="border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary disabled:opacity-40"
+        >
+          Draft
+        </button>
+        <button
+          type="button"
+          disabled={!canPublish || !marksApiAvailable()}
+          onClick={() => void confirmPublish()}
+          className="btn btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm disabled:opacity-40"
+        >
+          Publish
+        </button>
+        <button
+          type="button"
+          disabled={!canCancel}
+          onClick={() => void confirmCancel()}
+          className="border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary disabled:opacity-40"
+        >
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
   return (
     <>
       <PageHeader
@@ -599,8 +955,11 @@ export function TutorMarksPage() {
 
       {saveMessage && (
         <div
+          ref={saveMessageRef}
+          role={saveMessage.type === 'error' ? 'alert' : undefined}
+          tabIndex={saveMessage.type === 'error' ? -1 : undefined}
           className={cn(
-            'mb-4 flex items-start gap-2 rounded-md border px-3 py-2 text-sm',
+            'mb-4 flex items-start gap-2 rounded-md border px-3 py-2 text-sm outline-none',
             saveMessage.type === 'success'
               ? 'border-leaf/30 bg-leaf/10 text-foreground'
               : 'border-rose/30 bg-rose/10 text-rose',
@@ -617,28 +976,28 @@ export function TutorMarksPage() {
           value={activitySessions.length}
           hint={`${offlineRecords.length} mark entries`}
         />
-        <AppStat label="Manual entered" value={manualCount} hint="Spreadsheet saves" />
-        <AppStat label="Uploaded" value={uploadCount} hint="From CSV files" tone="accent" />
+        <AppStat label="Drafts" value={drafts.length} hint="Saved for later" />
+        <AppStat
+          label="Published"
+          value={manualCount + uploadCount}
+          hint={`${manualCount} manual · ${uploadCount} upload`}
+          tone="accent"
+        />
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6 ln-tabs-bar">
+      <SegmentedTabs aria-label="Marks workspace">
         {TABS.map(({ id, label, icon: Icon }) => (
-          <button
+          <SegmentedTab
             key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={cn(
-              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors',
-              tab === id
-                ? 'bg-accent text-accent-foreground font-medium'
-                : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-            )}
+            active={tab === id}
+            icon={<Icon className="w-3.5 h-3.5 shrink-0" />}
+            count={id === 'drafts' ? drafts.length : undefined}
+            onClick={() => void handleTabChange(id)}
           >
-            <Icon className="w-3.5 h-3.5" />
             {label}
-          </button>
+          </SegmentedTab>
         ))}
-      </div>
+      </SegmentedTabs>
 
       {tab === 'recent' && (
         <AppCard>
@@ -659,8 +1018,7 @@ export function TutorMarksPage() {
             )}
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            Manual entries and CSV uploads saved to your institution. These feed Reports alongside
-            assessment results.
+            Published mark sheets for your institution. Unfinished work stays under Drafts.
           </p>
 
           {loadingMarks ? (
@@ -669,7 +1027,7 @@ export function TutorMarksPage() {
             </div>
           ) : activitySessions.length === 0 ? (
             <div className="rounded-lg border border-border py-10 text-center text-muted-foreground text-sm">
-              No recent activity yet. Enter marks manually or upload a CSV file.
+              No published marks yet. Enter marks manually or upload a CSV file.
             </div>
           ) : (
             <div className="space-y-2">
@@ -691,6 +1049,38 @@ export function TutorMarksPage() {
         </AppCard>
       )}
 
+      {tab === 'drafts' && (
+        <AppCard>
+          <div className="flex items-center gap-2 mb-2">
+            <ClipboardCheck className="w-5 h-5 text-accent" />
+            <h2 className="font-display text-lg text-foreground">Mark sheet drafts</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Resume unfinished manual or upload sheets. Published entries appear under Recent activity.
+          </p>
+
+          {loadingMarks ? (
+            <div className="rounded-lg border border-border py-10 flex justify-center">
+              <InlineLoader label="Loading drafts…" size="sm" />
+            </div>
+          ) : sortedDrafts.length === 0 ? (
+            <div className="rounded-lg border border-border py-10 text-center text-muted-foreground text-sm">
+              No drafts yet. Save a Draft from Manual entry or Upload to continue later.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sortedDrafts.map((draft) => (
+                <MarksDraftRow
+                  key={draft.id}
+                  draft={draft}
+                  onResume={() => resumeDraft(draft)}
+                />
+              ))}
+            </div>
+          )}
+        </AppCard>
+      )}
+
       {tab === 'upload' && (
         <AppCard className="flex flex-col">
           <div className="flex flex-wrap items-end gap-3 mb-4">
@@ -698,7 +1088,10 @@ export function TutorMarksPage() {
               <AppDropdown
                 label="Batch"
                 value={uploadBatchId}
-                onChange={setUploadBatchId}
+                onChange={(value) => {
+                  touchUpload()
+                  setUploadBatchId(value)
+                }}
                 options={batchOptions}
               />
             </div>
@@ -748,8 +1141,11 @@ export function TutorMarksPage() {
               <label className="block text-xs text-muted-foreground mb-1">Assessment title</label>
               <input
                 value={uploadTitle}
-                onChange={(e) => setUploadTitle(e.target.value)}
-                placeholder="Required before saving"
+                onChange={(e) => {
+                  touchUpload()
+                  setUploadTitle(e.target.value)
+                }}
+                placeholder="Required before publishing"
                 className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background h-[38px]"
               />
             </div>
@@ -770,6 +1166,9 @@ export function TutorMarksPage() {
                   ? `· ${uploadSubjectOptions.length} curriculum subject${uploadSubjectOptions.length === 1 ? '' : 's'}`
                   : '· No subjects in curriculum setup'}
               </span>
+              {uploadDraftId && (
+                <span className="text-amber-700 dark:text-amber-400">· Editing draft</span>
+              )}
             </div>
           )}
 
@@ -785,8 +1184,12 @@ export function TutorMarksPage() {
               students={[]}
               columns={uploadColumns}
               marks={{}}
-              onColumnChange={(columnId, patch) => patchColumn(setUploadColumns, columnId, patch)}
-              onAddColumn={() =>
+              onColumnChange={(columnId, patch) => {
+                touchUpload()
+                patchColumn(setUploadColumns, columnId, patch)
+              }}
+              onAddColumn={() => {
+                touchUpload()
                 setUploadColumns((cols) => [
                   ...cols,
                   createMarksColumn({
@@ -794,10 +1197,11 @@ export function TutorMarksPage() {
                     subject: pickNextSubject(cols, uploadSubjectOptions),
                   }),
                 ])
-              }
-              onRemoveColumn={(columnId) =>
+              }}
+              onRemoveColumn={(columnId) => {
+                touchUpload()
                 removeColumn(setUploadColumns, setUploadMarks, columnId)
-              }
+              }}
               subjectOptions={uploadSubjectOptions}
               marksReadOnly
               emptyMessage="Configure subject columns above, then download the template."
@@ -819,7 +1223,12 @@ export function TutorMarksPage() {
             </div>
 
             {uploadParseError && (
-              <div className="mx-4 mt-3 rounded-md border border-rose/30 bg-rose/10 px-3 py-2 text-sm text-rose">
+              <div
+                ref={uploadParseErrorRef}
+                role="alert"
+                tabIndex={-1}
+                className="mx-4 mt-3 rounded-md border border-rose/30 bg-rose/10 px-3 py-2 text-sm text-rose outline-none"
+              >
                 {uploadParseError}
               </div>
             )}
@@ -847,17 +1256,7 @@ export function TutorMarksPage() {
             </div>
           </div>
 
-          <div className="flex justify-end pt-4 shrink-0">
-            <button
-              type="button"
-              disabled={!uploadPreviewLoaded}
-              onClick={handleSaveUpload}
-              className="btn btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm disabled:opacity-40"
-            >
-              <Save className="w-4 h-4" />
-              Save uploaded marks
-            </button>
-          </div>
+          {entryFooter('upload')}
         </AppCard>
       )}
 
@@ -866,10 +1265,15 @@ export function TutorMarksPage() {
           <div className="flex items-center gap-2 mb-2">
             <ClipboardCheck className="w-5 h-5 text-accent" />
             <h2 className="font-display text-lg text-foreground">Manual entry</h2>
+            {manualDraftId && (
+              <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300">
+                Draft
+              </span>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mb-6">
             Select a batch, set assessment details, then enter marks. Use <strong>Add column</strong>{' '}
-            for multiple subjects in one sheet.
+            for multiple subjects in one sheet. Save incomplete work as a draft, or publish when ready.
           </p>
 
           <div className="space-y-4 mb-6">
@@ -877,7 +1281,10 @@ export function TutorMarksPage() {
               <label className="block text-xs text-muted-foreground mb-1">Assessment title</label>
               <input
                 value={manualTitle}
-                onChange={(e) => setManualTitle(e.target.value)}
+                onChange={(e) => {
+                  touchManual()
+                  setManualTitle(e.target.value)
+                }}
                 placeholder="e.g. Weekly test — Fractions"
                 className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background font-medium"
               />
@@ -886,13 +1293,24 @@ export function TutorMarksPage() {
               <label className="block text-xs text-muted-foreground mb-1">Description (optional)</label>
               <textarea
                 value={manualDescription}
-                onChange={(e) => setManualDescription(e.target.value)}
+                onChange={(e) => {
+                  touchManual()
+                  setManualDescription(e.target.value)
+                }}
                 rows={2}
                 placeholder="What this assessment covers, instructions, or notes for your records…"
                 className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background resize-y"
               />
             </div>
-            <AppDropdown label="Batch" value={batchId} onChange={setBatchId} options={batchOptions} />
+            <AppDropdown
+              label="Batch"
+              value={batchId}
+              onChange={(value) => {
+                touchManual()
+                setBatchId(value)
+              }}
+              options={batchOptions}
+            />
             {selectedBatch && (
               <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-1">
                 <span>
@@ -916,14 +1334,19 @@ export function TutorMarksPage() {
             students={batchStudents}
             columns={manualColumns}
             marks={manualMarks}
-            onMarksChange={(columnId, studentId, value) =>
+            onMarksChange={(columnId, studentId, value) => {
+              touchManual()
               setManualMarks((prev) => ({
                 ...prev,
                 [columnId]: { ...prev[columnId], [studentId]: value },
               }))
-            }
-            onColumnChange={(columnId, patch) => patchColumn(setManualColumns, columnId, patch)}
-            onAddColumn={() =>
+            }}
+            onColumnChange={(columnId, patch) => {
+              touchManual()
+              patchColumn(setManualColumns, columnId, patch)
+            }}
+            onAddColumn={() => {
+              touchManual()
               setManualColumns((cols) => [
                 ...cols,
                 createMarksColumn({
@@ -931,37 +1354,65 @@ export function TutorMarksPage() {
                   subject: pickNextSubject(cols, manualSubjectOptions),
                 }),
               ])
-            }
-            onRemoveColumn={(columnId) =>
+            }}
+            onRemoveColumn={(columnId) => {
+              touchManual()
               removeColumn(setManualColumns, setManualMarks, columnId)
-            }
+            }}
             subjectOptions={manualSubjectOptions}
           />
 
-          <div className="flex flex-wrap gap-3 mt-6">
-            <button
-              type="button"
-              onClick={handleSaveManual}
-              disabled={!batchId || batchStudents.length === 0}
-              className="btn btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm disabled:opacity-40"
-            >
-              <Save className="w-4 h-4" />
-              Save marks
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setManualMarks({})
-                flash('success', 'Cleared unsaved marks.')
-              }}
-              className="border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary"
-            >
-              Clear entries
-            </button>
-          </div>
+          {entryFooter('manual')}
         </AppCard>
       )}
     </>
+  )
+}
+
+function MarksDraftRow({ draft, onResume }: { draft: MarksDraftApi; onResume: () => void }) {
+  const columnCount = draft.payload?.columns?.length ?? 0
+  const title = draft.assessmentTitle?.trim() || 'Untitled draft'
+
+  return (
+    <div className="rounded-lg border border-border overflow-hidden">
+      <button
+        type="button"
+        onClick={onResume}
+        className="w-full flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 bg-card hover:bg-secondary/20 transition-colors text-left"
+      >
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">
+            <PenLine className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">Draft saved</p>
+            <h3 className="font-display text-base font-semibold text-foreground truncate">{title}</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              {draft.batch || 'No batch'}
+              {columnCount > 0 && (
+                <>
+                  <span className="mx-1.5">·</span>
+                  {columnCount} column{columnCount === 1 ? '' : 's'}
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0 sm:justify-end">
+          <span className="text-xs text-muted-foreground whitespace-nowrap order-last sm:order-none w-full sm:w-auto">
+            {formatSavedAt(draft.updatedAt || draft.createdAt)}
+          </span>
+          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300">
+            Draft
+          </span>
+          <SourceBadge source={draft.source === 'upload' ? 'upload' : 'manual'} />
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium min-h-[36px]">
+            Resume
+          </span>
+        </div>
+      </button>
+    </div>
   )
 }
 

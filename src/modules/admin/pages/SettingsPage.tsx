@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { Pencil, X, Check } from 'lucide-react'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { btnClass } from '@/components/ui/Button'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import {
   fetchInstitutionPolicies,
   updateInstitutionPolicies,
@@ -186,11 +187,7 @@ export function AdminSettingsPage() {
         }
       />
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-rose/30 bg-rose/5 px-4 py-3 text-sm text-rose">
-          {error}
-        </div>
-      )}
+      {error && <FormErrorBanner message={error} className="mb-4 rounded-lg" />}
       {success && !editing && (
         <div className="mb-4 rounded-lg border border-leaf/30 bg-leaf/5 px-4 py-3 text-sm text-foreground">
           {success}

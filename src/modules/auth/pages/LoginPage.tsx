@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, GraduationCap, Users, Shield, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { InlineLoader } from '@/components/ui/PrismLoader'
 import { useAuth } from '@/hooks/useAuth'
 import { authTheme } from '@/modules/auth/lib/authTheme'
@@ -183,12 +184,11 @@ export function LoginPage() {
             </p>
 
             {error && (
-              <div
-                className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
-                role="alert"
-              >
-                {error}
-              </div>
+              <FormErrorBanner
+                message={error}
+                size="sm"
+                className="mb-4 rounded-lg border-rose-200 bg-rose-50 text-rose-700"
+              />
             )}
 
             <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -257,12 +257,11 @@ export function LoginPage() {
             </div>
 
             {error && (
-              <div
-                className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
-                role="alert"
-              >
-                {error}
-              </div>
+              <FormErrorBanner
+                message={error}
+                size="sm"
+                className="mb-4 rounded-lg border-rose-200 bg-rose-50 text-rose-700"
+              />
             )}
 
             {orgsLoading ? (

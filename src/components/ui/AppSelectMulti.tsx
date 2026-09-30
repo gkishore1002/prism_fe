@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Search, X } from 'lucide-react'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
+import { LabelWithRequired } from '@/components/ui/RequiredMark'
 import type { AppSelectOption } from './AppSelect'
 
 interface AppSelectMultiProps {
@@ -17,6 +18,7 @@ interface AppSelectMultiProps {
   onChange: (values: string[]) => void
   options: AppSelectOption[]
   label?: string
+  required?: boolean
   placeholder?: string
   searchable?: boolean
   searchPlaceholder?: string
@@ -31,6 +33,7 @@ export function AppSelectMulti({
   onChange,
   options,
   label,
+  required,
   placeholder = 'Select options',
   searchable = false,
   searchPlaceholder = 'Search…',
@@ -154,7 +157,11 @@ export function AppSelectMulti({
           <div className="flex flex-col items-center pt-2 pb-1 shrink-0 border-b border-border/60">
             <span className="ln-sheet-handle" aria-hidden />
             {label && (
-              <p className="text-sm font-medium text-foreground px-4 pb-2">{label}</p>
+              <LabelWithRequired
+                label={label}
+                required={required}
+                className="text-sm font-medium text-foreground px-4 pb-2"
+              />
             )}
           </div>
         )}
@@ -242,7 +249,11 @@ export function AppSelectMulti({
   return (
     <div className={cn('relative w-full min-w-0', className)}>
       {label && !isMobile && (
-        <span className="block text-xs text-muted-foreground mb-1">{label}</span>
+        <LabelWithRequired
+          label={label}
+          required={required}
+          className="block text-xs text-muted-foreground mb-1"
+        />
       )}
       <button
         ref={triggerRef}

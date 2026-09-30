@@ -129,12 +129,12 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
       title: draft.title ?? 'New assessment',
       board: draft.board ?? 'CBSE',
       grade: draft.grade ?? 'Grade 8',
-      subject: draft.subject ?? draft.subjects?.[0] ?? 'Mathematics',
+      subject: draft.subject ?? draft.subjects?.[0] ?? '',
       subjects: draft.subjects?.length
         ? draft.subjects
         : draft.subject
           ? [draft.subject]
-          : ['Mathematics'],
+          : [],
       scope: draft.scope ?? 'topic',
       mode: draft.mode ?? 'assessment',
       batchName: draft.batchName ?? '',

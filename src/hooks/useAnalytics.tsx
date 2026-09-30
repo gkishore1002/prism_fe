@@ -61,12 +61,15 @@ export type AnalyticsLoadKey =
   | 'adminAnalytics'
   | 'adminInstitution'
   | 'tutorDashboard'
+  | 'tutorDashboardHeavy'
   | 'tutorBatches'
   | 'tutorAtRisk'
   | 'tutorNames'
 
 interface AnalyticsContextValue {
   loading: boolean
+  /** True while deferred dashboard chart panels are still fetching. */
+  panelsLoading: boolean
   error: string | null
   load: (key: AnalyticsLoadKey | AnalyticsLoadKey[], force?: boolean) => Promise<void>
   refresh: (key?: AnalyticsLoadKey | AnalyticsLoadKey[]) => Promise<void>
@@ -112,6 +115,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
   const branchCenterId = isAllBranches ? undefined : activeCenterId
   const yearId = activeYearId
   const [loading, setLoading] = useState(false)
+  const [panelsLoading, setPanelsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const loadedRef = useRef(new Set<AnalyticsLoadKey>())
 
@@ -285,16 +289,18 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       case 'adminDashboardHeavy': {
         // Charts / secondary panels — load after first paint.
         const centerId = branchCenterId
-        const [teacherRows, subjects, insights, matrix] = await Promise.all([
+        const [teacherRows, subjects, insights, matrix, syllabus] = await Promise.all([
           analyticsApi.institutionTeachers(centerId, yearId),
           analyticsApi.subjectHealth(centerId, yearId),
           analyticsApi.classInsights(centerId, undefined, yearId),
           analyticsApi.branchSubjectMatrix(centerId, yearId),
+          analyticsApi.syllabusCompletion(centerId, yearId).catch(() => []),
         ])
         setTeachers(teacherRows)
         setSubjectHealth(subjects)
         setClassInsights(insights)
         setBranchSubjectMatrix(matrix)
+        setSyllabusCompletion(syllabus)
         break
       }
       case 'adminStudents': {
@@ -339,16 +345,34 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       }
       case 'tutorDashboard': {
         const centerId = branchCenterId
-        const [weakness, insights, risk, copilotData] = await Promise.all([
+        const [weakness, insights, risk, copilotData, inst, ops] = await Promise.all([
           analyticsApi.tutorTopicWeakness(undefined, undefined, centerId),
           analyticsApi.classInsights(centerId, undefined, yearId),
           analyticsApi.tutorAtRisk(undefined, undefined, centerId, yearId),
           analyticsApi.tutorCopilot(undefined, centerId),
+          analyticsApi.institutionOverview(centerId, yearId).catch(() => null),
+          analyticsApi.institutionOperationalStats(centerId, yearId).catch(() => null),
         ])
         setTopicWeakness(weakness)
         setClassInsights(insights)
         setAtRisk(risk)
         setCopilot(copilotData)
+        if (inst) setOverview(inst)
+        if (ops) setOperationalStats(ops)
+        break
+      }
+      case 'tutorDashboardHeavy': {
+        const centerId = branchCenterId
+        const [subjects, trend, heatmap, syllabus] = await Promise.all([
+          analyticsApi.subjectHealth(centerId, yearId),
+          analyticsApi.monthlyTrend(centerId, yearId),
+          analyticsApi.tutorBatchHeatmap(undefined, undefined, centerId, yearId),
+          analyticsApi.syllabusCompletion(centerId, yearId).catch(() => []),
+        ])
+        setSubjectHealth(subjects)
+        setMonthlyTrend(trend)
+        setBatchHeatmap(heatmap)
+        setSyllabusCompletion(syllabus)
         break
       }
       case 'tutorBatches': {
@@ -376,8 +400,9 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       if (pending.length === 0) return
 
       // Heavy secondary panels should not block the full-page loader.
-      const critical = pending.filter((k) => k !== 'adminDashboardHeavy')
-      const deferred = pending.filter((k) => k === 'adminDashboardHeavy')
+      const isHeavy = (k: AnalyticsLoadKey) => k === 'adminDashboardHeavy' || k === 'tutorDashboardHeavy'
+      const critical = pending.filter((k) => !isHeavy(k))
+      const deferred = pending.filter(isHeavy)
       const isInitialFetch = critical.some((k) => !loadedRef.current.has(k))
       if (isInitialFetch) setLoading(true)
       setError(null)
@@ -393,11 +418,14 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       }
 
       if (deferred.length) {
+        setPanelsLoading(true)
         try {
           await Promise.all(deferred.map((key) => runKey(key)))
           deferred.forEach((k) => loadedRef.current.add(k))
         } catch (e) {
           setError(e instanceof Error ? e.message : 'Failed to load analytics')
+        } finally {
+          setPanelsLoading(false)
         }
       }
     },
@@ -427,11 +455,13 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
     if (isAuthenticated) return
     loadedRef.current.clear()
     setLoading(false)
+    setPanelsLoading(false)
   }, [isAuthenticated])
 
   const value = useMemo(
     () => ({
       loading,
+      panelsLoading,
       error,
       load,
       refresh,
@@ -468,6 +498,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
     }),
     [
       loading,
+      panelsLoading,
       error,
       load,
       refresh,
@@ -515,7 +546,7 @@ export function useAnalytics() {
 
 /** Call once on mount for the current page's analytics needs. */
 export function useAnalyticsPage(key: AnalyticsLoadKey | AnalyticsLoadKey[]) {
-  const { load, loading, error } = useAnalytics()
+  const { load, loading, panelsLoading, error } = useAnalytics()
   const { activeCenterId, isAllBranches } = useCenters()
   const { activeYearId } = useAcademicYears()
   const branchCenterId = isAllBranches ? undefined : activeCenterId
@@ -533,5 +564,5 @@ export function useAnalyticsPage(key: AnalyticsLoadKey | AnalyticsLoadKey[]) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, keysKey, scopeKey])
 
-  return { loading, error }
+  return { loading, panelsLoading, error }
 }

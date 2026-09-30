@@ -50,18 +50,18 @@ export function AdminBoardsPage() {
               <div className="font-display text-2xl">{b.board}</div>
               <div className="font-mono-data text-sm text-muted-foreground">{b.students} students</div>
             </div>
-            <div className="grid grid-cols-3 gap-3 mt-4">
-              <div>
+            <div className="metric-chip-grid mt-4">
+              <div className="min-w-0">
                 <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Avg</div>
                 <div className="font-mono-data text-xl">{b.avg}%</div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Score growth</div>
                 <div className="font-mono-data text-xl text-leaf">
                   {b.improvement > 0 ? '+' : ''}{b.improvement}%
                 </div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-[10px] uppercase tracking-widest text-muted-foreground">At-risk</div>
                 <div className="font-mono-data text-xl text-rose">{b.atRisk}</div>
               </div>

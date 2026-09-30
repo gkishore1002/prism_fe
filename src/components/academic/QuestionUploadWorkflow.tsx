@@ -1,4 +1,11 @@
-import { useRef, useState } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import {
   Upload,
   Download,
@@ -18,20 +25,33 @@ import {
   downloadQuestionJsonTemplate,
   parseQuestionUploadFile,
   QUESTION_UPLOAD_COLUMNS,
+  revalidateUploadRowsAgainstCurriculum,
   validateQuestionUploadRow,
 } from '@/lib/questionUploadParse'
+import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
+import { RequiredMark } from '@/components/ui/RequiredMark'
 import {
   canParseExcelImages,
   parseQuestionUploadExcelWithImages,
 } from '@/lib/questionUploadParseExcelImages'
 import { mapQuestionTopics } from '@/lib/api/syllabusBooksApi'
 import { ApiError, isApiEnabled } from '@/lib/apiClient'
+import { useCurriculum } from '@/hooks/useCurriculum'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
-import type { QuestionUploadRow } from '@/types'
+import { useUnsavedWorkGuard } from '@/hooks/useUnsavedWorkGuard'
+import type { QuestionBankEntry, QuestionPaper, QuestionUploadRow } from '@/types'
 import { cn } from '@/lib/cn'
 
-interface QuestionUploadWorkflowProps {
+export interface QuestionUploadWorkflowHandle {
+  requestLeave: () => Promise<boolean>
+  isDirty: boolean
+}
+
+export interface QuestionUploadWorkflowProps {
   onPaperCreated?: (paperId: string) => void
+  onPublished?: (paper: QuestionPaper) => void
+  initialPaperId?: string
+  onDirtyChange?: (dirty: boolean) => void
   variant?: 'full' | 'minimal'
 }
 
@@ -42,11 +62,67 @@ const STEPS = [
   { id: 4, label: 'Publish', icon: BookMarked },
 ] as const
 
-export function QuestionUploadWorkflow({
-  onPaperCreated,
-  variant = 'minimal',
-}: QuestionUploadWorkflowProps) {
-  const { addPaperFromUpload } = useQuestionPapers()
+function bankEntryToUploadRow(q: QuestionBankEntry, row: number): QuestionUploadRow {
+  const grade = q.grade.replace(/^Grade\s+/i, '')
+  return validateQuestionUploadRow({
+    row,
+    board: q.board,
+    grade,
+    subject: q.subject,
+    chapter: q.chapter,
+    topic: q.topic,
+    difficulty: q.difficulty,
+    marks: q.marks,
+    questionType: q.questionType,
+    text: q.text,
+    optionA: q.optionA,
+    optionB: q.optionB,
+    optionC: q.optionC,
+    optionD: q.optionD,
+    correctAnswer: q.correctAnswer,
+    textImageKey: q.textImageKey,
+    optionAImageKey: q.optionAImageKey,
+    optionBImageKey: q.optionBImageKey,
+    optionCImageKey: q.optionCImageKey,
+    optionDImageKey: q.optionDImageKey,
+    textImagePreviewUrl: q.textImageUrl,
+    optionAImagePreviewUrl: q.optionAImageUrl,
+    optionBImagePreviewUrl: q.optionBImageUrl,
+    optionCImagePreviewUrl: q.optionCImageUrl,
+    optionDImagePreviewUrl: q.optionDImageUrl,
+  })
+}
+
+function uploadSnapshot(paperName: string, rows: QuestionUploadRow[]) {
+  return JSON.stringify({
+    paperName,
+    rows: rows.map(({ textImageBlob: _a, optionAImageBlob: _b, optionBImageBlob: _c, optionCImageBlob: _d, optionDImageBlob: _e, ...rest }) => rest),
+  })
+}
+
+export const QuestionUploadWorkflow = forwardRef<
+  QuestionUploadWorkflowHandle,
+  QuestionUploadWorkflowProps
+>(function QuestionUploadWorkflow(
+  {
+    onPaperCreated,
+    onPublished,
+    initialPaperId,
+    onDirtyChange,
+    variant = 'minimal',
+  },
+  ref,
+) {
+  const {
+    addPaperFromUpload,
+    publishPaper,
+    removePaper,
+    getPaper,
+    getQuestionsByIds,
+    ensureLoaded,
+    refresh,
+  } = useQuestionPapers()
+  const { curriculum, ensureLoaded: ensureCurriculumLoaded } = useCurriculum()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [rows, setRows] = useState<QuestionUploadRow[]>([])
   const [uploaded, setUploaded] = useState(false)
@@ -62,11 +138,37 @@ export function QuestionUploadWorkflow({
   const [mappedRowIds, setMappedRowIds] = useState<number[]>([])
   const [showTopicReview, setShowTopicReview] = useState(false)
   const [imageParseNote, setImageParseNote] = useState<string | null>(null)
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [cleanSnapshot, setCleanSnapshot] = useState(() => uploadSnapshot('', []))
+  const skipNextTabLeaveRef = useRef(false)
+  const hydratedRef = useRef<string | null>(null)
 
   const validRows = rows.filter((r) => r.valid)
   const invalidRows = rows.filter((r) => !r.valid)
   const blankTopicRows = rows.filter((r) => r.valid && !r.topic.trim())
   const activeStep = uploaded ? 3 : fileLabel ? 2 : 1
+  const isDirty = uploadSnapshot(paperName, rows) !== cleanSnapshot
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
+
+  useEffect(() => {
+    void ensureLoaded()
+    void ensureCurriculumLoaded()
+  }, [ensureLoaded, ensureCurriculumLoaded])
+
+  function applyCurriculumSubjectRules(nextRows: QuestionUploadRow[]) {
+    if (curriculum.length === 0) return nextRows
+    return revalidateUploadRowsAgainstCurriculum(nextRows, curriculum)
+  }
+
+  useEffect(() => {
+    if (curriculum.length === 0 || rows.length === 0) return
+    setRows((prev) => revalidateUploadRowsAgainstCurriculum(prev, curriculum))
+    // Only when curriculum arrives/changes — not on every row edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [curriculum])
 
   async function handleFile(file: File | undefined) {
     if (!file) return
@@ -82,7 +184,7 @@ export function QuestionUploadWorkflow({
       if (canParseExcelImages(file.name)) {
         try {
           const excel = await parseQuestionUploadExcelWithImages(file)
-          setRows(excel.rows)
+          setRows(applyCurriculumSubjectRules(excel.rows))
           setUploaded(true)
           setFileLabel(file.name)
           if (excel.suggestedName) setPaperName(excel.suggestedName)
@@ -123,7 +225,7 @@ export function QuestionUploadWorkflow({
         setParseError(result.error)
         return
       }
-      setRows(result.rows)
+      setRows(applyCurriculumSubjectRules(result.rows))
       setUploaded(true)
       setFileLabel(file.name)
       if (result.suggestedName) setPaperName(result.suggestedName)
@@ -150,14 +252,58 @@ export function QuestionUploadWorkflow({
     setMappedRowIds([])
     setShowTopicReview(false)
     setMappingTopics(false)
+    setDraftId(null)
+    setCleanSnapshot(uploadSnapshot('', []))
   }
+
+  // Resume server draft (reconstruct rows from bank questions when available)
+  useEffect(() => {
+    let cancelled = false
+    async function hydrate() {
+      if (!initialPaperId) return
+      if (hydratedRef.current === initialPaperId) return
+      hydratedRef.current = initialPaperId
+      await ensureLoaded()
+      if (cancelled) return
+      let paper = getPaper(initialPaperId)
+      if (!paper) {
+        await refresh()
+        if (cancelled) return
+        paper = getPaper(initialPaperId)
+      }
+      if (!paper) {
+        setSaveError('Could not load that draft paper.')
+        return
+      }
+      const bankQs = getQuestionsByIds(paper.questionIds)
+      const nextRows = applyCurriculumSubjectRules(bankQs.map((q, i) => bankEntryToUploadRow(q, i + 1)))
+      setPaperName(paper.name)
+      setRows(nextRows)
+      setUploaded(nextRows.length > 0)
+      setFileLabel(nextRows.length > 0 ? 'Resumed from library draft' : null)
+      setDraftId(paper.id)
+      setCleanSnapshot(uploadSnapshot(paper.name, nextRows))
+      setMapNote(
+        nextRows.length > 0
+          ? `Resumed draft "${paper.name}" (${nextRows.length} question${nextRows.length === 1 ? '' : 's'}). Re-upload the file if you need to replace rows.`
+          : `Resumed draft "${paper.name}". Upload a file to add questions, then Draft or Publish.`,
+      )
+    }
+    void hydrate()
+    return () => {
+      cancelled = true
+    }
+  }, [initialPaperId, ensureLoaded, getPaper, getQuestionsByIds, refresh])
 
   function updateRowTopic(rowNumber: number, topic: string) {
     setRows((prev) =>
       prev.map((row) => {
         if (row.row !== rowNumber) return row
         const { valid: _valid, errors: _errors, ...partial } = row
-        return validateQuestionUploadRow({ ...partial, topic })
+        return validateQuestionUploadRow(
+          { ...partial, topic },
+          curriculum.length ? { curriculum } : undefined,
+        )
       }),
     )
   }
@@ -211,20 +357,128 @@ export function QuestionUploadWorkflow({
     }
   }
 
-  async function handleCommit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!paperName.trim() || validRows.length === 0 || saving || mappingTopics) return
+  const saveDraft = useCallback(async () => {
+    if (!paperName.trim()) {
+      setSaveError('Enter a paper title before saving a draft.')
+      throw new Error('Paper name required')
+    }
+    if (rows.length === 0) {
+      setSaveError('Upload or resume questions before saving a draft.')
+      throw new Error('No rows')
+    }
     setSaving(true)
     setSaveError(null)
     try {
-      const paper = await addPaperFromUpload(paperName.trim(), rows)
-      onPaperCreated?.(paper.id)
-      resetPreview()
+      const paper = await addPaperFromUpload(paperName.trim(), rows, 'tut-1', {
+        status: 'draft',
+        paperId: draftId ?? undefined,
+      })
+      setDraftId(paper.id)
+      setCleanSnapshot(uploadSnapshot(paperName.trim(), rows))
+      setMapNote(`Draft saved (${rows.length} row${rows.length === 1 ? '' : 's'}).`)
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save question paper')
+      setSaveError(err instanceof Error ? err.message : 'Failed to save draft')
+      throw err
     } finally {
       setSaving(false)
     }
+  }, [addPaperFromUpload, draftId, paperName, rows])
+
+  const publishNow = useCallback(async () => {
+    if (!paperName.trim() || validRows.length === 0 || saving || mappingTopics) {
+      setSaveError('Paper title and at least one valid question are required to publish.')
+      throw new Error('Cannot publish')
+    }
+    setSaving(true)
+    setSaveError(null)
+    try {
+      let paper: QuestionPaper
+      if (draftId) {
+        await addPaperFromUpload(paperName.trim(), rows, 'tut-1', {
+          status: 'draft',
+          paperId: draftId,
+        })
+        paper = await publishPaper(draftId)
+      } else {
+        paper = await addPaperFromUpload(paperName.trim(), rows, 'tut-1', {
+          status: 'published',
+        })
+      }
+      skipNextTabLeaveRef.current = true
+      onPaperCreated?.(paper.id)
+      onPublished?.(paper)
+      resetPreview()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save question paper')
+      throw err
+    } finally {
+      setSaving(false)
+    }
+  }, [
+    addPaperFromUpload,
+    draftId,
+    mappingTopics,
+    onPaperCreated,
+    onPublished,
+    paperName,
+    publishPaper,
+    rows,
+    saving,
+    validRows.length,
+  ])
+
+  const cancelNow = useCallback(async () => {
+    setSaving(true)
+    setSaveError(null)
+    try {
+      if (draftId) {
+        await removePaper(draftId)
+      }
+      skipNextTabLeaveRef.current = true
+      resetPreview()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to discard draft')
+      throw err
+    } finally {
+      setSaving(false)
+    }
+  }, [draftId, removePaper])
+
+  const { requestLeave, confirmDraft, confirmPublish, confirmCancel, markClean } =
+    useUnsavedWorkGuard({
+      isDirty,
+      onDraft: saveDraft,
+      onPublish: publishNow,
+      onCancel: cancelNow,
+      modalOptions: {
+        title: 'Unsaved import',
+        message: 'Save a draft, publish, or discard before leaving.',
+      },
+    })
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty,
+      requestLeave: async () => {
+        if (skipNextTabLeaveRef.current) {
+          skipNextTabLeaveRef.current = false
+          markClean()
+          return true
+        }
+        return requestLeave()
+      },
+    }),
+    [isDirty, markClean, requestLeave],
+  )
+
+  const canDraft = rows.length > 0 && Boolean(paperName.trim())
+  const canPublish = validRows.length > 0 && Boolean(paperName.trim()) && !mappingTopics
+  const canCancel = isDirty || Boolean(draftId) || uploaded
+
+  async function handleCommit(e: React.FormEvent) {
+    e.preventDefault()
+    await confirmPublish()
   }
 
   const stepRail = (
@@ -399,7 +653,9 @@ export function QuestionUploadWorkflow({
         <form onSubmit={(e) => void handleCommit(e)} className="space-y-3">
           <div className="flex flex-col lg:flex-row lg:items-end gap-3">
             <label className="block flex-1 min-w-0">
-              <span className="mb-1.5 block text-xs text-muted-foreground">Paper title in library *</span>
+              <span className="mb-1.5 block text-xs text-muted-foreground">
+                Paper title in library <RequiredMark />
+              </span>
               <input
                 required
                 value={paperName}
@@ -411,10 +667,11 @@ export function QuestionUploadWorkflow({
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 type="button"
-                onClick={resetPreview}
-                className="btn btn-secondary shrink-0"
+                onClick={() => void confirmDraft()}
+                disabled={!canDraft || saving || mappingTopics}
+                className="border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary disabled:opacity-40"
               >
-                Cancel
+                Draft
               </button>
               <button
                 type="button"
@@ -436,19 +693,27 @@ export function QuestionUploadWorkflow({
               </button>
               <button
                 type="submit"
-                disabled={validRows.length === 0 || saving || mappingTopics}
+                disabled={!canPublish || saving}
                 className="btn btn-primary shrink-0 disabled:opacity-40"
               >
-                {saving ? 'Publishing…' : `Publish ${validRows.length} Qs`}
+                {saving ? 'Publishing…' : 'Publish'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmCancel()}
+                disabled={!canCancel || saving}
+                className="border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary disabled:opacity-40"
+              >
+                Cancel
               </button>
             </div>
           </div>
         </form>
       </div>
 
-      {mapError && <p className="text-sm text-rose px-4 sm:px-5 pt-3">{mapError}</p>}
+      {mapError && <FormErrorBanner message={mapError} className="mx-4 sm:mx-5 mt-3" />}
       {mapNote && !mapError && <p className="text-sm text-leaf px-4 sm:px-5 pt-3">{mapNote}</p>}
-      {saveError && <p className="text-sm text-rose px-4 sm:px-5 pt-3">{saveError}</p>}
+      {saveError && <FormErrorBanner message={saveError} className="mx-4 sm:mx-5 mt-3" />}
 
       {showTopicReview && mappedRowIds.length > 0 && (
         <div className="mx-4 sm:mx-5 mt-3 mb-1 rounded-[12px] border border-accent/35 bg-accent/5 p-3 sm:p-4 space-y-3">
@@ -647,7 +912,7 @@ export function QuestionUploadWorkflow({
         <p className="text-xs text-muted-foreground mt-2">
           Learning portal intake: validated rows publish as one reusable paper.
         </p>
-        {parseError && <p className="text-sm text-rose mt-2">{parseError}</p>}
+        {parseError && <FormErrorBanner message={parseError} className="mt-2" />}
         {imageParseNote && (
           <p className="text-xs text-muted-foreground mt-2 rounded-md border border-border bg-secondary/30 px-3 py-2">
             {imageParseNote}
@@ -672,7 +937,7 @@ export function QuestionUploadWorkflow({
         </div>
         {templateActions}
         <div className="mt-4">{dropZone}</div>
-        {parseError && <p className="text-sm text-rose mt-3">{parseError}</p>}
+        {parseError && <FormErrorBanner message={parseError} className="mt-3" />}
       </AppCard>
 
       <AppCard className="p-4 sm:p-5">
@@ -697,4 +962,5 @@ export function QuestionUploadWorkflow({
       {preview}
     </div>
   )
-}
+})
+

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUpDown, FileText, Target, Users } from 'lucide-react'
+import { ArrowUpDown, Download, FileText, Loader2, Share2, Target, Users } from 'lucide-react'
 import { PageLoader } from '@/components/ui/PrismLoader'
 import { AppCard, AppStat } from '@/components/layout/AppShell'
 import { AppDropdown } from '@/components/ui/AppDropdown'
@@ -12,11 +12,17 @@ import {
   subjectStudentInsightBullets,
   subjectTopicInsightBullets,
 } from '@/lib/analyticsInsights'
-import { gradesMatch } from '@/lib/academicScope'
+import { boardsMatch, getCurriculumSubjects, gradesMatch } from '@/lib/academicScope'
 import { getHealthStatus } from '@/lib/constants'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { analyticsApi } from '@/lib/api/analyticsApi'
 import { cn } from '@/lib/cn'
+import {
+  downloadReportPdf,
+  shareReportPdf,
+} from '@/modules/reports/learningGenome/printReport'
+
+const SUBJECT_REPORT_ROOT_ID = 'subject-report-print-root'
 
 type SubjectStudent = {
   id: string
@@ -70,6 +76,28 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('health')
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const exportTitle = `Subject performance — ${subject || 'report'}`
+
+  async function handleExportPdf() {
+    if (pdfBusy) return
+    setPdfBusy(true)
+    try {
+      await downloadReportPdf({ title: exportTitle, rootId: SUBJECT_REPORT_ROOT_ID })
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
+  async function handleSharePdf() {
+    if (pdfBusy) return
+    setPdfBusy(true)
+    try {
+      await shareReportPdf({ title: exportTitle, rootId: SUBJECT_REPORT_ROOT_ID })
+    } finally {
+      setPdfBusy(false)
+    }
+  }
 
   useEffect(() => {
     void ensureLoaded()
@@ -83,9 +111,17 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
     }
   }, [curriculum, board])
 
-  const boardData = curriculum.find((b) => b.board === board) ?? curriculum[0]
-  const gradeData = boardData?.grades.find((g) => g.grade === grade) ?? boardData?.grades[0]
-  const curriculumTopics = gradeData?.subjects.find((s) => s.name === subject)?.topics ?? []
+  const boardData = curriculum.find((b) => boardsMatch(b.board, board)) ?? curriculum[0]
+  const gradeData =
+    boardData?.grades.find((g) => gradesMatch(g.grade, grade)) ?? boardData?.grades[0]
+  const scopedSubjects = getCurriculumSubjects(curriculum, board, grade)
+  const curriculumTopics =
+    gradeData?.subjects.find((s) => s.name === subject)?.topics ?? []
+
+  useEffect(() => {
+    if (subject && scopedSubjects.includes(subject)) return
+    setSubject(scopedSubjects[0] ?? '')
+  }, [subject, scopedSubjects])
 
   useEffect(() => {
     if (!subject) return
@@ -175,7 +211,7 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
 
   const boardOptions = curriculum.map((b) => ({ value: b.board, label: b.board }))
   const gradeOptions = boardData.grades.map((g) => ({ value: g.grade, label: g.grade }))
-  const subjectOptions = gradeData.subjects.map((s) => ({ value: s.name, label: s.name }))
+  const subjectOptions = scopedSubjects.map((name) => ({ value: name, label: name }))
 
   return (
     <div className="space-y-6">
@@ -186,23 +222,45 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
             Compare topic mastery across the class, then drill into individual students.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary shrink-0"
-        >
-          <FileText className="w-3.5 h-3.5" />
-          Print report
-        </button>
+        <div className="flex flex-wrap items-center gap-2 shrink-0 print:hidden">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            disabled={pdfBusy}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Print
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSharePdf()}
+            disabled={pdfBusy}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
+          >
+            {pdfBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Share2 className="w-3.5 h-3.5" />}
+            Share
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExportPdf()}
+            disabled={pdfBusy}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
+          >
+            {pdfBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            Download PDF
+          </button>
+        </div>
       </div>
 
+      <div id={SUBJECT_REPORT_ROOT_ID} className="space-y-6">
       <AppCard>
         <div className="grid sm:grid-cols-3 gap-4">
           <AppDropdown
             label="Board"
             value={board}
             onChange={(value) => {
-              const nextBoard = curriculum.find((b) => b.board === value)
+              const nextBoard = curriculum.find((b) => boardsMatch(b.board, value))
               setBoard(value)
               setGrade(nextBoard?.grades[0]?.grade ?? '')
               setSubject(nextBoard?.grades[0]?.subjects[0]?.name ?? '')
@@ -213,9 +271,9 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
             label="Grade"
             value={grade}
             onChange={(value) => {
-              const nextGrade = boardData.grades.find((g) => g.grade === value)
+              const nextGrade = boardData.grades.find((g) => gradesMatch(g.grade, value))
               setGrade(value)
-              setSubject(nextGrade?.subjects[0]?.name ?? subject)
+              setSubject(nextGrade?.subjects[0]?.name ?? '')
             }}
             options={gradeOptions}
           />
@@ -474,6 +532,7 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
           </AppCard>
         </div>
       )}
+      </div>
     </div>
   )
 }
