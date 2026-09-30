@@ -14,6 +14,7 @@ import { useAnalytics, useAnalyticsPage } from '@/hooks/useAnalytics'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import {
   downloadReportPdf,
+  messageForShareResult,
   shareReportPdf,
 } from '@/modules/reports/learningGenome/printReport'
 
@@ -24,6 +25,8 @@ export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolea
   const { loading, studentProfile, improvementTrend, studentReport } = useAnalytics()
   const { students } = useCurriculum()
   const [busy, setBusy] = useState(false)
+  const [shareHint, setShareHint] = useState<string | null>(null)
+  const [shareBusy, setShareBusy] = useState(false)
   const student = studentProfile ?? (students[0] ? {
     name: students[0].name,
     board: students[0].board ?? 'CBSE',
@@ -47,9 +50,10 @@ export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolea
   }
 
   const exportTitle = `Meeting report — ${student.name}`
+  const actionBusy = busy || shareBusy
 
   async function runExport(kind: 'print' | 'download' | 'share') {
-    if (busy && kind !== 'print') return
+    if (actionBusy && kind !== 'print') return
     if (kind === 'print') {
       const prev = document.title
       document.title = exportTitle
@@ -59,46 +63,61 @@ export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolea
       }, 500)
       return
     }
-    setBusy(true)
-    try {
-      if (kind === 'share') {
-        await shareReportPdf({ title: exportTitle, rootId: MEETING_REPORT_ROOT_ID })
-      } else {
-        await downloadReportPdf({ title: exportTitle, rootId: MEETING_REPORT_ROOT_ID })
+    if (kind === 'share') {
+      setShareBusy(true)
+      setShareHint(null)
+      try {
+        const result = await shareReportPdf({ title: exportTitle, rootId: MEETING_REPORT_ROOT_ID })
+        setShareHint(messageForShareResult(result))
+      } finally {
+        setShareBusy(false)
       }
+      return
+    }
+    setBusy(true)
+    setShareHint(null)
+    try {
+      await downloadReportPdf({ title: exportTitle, rootId: MEETING_REPORT_ROOT_ID })
     } finally {
       setBusy(false)
     }
   }
 
   const exportActions = (
-    <div className="flex flex-wrap items-center gap-2 print:hidden">
-      <button
-        type="button"
-        onClick={() => void runExport('print')}
-        disabled={busy}
-        className="btn btn-secondary gap-2 px-3 py-2 text-sm disabled:opacity-50"
-      >
-        <Printer className="w-4 h-4" /> Print
-      </button>
-      <button
-        type="button"
-        onClick={() => void runExport('download')}
-        disabled={busy}
-        className="btn btn-primary gap-2 px-4 py-2 text-sm disabled:opacity-50"
-      >
-        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-        Download PDF
-      </button>
-      <button
-        type="button"
-        onClick={() => void runExport('share')}
-        disabled={busy}
-        className="btn btn-secondary gap-2 px-3 py-2 text-sm disabled:opacity-50"
-      >
-        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
-        Share
-      </button>
+    <div className="flex flex-col items-end gap-1.5 print:hidden">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => void runExport('print')}
+          disabled={actionBusy}
+          className="btn btn-secondary gap-2 px-3 py-2 text-sm disabled:opacity-50"
+        >
+          <Printer className="w-4 h-4" /> Print
+        </button>
+        <button
+          type="button"
+          onClick={() => void runExport('download')}
+          disabled={actionBusy}
+          className="btn btn-primary gap-2 px-4 py-2 text-sm disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          {busy ? 'Building PDF…' : 'Download PDF'}
+        </button>
+        <button
+          type="button"
+          onClick={() => void runExport('share')}
+          disabled={actionBusy}
+          className="btn btn-secondary gap-2 px-3 py-2 text-sm disabled:opacity-50"
+        >
+          {shareBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+          {shareBusy ? 'Preparing share…' : 'Share'}
+        </button>
+      </div>
+      {shareHint ? (
+        <span className="text-[10px] text-muted-foreground max-w-[18rem] text-right leading-snug">
+          {shareHint}
+        </span>
+      ) : null}
     </div>
   )
 

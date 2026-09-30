@@ -19,6 +19,7 @@ import { analyticsApi } from '@/lib/api/analyticsApi'
 import { cn } from '@/lib/cn'
 import {
   downloadReportPdf,
+  messageForShareResult,
   shareReportPdf,
 } from '@/modules/reports/learningGenome/printReport'
 
@@ -77,11 +78,15 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('health')
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareHint, setShareHint] = useState<string | null>(null)
   const exportTitle = `Subject performance — ${subject || 'report'}`
+  const actionBusy = pdfBusy || shareBusy
 
   async function handleExportPdf() {
-    if (pdfBusy) return
+    if (actionBusy) return
     setPdfBusy(true)
+    setShareHint(null)
     try {
       await downloadReportPdf({ title: exportTitle, rootId: SUBJECT_REPORT_ROOT_ID })
     } finally {
@@ -90,12 +95,14 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
   }
 
   async function handleSharePdf() {
-    if (pdfBusy) return
-    setPdfBusy(true)
+    if (actionBusy) return
+    setShareBusy(true)
+    setShareHint(null)
     try {
-      await shareReportPdf({ title: exportTitle, rootId: SUBJECT_REPORT_ROOT_ID })
+      const result = await shareReportPdf({ title: exportTitle, rootId: SUBJECT_REPORT_ROOT_ID })
+      setShareHint(messageForShareResult(result))
     } finally {
-      setPdfBusy(false)
+      setShareBusy(false)
     }
   }
 
@@ -222,34 +229,41 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
             Compare topic mastery across the class, then drill into individual students.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0 print:hidden">
-          <button
-            type="button"
-            onClick={() => window.print()}
-            disabled={pdfBusy}
-            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Print
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleExportPdf()}
-            disabled={pdfBusy}
-            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
-          >
-            {pdfBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            Download PDF
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleSharePdf()}
-            disabled={pdfBusy}
-            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
-          >
-            {pdfBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Share2 className="w-3.5 h-3.5" />}
-            Share
-          </button>
+        <div className="flex flex-col items-stretch sm:items-end gap-1.5 shrink-0 print:hidden">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              disabled={actionBusy}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Print
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleExportPdf()}
+              disabled={actionBusy}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
+            >
+              {pdfBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              {pdfBusy ? 'Building PDF…' : 'Download PDF'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSharePdf()}
+              disabled={actionBusy}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
+            >
+              {shareBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Share2 className="w-3.5 h-3.5" />}
+              {shareBusy ? 'Preparing share…' : 'Share'}
+            </button>
+          </div>
+          {shareHint ? (
+            <span className="text-[10px] text-muted-foreground max-w-[18rem] sm:text-right leading-snug">
+              {shareHint}
+            </span>
+          ) : null}
         </div>
       </div>
 

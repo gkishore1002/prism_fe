@@ -78,9 +78,17 @@ export const R = {
   print: { en: 'Print', ta: 'அச்சிடு' },
   share: { en: 'Share', ta: 'பகிர்' },
   sharingPdf: { en: 'Preparing share…', ta: 'பகிர்வு தயாராகிறது…' },
-  shareDownloadedFallback: {
-    en: 'Share isn’t available here — PDF downloaded instead.',
-    ta: 'பகிர்வு இங்கு கிடைக்கவில்லை — PDF பதிவிறக்கப்பட்டது.',
+  shareUrlFallback: {
+    en: 'Shared the report link (this device can’t attach PDFs).',
+    ta: 'அறிக்கை இணைப்பு பகிரப்பட்டது (இந்த சாதனம் PDF இணைக்க முடியாது).',
+  },
+  shareCopiedFallback: {
+    en: 'Report link copied to clipboard.',
+    ta: 'அறிக்கை இணைப்பு கிளிப்போர்டுக்கு நகலெடுக்கப்பட்டது.',
+  },
+  shareFailed: {
+    en: 'Couldn’t share this report. Try Download PDF instead.',
+    ta: 'இந்த அறிக்கையை பகிர முடியவில்லை. PDF பதிவிறக்கத்தை முயற்சிக்கவும்.',
   },
   buildingPdf: { en: 'Building PDF…', ta: 'PDF உருவாக்குகிறது…' },
   back: { en: 'Back', ta: 'பின்செல்' },

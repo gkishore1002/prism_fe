@@ -4,6 +4,7 @@ import { ArrowLeft, Download, Loader2, Printer, Share2 } from 'lucide-react'
 import { APP_NAME } from '@/lib/constants'
 import {
   downloadReportPdf,
+  messageForShareResult,
   printReport,
   scrollToReportSection,
   shareReportPdf,
@@ -87,9 +88,15 @@ export function LgReportToolbar({
         title: exportTitle,
         language: bilingual ? language : undefined,
       })
-      if (result === 'downloaded') {
-        setShareHint(L.shareDownloadedFallback)
-      }
+      setShareHint(
+        result === 'shared-url'
+          ? L.shareUrlFallback
+          : result === 'copied-url'
+            ? L.shareCopiedFallback
+            : result === 'failed'
+              ? L.shareFailed
+              : messageForShareResult(result),
+      )
     } finally {
       setShareBusy(false)
     }
@@ -227,36 +234,53 @@ export function LgSharePdfButton({
   className?: string
 }) {
   const [busy, setBusy] = useState(false)
+  const [hint, setHint] = useState<string | null>(null)
   const { L } = useReportLabels()
 
   return (
-    <button
-      type="button"
-      className={cn(
-        'inline-flex items-center gap-2 rounded-[10px] border border-border bg-background px-3.5 py-2 text-sm font-medium text-foreground shadow-sm transition-opacity hover:bg-secondary disabled:opacity-70',
-        className,
-      )}
-      disabled={busy}
-      aria-busy={busy}
-      onClick={() => {
-        if (busy) return
-        const root = document.getElementById('lg-report-print-root')
-        if (!root) {
-          window.alert(L.reportLoadingAlert)
-          return
-        }
-        setBusy(true)
-        void shareReportPdf({ title: title ?? `${APP_NAME} Learning Genome Report` }).finally(() =>
-          setBusy(false),
-        )
-      }}
-    >
-      {busy ? (
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-      ) : (
-        <Share2 className="h-4 w-4" aria-hidden />
-      )}
-      {busy ? L.sharingPdf : label === 'Share' ? L.share : label}
-    </button>
+    <div className="inline-flex flex-col items-start gap-1">
+      <button
+        type="button"
+        className={cn(
+          'inline-flex items-center gap-2 rounded-[10px] border border-border bg-background px-3.5 py-2 text-sm font-medium text-foreground shadow-sm transition-opacity hover:bg-secondary disabled:opacity-70',
+          className,
+        )}
+        disabled={busy}
+        aria-busy={busy}
+        onClick={() => {
+          if (busy) return
+          const root = document.getElementById('lg-report-print-root')
+          if (!root) {
+            window.alert(L.reportLoadingAlert)
+            return
+          }
+          setBusy(true)
+          setHint(null)
+          void shareReportPdf({ title: title ?? `${APP_NAME} Learning Genome Report` })
+            .then((result) => {
+              setHint(
+                result === 'shared-url'
+                  ? L.shareUrlFallback
+                  : result === 'copied-url'
+                    ? L.shareCopiedFallback
+                    : result === 'failed'
+                      ? L.shareFailed
+                      : messageForShareResult(result),
+              )
+            })
+            .finally(() => setBusy(false))
+        }}
+      >
+        {busy ? (
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        ) : (
+          <Share2 className="h-4 w-4" aria-hidden />
+        )}
+        {busy ? L.sharingPdf : label === 'Share' ? L.share : label}
+      </button>
+      {hint ? (
+        <span className="text-[10px] text-muted-foreground max-w-[14rem] leading-snug">{hint}</span>
+      ) : null}
+    </div>
   )
 }
