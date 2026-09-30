@@ -116,7 +116,9 @@ export function SyllabusCompletionChart({
   const gradeBars = useMemo(
     () =>
       chartData.map((row) => ({
-        ...row,
+        label: String(row.label ?? ''),
+        fullLabel: String(row.fullLabel ?? ''),
+        overall: Number(row.overall) || 0,
         fill: fillFor(Number(row.overall) || 0),
       })),
     [chartData],

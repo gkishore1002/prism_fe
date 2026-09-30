@@ -438,7 +438,7 @@ export function SyllabusBooksPanel() {
                       type="button"
                       className="px-2.5 py-1.5 rounded-md text-xs border border-border text-foreground hover:bg-secondary/70 disabled:opacity-40"
                       disabled={openingId === book.id}
-                      onClick={() => void openBookSummary(book, 'edit')}
+                      onClick={() => void openBookSummary(book)}
                     >
                       {openingId === book.id ? 'Opening…' : 'Edit outline'}
                     </button>
@@ -449,7 +449,7 @@ export function SyllabusBooksPanel() {
                       className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/70 disabled:opacity-40"
                       aria-label={`View summary of ${book.title}`}
                       disabled={openingId === book.id}
-                      onClick={() => void openBookSummary(book, 'edit')}
+                      onClick={() => void openBookSummary(book)}
                       title="View / edit outline"
                     >
                       {openingId === book.id ? (

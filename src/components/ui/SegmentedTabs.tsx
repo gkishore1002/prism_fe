@@ -59,9 +59,10 @@ export function SegmentedTab({
   )
 }
 
-type SegmentedTabLinkProps = Omit<NavLinkProps, 'className'> & {
+type SegmentedTabLinkProps = Omit<NavLinkProps, 'className' | 'children'> & {
   icon?: ReactNode
   className?: string
+  children: ReactNode
 }
 
 /** NavLink tab inside SegmentedTabs (route-based sections). */
