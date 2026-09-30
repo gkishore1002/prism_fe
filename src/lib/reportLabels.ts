@@ -74,7 +74,7 @@ export const R = {
   navAssessmentWise: { en: 'Assessment-wise', ta: 'தேர்வு வாரியாக' },
 
   // Toolbar
-  exportPdf: { en: 'Export PDF', ta: 'PDF ஏற்றுமதி' },
+  exportPdf: { en: 'Download PDF', ta: 'PDF பதிவிறக்கு' },
   print: { en: 'Print', ta: 'அச்சிடு' },
   share: { en: 'Share', ta: 'பகிர்' },
   sharingPdf: { en: 'Preparing share…', ta: 'பகிர்வு தயாராகிறது…' },
@@ -85,7 +85,7 @@ export const R = {
   buildingPdf: { en: 'Building PDF…', ta: 'PDF உருவாக்குகிறது…' },
   back: { en: 'Back', ta: 'பின்செல்' },
   reportLoadingAlert: {
-    en: 'The report is still loading. Wait a moment, then try Export PDF again.',
+    en: 'The report is still loading. Wait a moment, then try Share or Download PDF again.',
     ta: 'அறிக்கை ஏற்றப்படுகிறது. சிறிது நேரம் காத்திருந்து மீண்டும் முயற்சிக்கவும்.',
   },
   learningGenomeReport: { en: 'Learning Genome Report', ta: 'கற்றல் Genome அறிக்கை' },

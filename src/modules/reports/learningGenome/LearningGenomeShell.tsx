@@ -90,7 +90,7 @@ export function LgReportLayout({
   navLinks,
   backHref,
   backLabel,
-  exportLabel = 'Export PDF',
+  exportLabel = 'Download PDF',
   showExport = true,
   bilingual = false,
 }: {

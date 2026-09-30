@@ -234,21 +234,21 @@ export function SubjectReportsPanel({ studentReportPathPrefix }: SubjectReportsP
           </button>
           <button
             type="button"
-            onClick={() => void handleSharePdf()}
-            disabled={pdfBusy}
-            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
-          >
-            {pdfBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Share2 className="w-3.5 h-3.5" />}
-            Share
-          </button>
-          <button
-            type="button"
             onClick={() => void handleExportPdf()}
             disabled={pdfBusy}
             className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
           >
             {pdfBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
             Download PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSharePdf()}
+            disabled={pdfBusy}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary disabled:opacity-50"
+          >
+            {pdfBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Share2 className="w-3.5 h-3.5" />}
+            Share
           </button>
         </div>
       </div>

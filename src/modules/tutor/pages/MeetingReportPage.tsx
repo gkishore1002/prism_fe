@@ -83,21 +83,21 @@ export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolea
       </button>
       <button
         type="button"
-        onClick={() => void runExport('share')}
-        disabled={busy}
-        className="btn btn-secondary gap-2 px-3 py-2 text-sm disabled:opacity-50"
-      >
-        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
-        Share
-      </button>
-      <button
-        type="button"
         onClick={() => void runExport('download')}
         disabled={busy}
         className="btn btn-primary gap-2 px-4 py-2 text-sm disabled:opacity-50"
       >
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
         Download PDF
+      </button>
+      <button
+        type="button"
+        onClick={() => void runExport('share')}
+        disabled={busy}
+        className="btn btn-secondary gap-2 px-3 py-2 text-sm disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+        Share
       </button>
     </div>
   )

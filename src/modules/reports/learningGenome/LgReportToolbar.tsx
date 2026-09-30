@@ -25,7 +25,7 @@ interface LgReportToolbarProps {
   backLabel?: string
   /** Primary download button label */
   exportLabel?: string
-  /** Hide Print / Export PDF / Share actions (e.g. Class Insights). */
+  /** Hide Print / Download PDF / Share actions (e.g. Class Insights). */
   showExport?: boolean
   /** Append selected report language to export filename. */
   bilingual?: boolean
@@ -38,7 +38,7 @@ export function LgReportToolbar({
   printTitle,
   backHref,
   backLabel = 'Back',
-  exportLabel = 'Export PDF',
+  exportLabel = 'Download PDF',
   showExport = true,
   bilingual = false,
   className,
@@ -49,7 +49,8 @@ export function LgReportToolbar({
   const { language } = useReportLanguage()
   const { L } = useReportLabels()
   const resolvedBackLabel = backLabel === 'Back' ? L.back : backLabel
-  const resolvedExportLabel = exportLabel === 'Export PDF' ? L.exportPdf : exportLabel
+  const resolvedExportLabel =
+    exportLabel === 'Export PDF' || exportLabel === 'Download PDF' ? L.exportPdf : exportLabel
   const fileTitle = printTitle ?? `${brand} ${L.learningGenomeReport}`
   const exportTitle = bilingual ? `${fileTitle} (${reportLanguageLabel(language)})` : fileTitle
   const busy = pdfBusy || shareBusy
@@ -131,6 +132,20 @@ export function LgReportToolbar({
           </button>
           <button
             type="button"
+            className="lg-nav-btn lg-nav-btn-primary lg-nav-export"
+            onClick={() => void handlePdf()}
+            disabled={busy}
+            aria-busy={pdfBusy}
+          >
+            {pdfBusy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            ) : (
+              <Download className="h-3.5 w-3.5" aria-hidden />
+            )}
+            {pdfBusy ? L.buildingPdf : resolvedExportLabel}
+          </button>
+          <button
+            type="button"
             className="lg-nav-btn"
             onClick={() => void handleShare()}
             disabled={busy}
@@ -143,20 +158,6 @@ export function LgReportToolbar({
               <Share2 className="h-3.5 w-3.5" aria-hidden />
             )}
             {shareBusy ? L.sharingPdf : L.share}
-          </button>
-          <button
-            type="button"
-            className="lg-nav-btn lg-nav-btn-primary lg-nav-export"
-            onClick={() => void handlePdf()}
-            disabled={busy}
-            aria-busy={pdfBusy}
-          >
-            {pdfBusy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-            ) : (
-              <Download className="h-3.5 w-3.5" aria-hidden />
-            )}
-            {pdfBusy ? L.buildingPdf : resolvedExportLabel}
           </button>
           {shareHint && (
             <span className="text-[10px] text-muted-foreground max-w-[12rem] leading-snug sm:max-w-none">
@@ -172,7 +173,7 @@ export function LgReportToolbar({
 /** Standalone Export PDF control for page headers / filter bars. */
 export function LgExportPdfButton({
   title,
-  label = 'Export PDF',
+  label = 'Download PDF',
   className,
 }: {
   title?: string
@@ -180,6 +181,8 @@ export function LgExportPdfButton({
   className?: string
 }) {
   const [busy, setBusy] = useState(false)
+  const { L } = useReportLabels()
+  const resolvedLabel = label === 'Export PDF' || label === 'Download PDF' ? L.exportPdf : label
 
   return (
     <button
@@ -194,7 +197,7 @@ export function LgExportPdfButton({
         if (busy) return
         const root = document.getElementById('lg-report-print-root')
         if (!root) {
-          window.alert('The report is still loading. Wait a moment, then try Export PDF again.')
+          window.alert(L.reportLoadingAlert)
           return
         }
         setBusy(true)
@@ -208,7 +211,7 @@ export function LgExportPdfButton({
       ) : (
         <Download className="h-4 w-4" aria-hidden />
       )}
-      {busy ? 'Building PDF…' : label}
+      {busy ? L.buildingPdf : resolvedLabel}
     </button>
   )
 }

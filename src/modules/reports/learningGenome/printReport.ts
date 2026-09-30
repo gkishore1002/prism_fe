@@ -28,10 +28,12 @@ type CaptureItem =
 
 function safeFilename(title: string): string {
   const cleaned = title
+    .toLowerCase()
     .replace(/[^\w\s\-—.]+/g, '')
     .trim()
     .replace(/\s+/g, '_')
-  return (cleaned || 'Prism_Report').slice(0, 80)
+  const base = (cleaned || 'report').slice(0, 72)
+  return base.startsWith('report_') ? base : `report_${base}`
 }
 
 function blendRgba(
@@ -606,8 +608,10 @@ export async function downloadReportPdf(options?: ReportPdfOptions): Promise<voi
 }
 
 /**
- * Share the report as a PDF via the system share sheet when available.
- * Falls back to downloading the PDF if share/files are unsupported.
+ * Share the report PDF via the OS share sheet (Windows Share / Android / iOS),
+ * same pattern as Swotify Plus. Prefer files-only ShareData — Chromium on Windows
+ * often rejects canShare when title/text are mixed with files.
+ * Falls back to downloading the PDF if share is unavailable.
  */
 export async function shareReportPdf(
   options?: ReportPdfOptions,
@@ -615,22 +619,43 @@ export async function shareReportPdf(
   try {
     const { blob, filename } = await buildReportPdfBlob(options)
     const file = new File([blob], filename, { type: 'application/pdf' })
-    const shareData: ShareData = {
+
+    if (typeof navigator.share !== 'function') {
+      triggerBlobDownload(blob, filename)
+      return 'downloaded'
+    }
+
+    const filesOnly: ShareData = { files: [file] }
+    const withMeta: ShareData = {
       files: [file],
-      title: options?.title ?? 'Prism report',
-      text: options?.title ?? 'Prism report PDF',
+      title: options?.title ?? 'Report',
+      text: options?.title ?? 'Report PDF',
     }
-    if (typeof navigator.canShare === 'function' && navigator.canShare(shareData)) {
-      try {
-        await navigator.share(shareData)
-        return 'shared'
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          return 'cancelled'
-        }
-        // Fall through to download when share fails (permissions, etc.).
+
+    let shareData: ShareData | null = null
+    if (typeof navigator.canShare !== 'function') {
+      shareData = filesOnly
+    } else if (navigator.canShare(filesOnly)) {
+      shareData = filesOnly
+    } else if (navigator.canShare(withMeta)) {
+      shareData = withMeta
+    }
+
+    if (!shareData) {
+      triggerBlobDownload(blob, filename)
+      return 'downloaded'
+    }
+
+    try {
+      await navigator.share(shareData)
+      return 'shared'
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return 'cancelled'
       }
+      // Permissions / unsupported payload — fall through to download.
     }
+
     triggerBlobDownload(blob, filename)
     return 'downloaded'
   } catch (err) {
