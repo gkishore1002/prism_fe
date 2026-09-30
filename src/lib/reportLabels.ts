@@ -82,6 +82,10 @@ export const R = {
     en: 'Sharing isn’t available here — PDF downloaded instead.',
     ta: 'பகிர்வு இங்கு கிடைக்கவில்லை — PDF பதிவிறக்கப்பட்டது.',
   },
+  shareReadyClickAgain: {
+    en: 'PDF is ready — click Share again to open the system share sheet.',
+    ta: 'PDF தயார் — கணினி பகிர்வு தாளைத் திறக்க மீண்டும் பகிர் என்பதைக் கிளிக் செய்யவும்.',
+  },
   shareFailed: {
     en: 'Couldn’t share this report. Try Download PDF instead.',
     ta: 'இந்த அறிக்கையை பகிர முடியவில்லை. PDF பதிவிறக்கத்தை முயற்சிக்கவும்.',

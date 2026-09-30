@@ -600,6 +600,7 @@ export async function buildReportPdfBlob(
 export async function downloadReportPdf(options?: ReportPdfOptions): Promise<void> {
   try {
     const { blob, filename } = await buildReportPdfBlob(options)
+    rememberSharePdfCache(options, blob, filename)
     triggerBlobDownload(blob, filename)
   } catch (err) {
     console.error('PDF download failed, falling back to print', err)
@@ -611,14 +612,24 @@ export async function downloadReportPdf(options?: ReportPdfOptions): Promise<voi
  * Share the report PDF via the device native share sheet (Web Share API).
  * Reuses `buildReportPdfBlob` — same PDF as Download PDF.
  * No in-app share modal. AbortError (user dismisses sheet) is silent.
- * Unsupported browsers: download the PDF and return `'downloaded'`.
+ *
+ * Desktop browsers often drop the transient user activation during long PDF
+ * capture; we cache the last blob so a second Share click opens the sheet
+ * immediately. Unsupported / blocked file share → download fallback.
  */
-export type ShareReportResult = 'shared' | 'downloaded' | 'cancelled' | 'failed'
+export type ShareReportResult =
+  | 'shared'
+  | 'downloaded'
+  | 'cancelled'
+  | 'failed'
+  | 'ready-click-again'
 
 export function messageForShareResult(result: ShareReportResult): string | null {
   switch (result) {
     case 'downloaded':
       return 'Sharing isn’t available here — PDF downloaded instead.'
+    case 'ready-click-again':
+      return 'PDF is ready — click Share again to open the system share sheet.'
     case 'failed':
       return 'Couldn’t share this report. Try Download PDF instead.'
     default:
@@ -626,32 +637,123 @@ export function messageForShareResult(result: ShareReportResult): string | null 
   }
 }
 
+type SharePdfCache = {
+  key: string
+  blob: Blob
+  filename: string
+}
+
+let sharePdfCache: SharePdfCache | null = null
+
+function sharePdfCacheKey(options?: ReportPdfOptions): string {
+  const rootId = options?.rootId ?? 'lg-report-print-root'
+  const root = document.getElementById(rootId)
+  const signature = root
+    ? `${root.scrollHeight}:${root.scrollWidth}:${root.querySelectorAll('*').length}`
+    : 'missing'
+  return `${rootId}|${options?.title ?? ''}|${options?.language ?? ''}|${signature}`
+}
+
+function rememberSharePdfCache(
+  options: ReportPdfOptions | undefined,
+  blob: Blob,
+  filename: string,
+) {
+  sharePdfCache = {
+    key: sharePdfCacheKey(options),
+    blob,
+    filename,
+  }
+}
+
+function getCachedSharePdf(
+  options?: ReportPdfOptions,
+): { blob: Blob; filename: string } | null {
+  if (!sharePdfCache) return null
+  if (sharePdfCache.key !== sharePdfCacheKey(options)) return null
+  return { blob: sharePdfCache.blob, filename: sharePdfCache.filename }
+}
+
+async function resolveSharePdf(
+  options?: ReportPdfOptions,
+): Promise<{ blob: Blob; filename: string; fromCache: boolean }> {
+  const cached = getCachedSharePdf(options)
+  if (cached) {
+    return { ...cached, fromCache: true }
+  }
+  const built = await buildReportPdfBlob(options)
+  rememberSharePdfCache(options, built.blob, built.filename)
+  return { ...built, fromCache: false }
+}
+
+function canSharePdfFile(file: File): boolean {
+  if (typeof navigator.share !== 'function') return false
+  if (typeof navigator.canShare !== 'function') {
+    // Older Safari: try share anyway.
+    return true
+  }
+  try {
+    return navigator.canShare({ files: [file] })
+  } catch {
+    return false
+  }
+}
+
+async function tryNativePdfShare(file: File): Promise<'shared' | 'cancelled' | 'blocked'> {
+  // Prefer files-only — Windows/Chromium share sheet is most reliable this way.
+  const payloads: ShareData[] = [
+    { files: [file] },
+    { title: 'Student Report', text: 'Student Report', files: [file] },
+  ]
+
+  let sawNonAbortFailure = false
+
+  for (const data of payloads) {
+    if (typeof navigator.canShare === 'function') {
+      try {
+        if (!navigator.canShare(data)) continue
+      } catch {
+        continue
+      }
+    }
+    try {
+      await navigator.share(data)
+      return 'shared'
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return 'cancelled'
+      }
+      sawNonAbortFailure = true
+      // Try next payload (e.g. files-only vs files+meta).
+    }
+  }
+
+  return sawNonAbortFailure || payloads.length > 0 ? 'blocked' : 'blocked'
+}
+
 export async function shareReportPdf(
   options?: ReportPdfOptions,
 ): Promise<ShareReportResult> {
   try {
-    const { blob, filename } = await buildReportPdfBlob(options)
-    const pdfFile = new File([blob], 'student-report.pdf', { type: 'application/pdf' })
+    const { blob, filename, fromCache } = await resolveSharePdf(options)
+    const pdfFile = new File([blob], 'student-report.pdf', {
+      type: 'application/pdf',
+      lastModified: Date.now(),
+    })
 
-    const canShareFiles =
-      typeof navigator.share === 'function' &&
-      typeof navigator.canShare === 'function' &&
-      navigator.canShare({ files: [pdfFile] })
+    if (!canSharePdfFile(pdfFile)) {
+      triggerBlobDownload(blob, filename)
+      return 'downloaded'
+    }
 
-    if (canShareFiles) {
-      try {
-        await navigator.share({
-          title: 'Student Report',
-          text: 'Student Report',
-          files: [pdfFile],
-        })
-        return 'shared'
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          return 'cancelled'
-        }
-        // Share rejected for another reason — fall through to download.
-      }
+    const outcome = await tryNativePdfShare(pdfFile)
+    if (outcome === 'shared') return 'shared'
+    if (outcome === 'cancelled') return 'cancelled'
+
+    // Gesture often expires after a long html2canvas capture. Cache is warm —
+    // ask the user to click Share once more (instant share under a fresh gesture).
+    if (!fromCache) {
+      return 'ready-click-again'
     }
 
     triggerBlobDownload(blob, filename)

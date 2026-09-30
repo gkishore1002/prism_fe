@@ -72,12 +72,15 @@ export function TutorMeetingReportPage({ embedded = false }: { embedded?: boolea
         const result = await shareReportPdf({ title: exportTitle, rootId: MEETING_REPORT_ROOT_ID })
         const hint = messageForShareResult(result)
         setShareHint(hint)
-        if ((result === 'downloaded' || result === 'failed') && hint) {
+        if (
+          (result === 'downloaded' || result === 'failed' || result === 'ready-click-again') &&
+          hint
+        ) {
           showToast({
-            title: result === 'downloaded' ? 'Share' : 'Share failed',
+            title: result === 'failed' ? 'Share failed' : 'Share',
             message: hint,
             variant: result === 'failed' ? 'urgent' : 'info',
-            durationMs: 5000,
+            durationMs: result === 'ready-click-again' ? 8000 : 5000,
           })
         }
       } finally {

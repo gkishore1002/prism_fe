@@ -63,16 +63,18 @@ export function LgReportToolbar({
     const hint =
       result === 'downloaded'
         ? L.shareDownloadedFallback
-        : result === 'failed'
-          ? L.shareFailed
-          : messageForShareResult(result)
+        : result === 'ready-click-again'
+          ? L.shareReadyClickAgain
+          : result === 'failed'
+            ? L.shareFailed
+            : messageForShareResult(result)
     setShareHint(hint)
-    if (result === 'downloaded' || result === 'failed') {
+    if (result === 'downloaded' || result === 'failed' || result === 'ready-click-again') {
       showToast({
-        title: result === 'downloaded' ? L.share : L.shareFailed,
+        title: result === 'ready-click-again' ? L.share : result === 'downloaded' ? L.share : L.shareFailed,
         message: hint ?? L.shareFailed,
         variant: result === 'failed' ? 'urgent' : 'info',
-        durationMs: 5000,
+        durationMs: result === 'ready-click-again' ? 8000 : 5000,
       })
     }
   }
@@ -275,16 +277,23 @@ export function LgSharePdfButton({
               const next =
                 result === 'downloaded'
                   ? L.shareDownloadedFallback
-                  : result === 'failed'
-                    ? L.shareFailed
-                    : messageForShareResult(result)
+                  : result === 'ready-click-again'
+                    ? L.shareReadyClickAgain
+                    : result === 'failed'
+                      ? L.shareFailed
+                      : messageForShareResult(result)
               setHint(next)
-              if (result === 'downloaded' || result === 'failed') {
+              if (result === 'downloaded' || result === 'failed' || result === 'ready-click-again') {
                 showToast({
-                  title: result === 'downloaded' ? L.share : L.shareFailed,
+                  title:
+                    result === 'ready-click-again'
+                      ? L.share
+                      : result === 'downloaded'
+                        ? L.share
+                        : L.shareFailed,
                   message: next ?? L.shareFailed,
                   variant: result === 'failed' ? 'urgent' : 'info',
-                  durationMs: 5000,
+                  durationMs: result === 'ready-click-again' ? 8000 : 5000,
                 })
               }
             })
