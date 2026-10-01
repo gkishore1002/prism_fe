@@ -35,6 +35,7 @@ import {
   parseQuestionUploadExcelWithImages,
 } from '@/lib/questionUploadParseExcelImages'
 import { mapQuestionTopics } from '@/lib/api/syllabusBooksApi'
+import * as questionsApi from '@/lib/api/questionsApi'
 import { ApiError, isApiEnabled } from '@/lib/apiClient'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
@@ -50,6 +51,8 @@ export interface QuestionUploadWorkflowHandle {
 export interface QuestionUploadWorkflowProps {
   onPaperCreated?: (paperId: string) => void
   onPublished?: (paper: QuestionPaper) => void
+  /** Called after Save as draft — parent should show Drafts list. */
+  onDraftSaved?: (paper: QuestionPaper) => void
   initialPaperId?: string
   onDirtyChange?: (dirty: boolean) => void
   variant?: 'full' | 'minimal'
@@ -107,6 +110,7 @@ export const QuestionUploadWorkflow = forwardRef<
   {
     onPaperCreated,
     onPublished,
+    onDraftSaved,
     initialPaperId,
     onDirtyChange,
     variant = 'minimal',
@@ -260,34 +264,60 @@ export const QuestionUploadWorkflow = forwardRef<
   useEffect(() => {
     let cancelled = false
     async function hydrate() {
-      if (!initialPaperId) return
-      if (hydratedRef.current === initialPaperId) return
-      hydratedRef.current = initialPaperId
-      await ensureLoaded()
-      if (cancelled) return
-      let paper = getPaper(initialPaperId)
-      if (!paper) {
-        await refresh()
-        if (cancelled) return
-        paper = getPaper(initialPaperId)
-      }
-      if (!paper) {
-        setSaveError('Could not load that draft paper.')
+      if (!initialPaperId) {
+        hydratedRef.current = null
         return
       }
-      const bankQs = getQuestionsByIds(paper.questionIds)
-      const nextRows = applyCurriculumSubjectRules(bankQs.map((q, i) => bankEntryToUploadRow(q, i + 1)))
-      setPaperName(paper.name)
-      setRows(nextRows)
-      setUploaded(nextRows.length > 0)
-      setFileLabel(nextRows.length > 0 ? 'Resumed from library draft' : null)
-      setDraftId(paper.id)
-      setCleanSnapshot(uploadSnapshot(paper.name, nextRows))
-      setMapNote(
-        nextRows.length > 0
-          ? `Resumed draft "${paper.name}" (${nextRows.length} question${nextRows.length === 1 ? '' : 's'}). Re-upload the file if you need to replace rows.`
-          : `Resumed draft "${paper.name}". Upload a file to add questions, then Draft or Publish.`,
-      )
+      if (hydratedRef.current === initialPaperId) return
+
+      try {
+        await ensureLoaded()
+        if (cancelled) return
+
+        let paper = getPaper(initialPaperId)
+        let bankQs = paper ? getQuestionsByIds(paper.questionIds) : []
+
+        if (!paper || (paper.questionIds.length > 0 && bankQs.length !== paper.questionIds.length)) {
+          const [qs, papers] = await Promise.all([
+            questionsApi.fetchQuestions(),
+            questionsApi.fetchQuestionPapers({ status: 'all' }),
+          ])
+          if (cancelled) return
+          await refresh()
+          if (cancelled) return
+          paper = papers.find((p) => p.id === initialPaperId) ?? getPaper(initialPaperId)
+          if (paper) {
+            const byId = new Map(qs.map((q) => [q.id, q]))
+            bankQs = paper.questionIds
+              .map((id) => byId.get(id))
+              .filter((q): q is QuestionBankEntry => Boolean(q))
+          }
+        }
+
+        if (!paper) {
+          setSaveError('Could not load that draft paper.')
+          return
+        }
+
+        const nextRows = applyCurriculumSubjectRules(
+          bankQs.map((q, i) => bankEntryToUploadRow(q, i + 1)),
+        )
+        if (cancelled) return
+        setPaperName(paper.name)
+        setRows(nextRows)
+        setUploaded(nextRows.length > 0)
+        setFileLabel(nextRows.length > 0 ? 'Resumed from library draft' : null)
+        setDraftId(paper.id)
+        setCleanSnapshot(uploadSnapshot(paper.name, nextRows))
+        setMapNote(
+          nextRows.length > 0
+            ? `Resumed draft "${paper.name}" (${nextRows.length} question${nextRows.length === 1 ? '' : 's'}). Re-upload the file if you need to replace rows.`
+            : `Resumed draft "${paper.name}". Upload a file to add questions, then Draft or Publish.`,
+        )
+        hydratedRef.current = initialPaperId
+      } catch {
+        if (!cancelled) setSaveError('Could not load that draft paper.')
+      }
     }
     void hydrate()
     return () => {
@@ -373,16 +403,19 @@ export const QuestionUploadWorkflow = forwardRef<
         status: 'draft',
         paperId: draftId ?? undefined,
       })
-      setDraftId(paper.id)
-      setCleanSnapshot(uploadSnapshot(paperName.trim(), rows))
-      setMapNote(`Draft saved (${rows.length} row${rows.length === 1 ? '' : 's'}).`)
+      skipNextTabLeaveRef.current = true
+      resetPreview()
+      setMapNote(
+        `Draft saved (${rows.length} row${rows.length === 1 ? '' : 's'}). Form cleared — use Continue in Drafts to edit again.`,
+      )
+      onDraftSaved?.(paper)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save draft')
       throw err
     } finally {
       setSaving(false)
     }
-  }, [addPaperFromUpload, draftId, paperName, rows])
+  }, [addPaperFromUpload, draftId, onDraftSaved, paperName, rows])
 
   const publishNow = useCallback(async () => {
     if (!paperName.trim() || validRows.length === 0 || saving || mappingTopics) {
@@ -405,9 +438,10 @@ export const QuestionUploadWorkflow = forwardRef<
         })
       }
       skipNextTabLeaveRef.current = true
+      resetPreview()
+      hydratedRef.current = null
       onPaperCreated?.(paper.id)
       onPublished?.(paper)
-      resetPreview()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save question paper')
       throw err
@@ -452,7 +486,8 @@ export const QuestionUploadWorkflow = forwardRef<
       onCancel: cancelNow,
       modalOptions: {
         title: 'Unsaved import',
-        message: 'Save a draft, publish, or discard before leaving.',
+        message: 'Save a draft, publish, or discard before leaving this page.',
+        cancelLabel: 'Discard & leave',
       },
     })
 
@@ -671,7 +706,7 @@ export const QuestionUploadWorkflow = forwardRef<
                 disabled={!canDraft || saving || mappingTopics}
                 className="border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary disabled:opacity-40"
               >
-                Draft
+                Save as draft
               </button>
               <button
                 type="button"

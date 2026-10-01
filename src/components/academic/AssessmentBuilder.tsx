@@ -16,7 +16,14 @@ import type { StudentSummary } from '@/types'
 import { questionsForPaper, totalMarksForQuestions, topicCounts } from '@/lib/questionPaperUtils'
 import type { TutorAssessmentSchedule } from '@/types'
 import { cn } from '@/lib/cn'
-import { gradesMatch, boardsMatch, getCurriculumSubjects, scopeLabel, studentFitsScope } from '@/lib/academicScope'
+import {
+  gradesMatch,
+  boardsMatch,
+  getCurriculumSubjects,
+  scopeLabel,
+  studentFitsScope,
+  todayIsoDate,
+} from '@/lib/academicScope'
 import { formatSubjects, normalizeSubjectsList } from '@/lib/formatSubjects'
 import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { RequiredMark } from '@/components/ui/RequiredMark'
@@ -65,6 +72,7 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
   const [topicSearch, setTopicSearch] = useState('')
   const [showPaperPreview, setShowPaperPreview] = useState(false)
   const [shuffleQuestions, setShuffleQuestions] = useState(false)
+  const minScheduleDate = todayIsoDate()
 
   function resetForm() {
     setStep(1)
@@ -383,6 +391,20 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
     }
     if (mode !== 'practice' && mode !== 'assessment') {
       setPublishError('Select a mode before scheduling.')
+      return
+    }
+    const scheduleDate = scheduledAt.trim()
+    const untilDate = (availableUntil || scheduledAt).trim()
+    if (scheduleDate && scheduleDate < minScheduleDate) {
+      setPublishError('Scheduled date cannot be in the past.')
+      return
+    }
+    if (untilDate && untilDate < minScheduleDate) {
+      setPublishError('Available until cannot be in the past.')
+      return
+    }
+    if (scheduleDate && untilDate && untilDate < scheduleDate) {
+      setPublishError('Available until must be on or after the scheduled date.')
       return
     }
     setPublishing(true)
@@ -885,10 +907,15 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                   <span className="text-xs text-muted-foreground">Scheduled date (optional)</span>
                   <input
                     type="date"
+                    min={minScheduleDate}
                     value={scheduledAt}
                     onChange={(e) => {
-                      setScheduledAt(e.target.value)
-                      if (!availableUntil) setAvailableUntil(e.target.value)
+                      const next = e.target.value
+                      if (next && next < minScheduleDate) return
+                      setScheduledAt(next)
+                      if (!availableUntil || (availableUntil && availableUntil < next)) {
+                        setAvailableUntil(next)
+                      }
                     }}
                     className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
                   />
@@ -900,8 +927,15 @@ export function AssessmentBuilder({ open, onClose, onSave, questionBankPath = '/
                     </span>
                     <input
                       type="date"
+                      min={scheduledAt && scheduledAt > minScheduleDate ? scheduledAt : minScheduleDate}
                       value={availableUntil}
-                      onChange={(e) => setAvailableUntil(e.target.value)}
+                      onChange={(e) => {
+                        const next = e.target.value
+                        const floor =
+                          scheduledAt && scheduledAt > minScheduleDate ? scheduledAt : minScheduleDate
+                        if (next && next < floor) return
+                        setAvailableUntil(next)
+                      }}
                       className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
                     />
                   </label>

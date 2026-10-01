@@ -12,10 +12,11 @@ const MIN_CAPTURE_WIDTH_PX = Math.round(PDF_CONTENT_WIDTH_MM * PX_PER_MM)
 const PARCHMENT = { r: 246, g: 241, b: 228 }
 const NAVY = { r: 11, g: 31, b: 58 }
 
-const BLOCK_SELECTOR =
-  '.lg-hero, .lg-kpi-strip, .lg-section, section.lg-section, .lg-footer, footer.lg-footer'
+const CHART_SELECTOR =
+  '.lg-chart-frame, .recharts-responsive-container, [data-pdf-chart]'
 
 const PARCHMENT_BG = '#f6f1e4'
+const NAVY_BG = 'rgb(11, 31, 58)'
 
 /** Small gap between consecutive blocks on the same PDF page (mm). */
 const BLOCK_GAP_MM = 2
@@ -100,6 +101,19 @@ export function solidifyCloneForPdf(clone: HTMLElement) {
     },
   )
 
+  // Percentage-width CSS bars sometimes collapse in clones — bake computed width.
+  clone.querySelectorAll<HTMLElement>('.lg-affinity-fill, .lg-kl-bar-fill, .lg-mini-bar-fill').forEach(
+    (el) => {
+      const widthPct = el.style.width
+      if (widthPct) {
+        el.style.width = widthPct
+        el.style.minWidth = widthPct
+      }
+      el.style.printColorAdjust = 'exact'
+      el.style.setProperty('-webkit-print-color-adjust', 'exact')
+    },
+  )
+
   clone.querySelectorAll<HTMLElement>('*').forEach((el) => {
     el.style.animation = 'none'
     el.style.transition = 'none'
@@ -109,10 +123,56 @@ export function solidifyCloneForPdf(clone: HTMLElement) {
     el.style.backdropFilter = 'none'
     el.style.setProperty('-webkit-backdrop-filter', 'none')
 
-    const inHero = el.closest('.lg-hero, .lg-detail-head, .lg-footer, .lg-kl-section, .lg-insight-feed') !== null
-    const bgBase = inHero ? NAVY : PARCHMENT
+    const inDark =
+      el.closest('.lg-hero, .lg-detail-head, .lg-footer, .lg-kl-section, .lg-insight-feed') !== null
+    const bgBase = inDark ? NAVY : PARCHMENT
     solidifyBackground(el, bgBase)
   })
+}
+
+/**
+ * Recharts / SVG charts often render at 0×0 in an off-screen clone.
+ * Rasterize the live on-screen charts and swap them into the clone as images.
+ */
+async function rasterizeLiveChartsIntoClone(sourceRoot: HTMLElement, clone: HTMLElement) {
+  const sourceCharts = Array.from(
+    sourceRoot.querySelectorAll<HTMLElement>(CHART_SELECTOR),
+  ).filter((el) => el.offsetWidth > 2 && el.offsetHeight > 2)
+
+  const cloneCharts = Array.from(clone.querySelectorAll<HTMLElement>(CHART_SELECTOR))
+  const count = Math.min(sourceCharts.length, cloneCharts.length)
+
+  for (let i = 0; i < count; i++) {
+    const src = sourceCharts[i]
+    const dst = cloneCharts[i]
+    try {
+      const canvas = await html2canvas(src, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: null,
+        scrollX: 0,
+        scrollY: 0,
+      })
+      if (!canvas.width || !canvas.height) continue
+      const img = document.createElement('img')
+      img.src = canvas.toDataURL('image/png')
+      img.alt = 'Chart'
+      img.setAttribute('data-pdf-chart-image', 'true')
+      img.style.cssText = [
+        'display:block',
+        'width:100%',
+        'max-width:100%',
+        'height:auto',
+        `min-height:${Math.max(src.offsetHeight, 120)}px`,
+        'object-fit:contain',
+      ].join(';')
+      dst.replaceWith(img)
+    } catch (err) {
+      console.warn('PDF chart rasterize failed', err)
+    }
+  }
 }
 
 function applyPdfSpacingStyles(clone: HTMLElement, captureWidth: number) {
@@ -200,27 +260,46 @@ function collectCaptureItems(root: HTMLElement, captureWidth: number): CaptureIt
 
   const pushEl = (el: HTMLElement) => {
     if (seen.has(el) || el.style.display === 'none') return
+    for (const prev of seen) {
+      if (prev.contains(el) && prev !== el) return
+    }
+    for (const prev of [...seen]) {
+      if (el.contains(prev) && prev !== el) {
+        seen.delete(prev)
+        const idx = items.findIndex((it) => it.kind === 'element' && it.el === prev)
+        if (idx >= 0) items.splice(idx, 1)
+      }
+    }
     seen.add(el)
     items.push({ kind: 'element', el })
   }
+
+  /** Major report partitions only — one canvas each. */
+  const TOP_SELECTOR = [
+    '.lg-hero',
+    '.lg-kpi-strip',
+    '.lg-detail-head',
+    '.lg-detail-body',
+    '.lg-section',
+    'section.lg-section',
+    '.lg-footer',
+    'footer.lg-footer',
+    '[data-pdf-page]',
+  ].join(', ')
 
   const visit = (node: HTMLElement) => {
     for (const child of Array.from(node.children) as HTMLElement[]) {
       if (child.style.display === 'none') continue
 
-      if (child.matches('.lg-hero, .lg-kpi-strip, .lg-footer, footer.lg-footer')) {
-        pushEl(child)
-        continue
-      }
-
-      if (child.matches('.lg-section, section.lg-section')) {
+      if (child.matches(TOP_SELECTOR)) {
+        // Cohort "all assessments" can be huge — keep per-test split only there.
         if (child.id === 'all-assessments') {
-          const testBlocks = Array.from(
+          const tests = Array.from(
             child.querySelectorAll(':scope > [data-pdf-block]'),
           ) as HTMLElement[]
-          if (testBlocks.length > 0) {
+          if (tests.length > 0) {
             items.push({ kind: 'section-header', section: child, width: captureWidth })
-            for (const test of testBlocks) pushEl(test)
+            for (const test of tests) pushEl(test)
           } else {
             pushEl(child)
           }
@@ -232,8 +311,9 @@ function collectCaptureItems(root: HTMLElement, captureWidth: number): CaptureIt
 
       if (
         child.id === 'profile' ||
-        child.classList.contains('lg-detail-body') ||
-        child.querySelector(BLOCK_SELECTOR)
+        child.classList.contains('lg-student-page') ||
+        child.classList.contains('lg-overall-page') ||
+        child.querySelector(TOP_SELECTOR)
       ) {
         visit(child)
       }
@@ -241,6 +321,10 @@ function collectCaptureItems(root: HTMLElement, captureWidth: number): CaptureIt
   }
 
   visit(root)
+
+  if (items.length === 0) {
+    items.push({ kind: 'element', el: root })
+  }
   return items
 }
 
@@ -250,11 +334,16 @@ function gapAfterItem(item: CaptureItem, isLast: boolean): number {
   if (item.kind === 'element') {
     const el = item.el
     if (el.matches('.lg-hero')) return 0
-    if (el.matches('.lg-kpi-strip')) return BLOCK_GAP_MM
-    if (el.matches('[data-pdf-block]') && el.closest('#all-assessments')) return BLOCK_GAP_MM
+    if (el.matches('.lg-kpi-strip, .lg-detail-head')) return BLOCK_GAP_MM
     if (el.matches('.lg-footer, footer.lg-footer')) return 0
   }
   return BLOCK_GAP_MM
+}
+
+/** Start a new PDF page before knowledge layer only (simple partition). */
+function startsNewPage(item: CaptureItem): boolean {
+  if (item.kind !== 'element') return false
+  return item.el.matches('#knowledge-layer, .lg-kl-section')
 }
 
 async function waitForLayout() {
@@ -263,14 +352,18 @@ async function waitForLayout() {
   })
 }
 
-async function captureElement(el: HTMLElement, scale: number): Promise<HTMLCanvasElement> {
+async function captureElement(
+  el: HTMLElement,
+  scale: number,
+  backgroundColor: string = PARCHMENT_BG,
+): Promise<HTMLCanvasElement> {
   await waitForLayout()
   return html2canvas(el, {
     scale,
     useCORS: true,
     allowTaint: true,
     logging: false,
-    backgroundColor: PARCHMENT_BG,
+    backgroundColor,
     scrollX: 0,
     scrollY: 0,
     imageTimeout: 15000,
@@ -282,7 +375,7 @@ async function captureElement(el: HTMLElement, scale: number): Promise<HTMLCanva
   })
 }
 
-/** Clone section title/eyebrow only — avoids empty space from hidden siblings. */
+/** Clone section title/eyebrow only — used for all-assessments header. */
 async function captureSectionHeader(
   section: HTMLElement,
   width: number,
@@ -437,18 +530,26 @@ function drawBlockOnPdf(
   state: PdfLayoutState,
   canvas: HTMLCanvasElement,
   gapAfterMm: number,
+  forceNewPage = false,
 ) {
   if (!canvas.width || !canvas.height) return
 
-  if (state.pageOpen && state.yMm >= PDF_CONTENT_HEIGHT_MM - 1) {
+  if (forceNewPage && state.pageOpen && state.yMm > 2) {
+    state.pdf.addPage()
+    state.yMm = 0
+  } else if (state.pageOpen && state.yMm >= PDF_CONTENT_HEIGHT_MM - 1) {
     state.pdf.addPage()
     state.yMm = 0
   }
 
   const blockHeightMm = canvasHeightMm(canvas)
-  if (state.pageOpen && state.yMm > 0) {
+  if (state.pageOpen && state.yMm > 0 && !forceNewPage) {
     const remaining = PDF_CONTENT_HEIGHT_MM - state.yMm
-    if (remaining < MIN_REMAINING_MM && blockHeightMm > remaining) {
+    // If the block fits on a full page but not in leftover space, move it down.
+    if (blockHeightMm <= PDF_CONTENT_HEIGHT_MM - 0.5 && blockHeightMm > remaining + 0.5) {
+      state.pdf.addPage()
+      state.yMm = 0
+    } else if (remaining < MIN_REMAINING_MM && blockHeightMm > remaining) {
       state.pdf.addPage()
       state.yMm = 0
     }
@@ -554,7 +655,9 @@ export async function buildReportPdfBlob(
     stagingHost.appendChild(clone)
 
     await waitForLayout()
-    await new Promise((r) => window.setTimeout(r, 600))
+    await rasterizeLiveChartsIntoClone(root, clone)
+    await waitForLayout()
+    await new Promise((r) => window.setTimeout(r, 400))
 
     solidifyCloneForPdf(clone)
     applyPdfSpacingStyles(clone, captureWidth)
@@ -577,11 +680,19 @@ export async function buildReportPdfBlob(
       } else {
         const domH = Math.max(item.el.scrollHeight, item.el.offsetHeight, 0)
         if (domH < 1) continue
-        canvas = trimCanvasWhitespace(await captureElement(item.el, scale))
+        const inKnowledge = item.el.matches('#knowledge-layer, .lg-kl-section')
+        canvas = trimCanvasWhitespace(
+          await captureElement(item.el, scale, inKnowledge ? NAVY_BG : PARCHMENT_BG),
+        )
       }
 
       if (!canvas || canvas.height < 2) continue
-      drawBlockOnPdf(state, canvas, gapAfterItem(item, i === items.length - 1))
+      drawBlockOnPdf(
+        state,
+        canvas,
+        gapAfterItem(item, i === items.length - 1),
+        startsNewPage(item),
+      )
     }
 
     if (!state.pageOpen) {

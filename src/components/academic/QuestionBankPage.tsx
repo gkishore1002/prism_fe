@@ -70,6 +70,9 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
   const [resumePaperId, setResumePaperId] = useState<string | null>(null)
   const [createDirty, setCreateDirty] = useState(false)
   const [importDirty, setImportDirty] = useState(false)
+  /** Bumped after publish/draft so Create/Import remount blank (no leftover fields). */
+  const [createFormEpoch, setCreateFormEpoch] = useState(0)
+  const [importFormEpoch, setImportFormEpoch] = useState(0)
 
   const createRef = useRef<ManualQuestionEntryHandle>(null)
   const importRef = useRef<QuestionUploadWorkflowHandle>(null)
@@ -210,6 +213,8 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
       }
       // Manual tab clicks start fresh; Resume sets paperId then setTab directly.
       setResumePaperId(null)
+      if (next === 'create') setCreateFormEpoch((n) => n + 1)
+      if (next === 'import') setImportFormEpoch((n) => n + 1)
       setTab(next)
     },
     [createDirty, importDirty, tab],
@@ -221,6 +226,8 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
       setResumePaperId(null)
       setCreateDirty(false)
       setImportDirty(false)
+      if (source === 'manual') setCreateFormEpoch((n) => n + 1)
+      else setImportFormEpoch((n) => n + 1)
       setTab('library')
       showFlash(
         source === 'manual'
@@ -231,14 +238,27 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
     [refresh],
   )
 
+  function handleDraftSaved(paper: QuestionPaper) {
+    setResumePaperId(null)
+    setCreateDirty(false)
+    setImportDirty(false)
+    if (paper.source === 'upload') setImportFormEpoch((n) => n + 1)
+    else setCreateFormEpoch((n) => n + 1)
+    void refresh()
+    setTab('drafts')
+    showFlash(
+      `Draft saved · "${paper.name}". Form cleared — use Continue in Drafts to edit again.`,
+    )
+  }
+
   function resumeDraft(paper: QuestionPaper) {
     setResumePaperId(paper.id)
     if (paper.source === 'upload') {
       setTab('import')
-      showFlash(`Resuming import draft "${paper.name}".`)
+      showFlash(`Draft loaded. You can Publish, Save as draft, or Discard.`)
     } else {
       setTab('create')
-      showFlash(`Resuming manual draft "${paper.name}".`)
+      showFlash(`Draft loaded. You can Publish, Save as draft, or Discard.`)
     }
   }
 
@@ -544,7 +564,7 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
             <EmptyState
               icon={PenLine}
               title="No drafts"
-              description="Save a Draft from Create or Import to continue later. Drafts stay here until you publish or delete them."
+              description="Use Save as draft from Create or Import to continue later. Drafts stay here until you publish or delete them."
               action={
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <button
@@ -569,7 +589,7 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
               <div className="px-4 sm:px-5 py-3 border-b border-border">
                 <h2 className="font-display text-lg text-foreground">Question bank drafts</h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Resume unfinished papers. Published papers appear under Library.
+                  Continue unfinished papers. Published papers appear under Library.
                 </p>
               </div>
               <div className="overflow-x-auto">
@@ -613,22 +633,23 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
                           <ActionMenu label={`Actions for ${paper.name}`}>
                             <ActionMenuItem onSelect={() => resumeDraft(paper)}>
                               <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
-                              Resume
+                              Continue
                             </ActionMenuItem>
                             <ActionMenuItem
                               className="text-rose"
                               onSelect={() => {
                                 void confirm({
-                                  title: 'Delete draft?',
-                                  message: `Delete draft "${paper.name}"?`,
-                                  confirmLabel: 'Delete',
+                                  title: 'Discard draft?',
+                                  message: 'Discard this draft? This cannot be undone.',
+                                  confirmLabel: 'Yes',
+                                  cancelLabel: 'No',
                                   variant: 'danger',
                                 }).then((ok) => {
                                   if (ok) void removePaper(paper.id)
                                 })
                               }}
                             >
-                              Delete
+                              Discard
                             </ActionMenuItem>
                           </ActionMenu>
                         </td>
@@ -664,11 +685,16 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
               <h2 className="font-display text-lg">Author paper</h2>
             </div>
             <ManualQuestionEntry
-              key={resumePaperId ? `manual-${resumePaperId}` : 'manual-new'}
+              key={
+                resumePaperId
+                  ? `manual-${resumePaperId}`
+                  : `manual-new-${createFormEpoch}`
+              }
               ref={createRef}
               initialPaperId={resumePaperId ?? undefined}
               onDirtyChange={setCreateDirty}
               onPublished={(paper) => void handlePublished(paper, 'manual')}
+              onDraftSaved={handleDraftSaved}
             />
           </AppCard>
         </section>
@@ -677,12 +703,17 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
       {tab === 'import' && !readOnly && (
         <section>
           <QuestionUploadWorkflow
-            key={resumePaperId ? `upload-${resumePaperId}` : 'upload-new'}
+            key={
+              resumePaperId
+                ? `upload-${resumePaperId}`
+                : `upload-new-${importFormEpoch}`
+            }
             ref={importRef}
             variant="full"
             initialPaperId={resumePaperId ?? undefined}
             onDirtyChange={setImportDirty}
             onPublished={(paper) => void handlePublished(paper, 'upload')}
+            onDraftSaved={handleDraftSaved}
             onPaperCreated={() => {
               /* handled via onPublished for library flash + tab switch */
             }}

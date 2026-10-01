@@ -11,7 +11,8 @@ import {
 } from '@/modules/reports/learningGenome/LearningGenomeShell'
 import {
   KnowledgeChapterTopicBars,
-  knowledgeFill,
+  TopicMasterySnapshot,
+  topicDisplayName,
   type KnowledgeItem,
 } from '@/modules/reports/learningGenome/KnowledgeDistribution'
 import { subjectColorForName } from '@/modules/tutor/lib/learningGenomeData'
@@ -50,8 +51,8 @@ export function AssessmentReportBody({
   const weakTopics = [...topics].sort((a, b) => a.masteryPct - b.masteryPct).slice(0, 5)
 
   return (
-    <div className="lg-student-page">
-      <div className="lg-detail-head">
+    <div className="lg-student-page" data-pdf-root-page>
+      <div className="lg-detail-head" data-pdf-block>
         <div>
           <h2>{displayName}</h2>
           <div className="sub">
@@ -64,7 +65,7 @@ export function AssessmentReportBody({
       </div>
 
       <div className="lg-detail-body">
-        <div className="lg-kpi-row">
+        <div className="lg-kpi-row" data-pdf-block>
           <div className="lg-kpi">
             <div className="v">{report.accuracy}%</div>
             <div className="l">{L.yourScore}</div>
@@ -97,7 +98,7 @@ export function AssessmentReportBody({
           </div>
         </div>
 
-        <div className="lg-detail-grid">
+        <div className="lg-detail-grid" data-pdf-block>
           <div className="lg-panel-block">
             <h4>{L.subjectAffinity}</h4>
             {report.subjectScores.length === 0 ? (
@@ -107,7 +108,9 @@ export function AssessmentReportBody({
             ) : (
               report.subjectScores.map((row) => (
                 <div key={row.subject} className="lg-affinity-row">
-                  <div className="sname">{row.subject}</div>
+                  <div className="sname" title={row.subject}>
+                    {row.subject}
+                  </div>
                   <div className="lg-affinity-track">
                     <div
                       className="lg-affinity-fill"
@@ -120,38 +123,16 @@ export function AssessmentReportBody({
             )}
           </div>
           <div className="lg-panel-block">
-            <h4>Topic mastery — this exam</h4>
-            {topics.length === 0 ? (
-              <p className="text-sm" style={{ color: 'var(--lg-text-muted)' }}>
-                Topic scores appear once questions on this paper are tagged.
-              </p>
-            ) : (
-              topics.map((row) => (
-                <div key={`${row.subject}-${row.chapter}-${row.concept}`} className="lg-affinity-row">
-                  <div className="sname" title={row.chapter ? `${row.chapter} · ${row.concept}` : row.concept}>
-                    {row.chapter ? `${row.chapter} · ${row.concept}` : row.concept}
-                  </div>
-                  <div className="lg-affinity-track">
-                    <div
-                      className="lg-affinity-fill"
-                      style={{
-                        width: `${row.masteryPct}%`,
-                        background: knowledgeFill(row.masteryPct, row.subject),
-                      }}
-                    />
-                  </div>
-                  <div className="lg-affinity-val">{row.masteryPct}%</div>
-                </div>
-              ))
-            )}
+            <h4>Topic snapshot</h4>
+            <TopicMasterySnapshot items={topics} />
           </div>
         </div>
 
-        <div id="narrative">
+        <div id="narrative" data-pdf-block>
           <AssessmentReportNarratives report={report} />
         </div>
 
-        <div className="lg-panel-block" style={{ marginTop: '0.5rem' }}>
+        <div className="lg-panel-block" style={{ marginTop: '0.5rem' }} data-pdf-block>
           <h4>{L.fullMetricSet}</h4>
           <div className="lg-metric-strip">
             <div className="lg-mstrip-item">
@@ -178,13 +159,13 @@ export function AssessmentReportBody({
         </div>
       </div>
 
-      <section className="lg-section lg-kl-section" id="knowledge-layer">
+      <section className="lg-section lg-kl-section" id="knowledge-layer" data-pdf-block>
         <div className="lg-eyebrow">Level 2 · This exam</div>
         <h2 className="lg-section-title">Knowledge Layer</h2>
         <p className="lg-section-desc">
           Chapter and topic breakdown for {report.assessmentTitle} only — not the full-term genome.
         </p>
-        <div className="lg-kl-banner">
+        <div className="lg-kl-banner" data-pdf-block>
           <b>Summary.</b> {report.knowledgeSummary || 'Topic measures appear after tagged questions on this paper.'}
         </div>
         <KnowledgeChapterTopicBars
@@ -198,12 +179,15 @@ export function AssessmentReportBody({
               <p className="lg-kl-note">No topic error pattern on this paper.</p>
             ) : (
               <ul className="lg-kl-error-list">
-                {weakTopics.map((item) => (
-                  <li key={`${item.subject}-${item.chapter}-${item.concept}`}>
-                    {item.chapter ? `${item.chapter} · ${item.concept}` : item.concept}
+                {weakTopics.map((item) => {
+                  const name = topicDisplayName(item.concept, item.chapter)
+                  return (
+                  <li key={`${item.subject}-${item.chapter}-${item.concept}`} title={item.chapter ? `${item.chapter} · ${name}` : name}>
+                    {name}
                     <span className="pct">{item.masteryPct}%</span>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             )}
           </div>

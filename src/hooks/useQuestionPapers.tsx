@@ -87,9 +87,9 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, loaded])
 
   const ensureLoaded = useCallback(async () => {
-    if (loaded || loading) return
+    if (loaded) return
     await refresh()
-  }, [loaded, loading, refresh])
+  }, [loaded, refresh])
 
   const addPaperFromManualQuestions = useCallback(
     async (
@@ -174,7 +174,10 @@ export function QuestionPaperProvider({ children }: { children: ReactNode }) {
   )
 
   const getQuestionsByIds = useCallback(
-    (ids: string[]) => questions.filter((q) => ids.includes(q.id)),
+    (ids: string[]) => {
+      const byId = new Map(questions.map((q) => [q.id, q]))
+      return ids.map((id) => byId.get(id)).filter((q): q is QuestionBankEntry => Boolean(q))
+    },
     [questions],
   )
 

@@ -179,6 +179,7 @@ export function LgHero({
   showSeal = false,
   backHref,
   backLabel,
+  compact = false,
 }: {
   reportKind: string
   title: ReactNode
@@ -195,12 +196,14 @@ export function LgHero({
   showSeal?: boolean
   backHref?: string
   backLabel?: string
+  /** Tighter student-report hero (Swotify detail-head scale). */
+  compact?: boolean
 }) {
   const { t } = useReportLabels()
   const statsBlock =
     stats && stats.length > 0 ? (
       statsPlacement === 'below' ? (
-        <div className="lg-kpi-strip">
+        <div className={`lg-kpi-strip${compact ? ' lg-kpi-strip--compact' : ''}`}>
           {stats.map((stat) => (
             <div key={stat.label} className="lg-kpi">
               <div className="v">
@@ -228,7 +231,7 @@ export function LgHero({
 
   return (
     <>
-      <section className="lg-hero">
+      <section className={`lg-hero${compact ? ' lg-hero--compact' : ''}`}>
         <div className="lg-hero-top">
           <div className="lg-brand">
             <HeroBrandMark />
@@ -259,7 +262,8 @@ export function LgHero({
         </h1>
 
         {quickFacts && <p className="lg-hero-quickfacts">{quickFacts}</p>}
-        {description && <p className="lg-hero-desc">{description}</p>}
+        {description && !compact && <p className="lg-hero-desc">{description}</p>}
+        {description && compact && <p className="lg-hero-desc lg-hero-desc--compact">{description}</p>}
 
         {detailLines && detailLines.length > 0 && (
           <div className="lg-hero-details">

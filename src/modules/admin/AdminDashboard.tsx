@@ -25,6 +25,7 @@ import { AdminBankQuestionPaperPage } from './pages/BankQuestionPaperPage'
 import { AdminAssessmentsPage } from './pages/AssessmentsPage'
 import { AdminQuestionPaperPage } from './pages/QuestionPaperPage'
 import { AdminAssessmentAttendancePage } from '@/components/academic/AssessmentAttendancePage'
+import { TutorMarksPage } from '@/modules/tutor/pages/MarksPage'
 import { AdminSettingsPage } from './pages/SettingsPage'
 import { AdminStaffPage } from './pages/StaffPage'
 import { AdminManageLayout } from './pages/ManageLayout'
@@ -77,6 +78,7 @@ export function AdminDashboard() {
           <Route path="assessments" element={<AdminAssessmentsPage />} />
           <Route path="assessments/:assessmentId/paper" element={<AdminQuestionPaperPage />} />
           <Route path="assessments/:assessmentId/attendance" element={<AdminAssessmentAttendancePage />} />
+          <Route path="marks" element={<TutorMarksPage />} />
           <Route path="reports" element={<AdminReportsLayout />}>
             <Route index element={<Navigate to="insights" replace />} />
             <Route path="insights" element={<AdminInsightsPage />} />

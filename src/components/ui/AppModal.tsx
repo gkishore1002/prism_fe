@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { AlertTriangle, FilePenLine, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full'
@@ -189,6 +189,77 @@ interface ConfirmModalContextValue {
 
 const ConfirmModalContext = createContext<ConfirmModalContextValue | null>(null)
 
+/** Centered confirm shell — Swotify-style (icon + title + message + stacked/row actions). */
+function ConfirmDialogShell({
+  title,
+  message,
+  tone = 'default',
+  children,
+  onDismiss,
+}: {
+  title: string
+  message?: string
+  tone?: 'default' | 'danger' | 'draft'
+  children: ReactNode
+  onDismiss: () => void
+}) {
+  const Icon = tone === 'danger' ? Trash2 : tone === 'draft' ? FilePenLine : AlertTriangle
+  const iconWrap =
+    tone === 'danger'
+      ? 'bg-rose/10 text-rose'
+      : tone === 'draft'
+        ? 'bg-accent/15 text-accent-foreground'
+        : 'bg-amber-50 text-amber-800'
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-ln-modal flex items-center justify-center p-4 safe-top safe-bottom"
+      role="presentation"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default bg-ink/50 backdrop-blur-[2px]"
+        aria-label="Dismiss"
+        onClick={onDismiss}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="prism-confirm-title"
+        className="relative z-[1] w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-center shadow-[0_18px_50px_rgba(15,23,42,0.22)] animate-ios-sheet sm:p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={cn('mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full', iconWrap)}>
+          <Icon className="h-6 w-6" aria-hidden />
+        </div>
+        <h3 id="prism-confirm-title" className="font-display text-lg font-semibold text-foreground">
+          {title}
+        </h3>
+        {message ? (
+          <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+            {message}
+          </p>
+        ) : null}
+        <div className="mt-5 flex flex-col gap-2">{children}</div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function confirmBtnClass(kind: 'primary' | 'secondary' | 'danger' | 'ghost') {
+  if (kind === 'danger') {
+    return 'w-full rounded-xl bg-rose px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90'
+  }
+  if (kind === 'primary') {
+    return 'w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-hover'
+  }
+  if (kind === 'secondary') {
+    return 'w-full rounded-xl border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-accent/20'
+  }
+  return 'w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground'
+}
+
 export function ConfirmModalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ModalState | null>(null)
 
@@ -216,86 +287,98 @@ export function ConfirmModalProvider({ children }: { children: ReactNode }) {
     setState(null)
   }
 
+  useEffect(() => {
+    if (!state) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      setState((prev) => {
+        if (!prev) return null
+        if (prev.kind === 'unsaved') prev.resolve(null)
+        else prev.resolve(false)
+        return null
+      })
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [state])
+
   const isDanger = state?.kind === 'binary' && state.variant === 'danger'
   const isUnsaved = state?.kind === 'unsaved'
 
   return (
     <ConfirmModalContext.Provider value={{ confirm, confirmUnsavedWork }}>
       {children}
-      <AppModal
-        open={Boolean(state)}
-        onClose={() => (isUnsaved ? closeUnsaved(null) : closeBinary(false))}
-        title={
-          state?.kind === 'unsaved'
-            ? (state.title ?? 'Unsaved work')
-            : (state?.title ?? 'Confirm')
-        }
-        size="sm"
-        closeOnOverlay={false}
-        footerClassName={
-          isUnsaved
-            ? 'justify-stretch flex-col-reverse sm:flex-row sm:justify-end gap-2'
-            : 'justify-stretch flex-col-reverse sm:flex-row sm:justify-end gap-2'
-        }
-        footer={
-          isUnsaved ? (
-            <>
-              <button
-                type="button"
-                onClick={() => closeUnsaved('cancel')}
-                className="text-sm px-4 py-2.5 rounded-[12px] border border-border glass ios-press hover:bg-secondary/60 transition-all duration-[280ms] w-full sm:w-auto"
-              >
-                {state.cancelLabel ?? 'Discard'}
-              </button>
-              <button
-                type="button"
-                onClick={() => closeUnsaved('draft')}
-                className="text-sm px-4 py-2.5 rounded-[12px] border border-accent/40 bg-accent/10 text-foreground font-medium ios-press hover:bg-accent/20 transition-all duration-[280ms] w-full sm:w-auto"
-              >
-                {state.draftLabel ?? 'Save draft'}
-              </button>
-              <button
-                type="button"
-                autoFocus
-                onClick={() => closeUnsaved('publish')}
-                className="text-sm px-4 py-2.5 rounded-[12px] font-medium bg-accent text-accent-foreground hover:opacity-90 ios-shadow-sm ios-press transition-all duration-[280ms] w-full sm:w-auto"
-              >
-                {state.publishLabel ?? 'Publish'}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => closeBinary(false)}
-                className="text-sm px-4 py-2.5 rounded-[12px] border border-border glass ios-press hover:bg-secondary/60 transition-all duration-[280ms] w-full sm:w-auto"
-              >
-                {state?.cancelLabel ?? 'Cancel'}
-              </button>
-              <button
-                type="button"
-                autoFocus
-                onClick={() => closeBinary(true)}
-                className={cn(
-                  'text-sm px-4 py-2.5 rounded-[12px] font-medium ios-press transition-all duration-[280ms] w-full sm:w-auto',
-                  isDanger
-                    ? 'bg-rose text-white hover:opacity-90 ios-shadow-sm'
-                    : 'bg-accent text-accent-foreground hover:opacity-90 ios-shadow-sm',
-                )}
-              >
-                {state?.confirmLabel ?? 'Confirm'}
-              </button>
-            </>
-          )
-        }
-      >
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          {state?.kind === 'unsaved'
-            ? (state.message ??
-              'You have unsaved changes. Save as draft to continue later, publish now, or discard and leave.')
-            : state?.message}
-        </p>
-      </AppModal>
+      {state ? (
+        isUnsaved ? (
+          <ConfirmDialogShell
+            title={state.title ?? 'Save before leaving?'}
+            message={
+              state.message ??
+              'You have unsaved changes. Publish, save as draft, or discard to leave this page.'
+            }
+            tone="draft"
+            onDismiss={() => closeUnsaved(null)}
+          >
+            <button
+              type="button"
+              autoFocus
+              onClick={() => closeUnsaved('publish')}
+              className={confirmBtnClass('primary')}
+            >
+              {state.publishLabel ?? 'Publish'}
+            </button>
+            <button
+              type="button"
+              onClick={() => closeUnsaved('draft')}
+              className={confirmBtnClass('secondary')}
+            >
+              {state.draftLabel ?? 'Save as draft'}
+            </button>
+            <button
+              type="button"
+              onClick={() => closeUnsaved('cancel')}
+              className={confirmBtnClass('danger')}
+            >
+              {state.cancelLabel ?? 'Discard & leave'}
+            </button>
+            <button
+              type="button"
+              onClick={() => closeUnsaved(null)}
+              className={confirmBtnClass('ghost')}
+            >
+              Stay on this page
+            </button>
+          </ConfirmDialogShell>
+        ) : (
+          <ConfirmDialogShell
+            title={state.title ?? 'Confirm'}
+            message={state.message}
+            tone={isDanger ? 'danger' : 'default'}
+            onDismiss={() => closeBinary(false)}
+          >
+            <button
+              type="button"
+              autoFocus
+              onClick={() => closeBinary(true)}
+              className={confirmBtnClass(isDanger ? 'danger' : 'primary')}
+            >
+              {state.confirmLabel ?? 'Confirm'}
+            </button>
+            <button
+              type="button"
+              onClick={() => closeBinary(false)}
+              className={confirmBtnClass('ghost')}
+            >
+              {state.cancelLabel ?? 'Cancel'}
+            </button>
+          </ConfirmDialogShell>
+        )
+      ) : null}
     </ConfirmModalContext.Provider>
   )
 }

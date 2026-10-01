@@ -5,6 +5,10 @@ import { ReportLoader } from '@/components/ui/PrismLoader'
 import { AppModal } from '@/components/ui/AppModal'
 import { btnClass } from '@/components/ui/Button'
 import { analyticsApi } from '@/lib/api/analyticsApi'
+import {
+  fetchStudentGenome,
+  type ApiStudentGenome,
+} from '@/lib/api/cohortReportApi'
 import type { AssessmentReport, OverallPerformanceReport } from '@/types'
 import { fallbackAssessmentSummaryTa } from '@/lib/reportBilingual'
 import { formatReportDate } from '@/lib/reportFormatters'
@@ -40,6 +44,7 @@ export function StudentPerformanceReportPage({
   const [overall, setOverall] = useState<OverallPerformanceReport | null>(null)
   const [overallError, setOverallError] = useState<string | null>(null)
   const [assessmentReports, setAssessmentReports] = useState<AssessmentReport[]>([])
+  const [genome, setGenome] = useState<ApiStudentGenome | null>(null)
   const [previewReport, setPreviewReport] = useState<AssessmentReport | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
 
@@ -78,6 +83,18 @@ export function StudentPerformanceReportPage({
       .finally(() => {
         if (!cancelled) setOverallLoading(false)
       })
+
+    if (studentId) {
+      void fetchStudentGenome(studentId)
+        .then((data) => {
+          if (!cancelled) setGenome(data)
+        })
+        .catch(() => {
+          if (!cancelled) setGenome(null)
+        })
+    } else {
+      setGenome(null)
+    }
 
     return () => {
       cancelled = true
@@ -234,6 +251,7 @@ export function StudentPerformanceReportPage({
               <OverallReportContent
                 report={overall}
                 assessmentReports={assessmentReports}
+                genome={genome}
                 backHref={reportsListHref}
                 backLabel="All students"
                 embedded

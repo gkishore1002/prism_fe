@@ -164,7 +164,7 @@ export function StudentAssessmentInsightsBody({
           <div className="lg-panel-block">
             <h4>{L.examPerformanceTrend}</h4>
             {trendData.length > 0 ? (
-              <div className="lg-chart-frame" style={{ height: 180 }}>
+              <div className="lg-chart-frame" style={{ height: 180 }} data-pdf-chart>
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={trendData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(13,27,42,0.1)" />
@@ -191,7 +191,7 @@ export function StudentAssessmentInsightsBody({
             <h4 className="lg-mono text-[0.62rem] uppercase tracking-widest text-[var(--lg-amber)] mb-2">
               {L.allAssessmentsChart}
             </h4>
-            <div className="lg-chart-frame" style={{ height: 200 }}>
+            <div className="lg-chart-frame" style={{ height: 200 }} data-pdf-chart>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={comparisonBars}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(13,27,42,0.1)" />

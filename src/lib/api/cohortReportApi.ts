@@ -10,6 +10,7 @@ import type { ConceptNotMastered } from '@/modules/tutor/lib/learningGenomeConce
 export interface ApiGenomeStudentProfile {
   overall: number
   subjAvg: Partial<Record<SubjectCode, number>>
+  subjectNames?: Partial<Record<SubjectCode, string>>
   strongest: SubjectCode
   weakest: SubjectCode
   bestDay: { date: string; score: number }
@@ -27,7 +28,13 @@ export interface ApiGenomeStudentProfile {
   balance: string
   growthPotential: number
   confidence: number
-  dailyCurve: { date: string; subject: SubjectCode; score: number; title?: string }[]
+  dailyCurve: {
+    date: string
+    subject: SubjectCode
+    subjectName?: string
+    score: number
+    title?: string
+  }[]
   examHistory?: {
     title: string
     date: string
@@ -89,6 +96,8 @@ export interface ApiCohortReport {
   topicMastery?: ConceptNotMastered[]
   knowledgeSummary?: string
   dataSource: 'live' | 'empty'
+  computedAt?: string
+  fingerprint?: string
 }
 
 export interface ApiStudentGenome {
@@ -109,6 +118,7 @@ function mapProfile(p: ApiGenomeStudentProfile): GenomeStudentProfile {
   return {
     overall: p.overall,
     subj_avg: p.subjAvg,
+    subject_names: p.subjectNames,
     strongest: p.strongest,
     weakest: p.weakest,
     best_day: p.bestDay,

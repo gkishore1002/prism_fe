@@ -63,6 +63,7 @@ export function GenomeFingerprintChart({
   const poly = pts.map((p) => p.join(',')).join(' ')
 
   return (
+    <div className="lg-chart-frame" data-pdf-chart style={{ width: size, height: size, margin: '0 auto' }}>
     <svg
       width={size}
       height={size}
@@ -112,6 +113,7 @@ export function GenomeFingerprintChart({
         )
       })}
     </svg>
+    </div>
   )
 }
 
@@ -129,6 +131,7 @@ export function DailyCurveChart({ curve, height = 180 }: { curve: GenomeDailyPoi
   const avgY = y(avg)
 
   return (
+    <div className="lg-chart-frame" data-pdf-chart style={{ width: '100%', height: h }}>
     <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label="Daily performance curve">
       {[0, 25, 50, 75, 100].map((v) => (
         <g key={v}>
@@ -161,11 +164,11 @@ export function DailyCurveChart({ curve, height = 180 }: { curve: GenomeDailyPoi
           cx={x(i)}
           cy={y(d.score)}
           r={4}
-          fill={SUBJECT_COLORS[d.subject]}
+          fill={SUBJECT_COLORS[d.subject] ?? SUBJECT_COLORS.OTH}
           stroke="#fff"
           strokeWidth={1.5}
         >
-          <title>{`${d.subject} ${d.date}: ${d.score}%`}</title>
+          <title>{`${d.subjectName || SUBJECT_FULL[d.subject] || d.subject} ${d.date}: ${d.score}%`}</title>
         </circle>
       ))}
       {curve.map((d, i) => (
@@ -182,6 +185,7 @@ export function DailyCurveChart({ curve, height = 180 }: { curve: GenomeDailyPoi
         </text>
       ))}
     </svg>
+    </div>
   )
 }
 

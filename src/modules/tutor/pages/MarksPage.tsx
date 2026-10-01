@@ -7,6 +7,7 @@ import {
   Eye,
   FileSpreadsheet,
   PenLine,
+  Trash2,
   Upload,
   X,
 } from 'lucide-react'
@@ -24,6 +25,7 @@ import {
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { useCenters } from '@/hooks/useCenters'
 import { useUnsavedWorkGuard } from '@/hooks/useUnsavedWorkGuard'
+import { useConfirmModal } from '@/components/ui/AppModal'
 import { fetchStudentsForBatch } from '@/lib/api/curriculumApi'
 import {
   getCurriculumSubjectsForBatch,
@@ -103,8 +105,17 @@ type MarksTab = (typeof TABS)[number]['id']
 
 export function TutorMarksPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const skipManualBatchResetRef = useRef(false)
-  const skipUploadBatchResetRef = useRef(false)
+  /** Holds grid data until students load; protect flag blocks later curriculum-triggered resets. */
+  const pendingManualResumeRef = useRef<{
+    columns: MarksColumnConfig[]
+    marks: MarksGrid
+  } | null>(null)
+  const protectManualGridRef = useRef(false)
+  const pendingUploadResumeRef = useRef<{
+    columns: MarksColumnConfig[]
+    marks: MarksGrid
+  } | null>(null)
+  const protectUploadGridRef = useRef(false)
   const skipNextTabSetRef = useRef(false)
   const { batches, curriculum, ensureLoaded } = useCurriculum()
   const { activeCenterId, isAllBranches } = useCenters()
@@ -116,6 +127,9 @@ export function TutorMarksPage() {
 
   const [tab, setTab] = useState<MarksTab>('recent')
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null)
+  /** Bumped after publish/draft/cancel so Manual/Upload editors remount blank. */
+  const [manualFormEpoch, setManualFormEpoch] = useState(0)
+  const [uploadFormEpoch, setUploadFormEpoch] = useState(0)
 
   const [offlineRecords, setOfflineRecords] = useState<MarksRecord[]>([])
   const [drafts, setDrafts] = useState<MarksDraftApi[]>([])
@@ -209,10 +223,8 @@ export function TutorMarksPage() {
   useEffect(() => {
     if (!batchId) {
       setBatchStudents([])
-      if (!skipManualBatchResetRef.current) {
+      if (!protectManualGridRef.current) {
         setManualMarks({})
-      } else {
-        skipManualBatchResetRef.current = false
       }
       return
     }
@@ -223,12 +235,18 @@ export function TutorMarksPage() {
       .then((list) => {
         if (cancelled) return
         setBatchStudents(list.map((s) => ({ id: s.id, name: s.name })))
-        if (skipManualBatchResetRef.current) {
-          skipManualBatchResetRef.current = false
+        if (protectManualGridRef.current) {
+          const pending = pendingManualResumeRef.current
+          if (pending) {
+            pendingManualResumeRef.current = null
+            setManualColumns(pending.columns)
+            setManualMarks(pending.marks)
+          }
           return
         }
         setManualMarks({})
-        const subjects = getCurriculumSubjectsForBatch(curriculum, selectedBatch)
+        const batch = batches.find((b) => b.id === batchId)
+        const subjects = getCurriculumSubjectsForBatch(curriculum, batch)
         setManualColumns([
           createMarksColumn({ conductedOn: todayIso(), subject: subjects[0] ?? '' }),
         ])
@@ -243,7 +261,7 @@ export function TutorMarksPage() {
     return () => {
       cancelled = true
     }
-  }, [batchId, curriculum, selectedBatch, branchCenterId])
+  }, [batchId, branchCenterId, batches, curriculum])
 
   const clearUploadPreview = useCallback(() => {
     setUploadPreviewLoaded(false)
@@ -256,28 +274,35 @@ export function TutorMarksPage() {
   useEffect(() => {
     if (!uploadBatchId) {
       setUploadStudents([])
-      if (!skipUploadBatchResetRef.current) {
+      if (!protectUploadGridRef.current) {
         clearUploadPreview()
-      } else {
-        skipUploadBatchResetRef.current = false
       }
       return
     }
 
     let cancelled = false
     setLoadingUploadStudents(true)
-    if (!skipUploadBatchResetRef.current) {
+    if (!protectUploadGridRef.current) {
       clearUploadPreview()
     }
     void fetchStudentsForBatch(uploadBatchId, branchCenterId)
       .then((list) => {
         if (cancelled) return
         setUploadStudents(list.map((s) => ({ id: s.id, name: s.name })))
-        if (skipUploadBatchResetRef.current) {
-          skipUploadBatchResetRef.current = false
+        if (protectUploadGridRef.current) {
+          const pending = pendingUploadResumeRef.current
+          if (pending) {
+            pendingUploadResumeRef.current = null
+            setUploadColumns(pending.columns)
+            setUploadMarks(pending.marks)
+            setUploadPreviewLoaded(Object.keys(pending.marks).length > 0)
+            setUploadFileName(null)
+            setUploadParseError(null)
+          }
           return
         }
-        const subjects = getCurriculumSubjectsForBatch(curriculum, uploadBatch)
+        const batch = batches.find((b) => b.id === uploadBatchId)
+        const subjects = getCurriculumSubjectsForBatch(curriculum, batch)
         setUploadColumns([
           createMarksColumn({ conductedOn: todayIso(), subject: subjects[0] ?? '' }),
         ])
@@ -292,27 +317,39 @@ export function TutorMarksPage() {
     return () => {
       cancelled = true
     }
-  }, [uploadBatchId, curriculum, uploadBatch, clearUploadPreview, branchCenterId])
+  }, [uploadBatchId, branchCenterId, clearUploadPreview, batches, curriculum])
 
-  const marksLog = useMemo(
-    () =>
-      [...offlineRecords].sort(
-        (a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime(),
-      ),
-    [offlineRecords],
-  )
+  const visibleBatchNames = useMemo(() => new Set(batches.map((b) => b.name)), [batches])
+  const visibleBatchIds = useMemo(() => new Set(batches.map((b) => b.id)), [batches])
+
+  const marksLog = useMemo(() => {
+    const scoped =
+      batches.length === 0
+        ? offlineRecords
+        : offlineRecords.filter((r) => visibleBatchNames.has(r.batch))
+    return [...scoped].sort(
+      (a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime(),
+    )
+  }, [offlineRecords, batches.length, visibleBatchNames])
 
   const activitySessions = useMemo(() => groupMarksBySession(marksLog), [marksLog])
 
-  const sortedDrafts = useMemo(
-    () =>
-      [...drafts].sort(
-        (a, b) =>
-          new Date(b.updatedAt || b.createdAt).getTime() -
-          new Date(a.updatedAt || a.createdAt).getTime(),
-      ),
-    [drafts],
-  )
+  const sortedDrafts = useMemo(() => {
+    const scoped =
+      batches.length === 0
+        ? drafts
+        : drafts.filter(
+            (d) =>
+              !d.batchId ||
+              visibleBatchIds.has(d.batchId) ||
+              (d.batch ? visibleBatchNames.has(d.batch) : false),
+          )
+    return [...scoped].sort(
+      (a, b) =>
+        new Date(b.updatedAt || b.createdAt).getTime() -
+        new Date(a.updatedAt || a.createdAt).getTime(),
+    )
+  }, [drafts, batches.length, visibleBatchIds, visibleBatchNames])
 
   const manualCount = offlineRecords.filter((r) => r.source === 'manual').length
   const uploadCount = offlineRecords.filter((r) => r.source === 'upload').length
@@ -323,7 +360,8 @@ export function TutorMarksPage() {
   }, [])
 
   const resetManualForm = useCallback(() => {
-    skipManualBatchResetRef.current = false
+    protectManualGridRef.current = false
+    pendingManualResumeRef.current = null
     setManualDraftId(null)
     setManualTitle('')
     setManualDescription('')
@@ -332,10 +370,12 @@ export function TutorMarksPage() {
     setManualColumns(emptyColumns())
     setManualMarks({})
     setManualDirty(false)
+    setManualFormEpoch((n) => n + 1)
   }, [])
 
   const resetUploadForm = useCallback(() => {
-    skipUploadBatchResetRef.current = false
+    protectUploadGridRef.current = false
+    pendingUploadResumeRef.current = null
     setUploadDraftId(null)
     setUploadTitle('')
     setUploadBatchId('')
@@ -343,6 +383,7 @@ export function TutorMarksPage() {
     setUploadColumns(emptyColumns())
     clearUploadPreview()
     setUploadDirty(false)
+    setUploadFormEpoch((n) => n + 1)
   }, [clearUploadPreview])
 
   function buildRecordsFromGrid(
@@ -517,12 +558,17 @@ export function TutorMarksPage() {
         if (manualDraftId) {
           await updateMarksDraft(manualDraftId, payload)
         } else {
-          const created = await createMarksDraft(payload)
-          setManualDraftId(created.id)
+          await createMarksDraft(payload)
         }
-        setManualDirty(false)
+        // Swotify parity: clear the editor — draft lives in the list until Continue.
+        resetManualForm()
+        skipNextTabSetRef.current = true
+        setTab('drafts')
         await reloadMarks()
-        flash('success', 'Draft saved.')
+        flash(
+          'success',
+          'Draft saved. The form was cleared — use Continue in Drafts to edit again.',
+        )
       } catch (e) {
         flash('error', e instanceof Error ? e.message : 'Failed to save draft.')
         throw e
@@ -536,12 +582,16 @@ export function TutorMarksPage() {
         if (uploadDraftId) {
           await updateMarksDraft(uploadDraftId, payload)
         } else {
-          const created = await createMarksDraft(payload)
-          setUploadDraftId(created.id)
+          await createMarksDraft(payload)
         }
-        setUploadDirty(false)
+        resetUploadForm()
+        skipNextTabSetRef.current = true
+        setTab('drafts')
         await reloadMarks()
-        flash('success', 'Draft saved.')
+        flash(
+          'success',
+          'Draft saved. Preview cleared — use Continue in Drafts to edit again.',
+        )
       } catch (e) {
         flash('error', e instanceof Error ? e.message : 'Failed to save draft.')
         throw e
@@ -553,6 +603,8 @@ export function TutorMarksPage() {
     flash,
     manualDraftId,
     reloadMarks,
+    resetManualForm,
+    resetUploadForm,
     tab,
     uploadDraftId,
   ])
@@ -563,6 +615,7 @@ export function TutorMarksPage() {
         flash('error', 'Select a batch first.')
         throw new Error('No batch')
       }
+      const publishedTitle = manualTitle.trim() || 'Untitled assessment'
       const result = await persistMarks(batchStudents, manualColumns, manualMarks, {
         title: manualTitle,
         description: manualDescription,
@@ -584,7 +637,7 @@ export function TutorMarksPage() {
       resetManualForm()
       skipNextTabSetRef.current = true
       setTab('recent')
-      flash('success', `Published · ${manualTitle.trim() || 'Untitled assessment'}`)
+      flash('success', `Published · ${publishedTitle}`)
       await reloadMarks()
       return
     }
@@ -656,7 +709,7 @@ export function TutorMarksPage() {
       }
       resetManualForm()
       await reloadMarks()
-      flash('success', 'Form reset.')
+      flash('success', 'Draft discarded.')
       return
     }
 
@@ -671,9 +724,28 @@ export function TutorMarksPage() {
       }
       resetUploadForm()
       await reloadMarks()
-      flash('success', 'Form reset.')
+      flash('success', 'Draft discarded.')
     }
   }, [flash, manualDraftId, reloadMarks, resetManualForm, resetUploadForm, tab, uploadDraftId])
+
+  const discardDraftById = useCallback(
+    async (draftId: string) => {
+      if (!marksApiAvailable()) {
+        flash('error', 'Marks require a connection to the Prism API.')
+        return
+      }
+      try {
+        await deleteMarksDraft(draftId)
+        if (manualDraftId === draftId) resetManualForm()
+        if (uploadDraftId === draftId) resetUploadForm()
+        await reloadMarks()
+        flash('success', 'Draft discarded.')
+      } catch (e) {
+        flash('error', e instanceof Error ? e.message : 'Failed to discard draft.')
+      }
+    },
+    [flash, manualDraftId, reloadMarks, resetManualForm, resetUploadForm, uploadDraftId],
+  )
 
   const { requestLeave, confirmDraft, confirmPublish, confirmCancel, markClean } =
     useUnsavedWorkGuard({
@@ -682,10 +754,31 @@ export function TutorMarksPage() {
       onPublish: publishActive,
       onCancel: cancelActive,
       modalOptions: {
-        title: 'Unsaved marks',
-        message: 'You have unsaved marks. Save a draft, publish, or discard before leaving.',
+        title: 'Save before leaving?',
+        message:
+          'You have unsaved marks. Publish to the school, save as draft, or discard to leave this page.',
+        draftLabel: 'Save draft',
+        publishLabel: 'Publish',
+        cancelLabel: 'Discard & leave',
       },
     })
+
+  const { confirm } = useConfirmModal()
+
+  const requestDiscardDraft = useCallback(
+    async (draftId: string) => {
+      const ok = await confirm({
+        title: 'Discard draft?',
+        message: 'Discard this draft? This cannot be undone.',
+        confirmLabel: 'Yes',
+        cancelLabel: 'No',
+        variant: 'danger',
+      })
+      if (!ok) return
+      await discardDraftById(draftId)
+    },
+    [confirm, discardDraftById],
+  )
 
   const handleTabChange = useCallback(
     async (next: MarksTab) => {
@@ -714,7 +807,8 @@ export function TutorMarksPage() {
       const marks = payload.marks ?? {}
 
       if (draft.source === 'upload') {
-        skipUploadBatchResetRef.current = true
+        protectUploadGridRef.current = true
+        pendingUploadResumeRef.current = { columns, marks }
         setUploadDraftId(draft.id)
         setUploadTitle(draft.assessmentTitle ?? '')
         setUploadColumns(columns)
@@ -726,11 +820,12 @@ export function TutorMarksPage() {
         setUploadDirty(false)
         markClean()
         setTab('upload')
-        flash('success', 'Draft resumed — continue editing, then Draft or Publish.')
+        flash('success', 'Draft loaded. You can Publish, Save as draft, or Discard.')
         return
       }
 
-      skipManualBatchResetRef.current = true
+      protectManualGridRef.current = true
+      pendingManualResumeRef.current = { columns, marks }
       setManualDraftId(draft.id)
       setManualTitle(draft.assessmentTitle ?? '')
       setManualDescription(draft.description ?? '')
@@ -740,7 +835,7 @@ export function TutorMarksPage() {
       setManualDirty(false)
       markClean()
       setTab('manual')
-      flash('success', 'Draft resumed — continue editing, then Draft or Publish.')
+      flash('success', 'Draft loaded. You can Publish, Save as draft, or Discard.')
     },
     [flash, markClean],
   )
@@ -905,19 +1000,17 @@ export function TutorMarksPage() {
       source === 'manual'
         ? Boolean(batchId && batchStudents.length > 0)
         : Boolean(uploadPreviewLoaded && uploadBatchId && uploadStudents.length > 0)
-    const canCancel =
+    const editingDraftId = source === 'manual' ? manualDraftId : uploadDraftId
+    const canSaveDraft =
+      source === 'manual'
+        ? Boolean(batchId && batchStudents.length > 0) && (manualDirty || Boolean(manualDraftId))
+        : Boolean(uploadPreviewLoaded && uploadBatchId && uploadStudents.length > 0) &&
+          (uploadDirty || Boolean(uploadDraftId))
+    const canDiscard =
       source === 'manual' ? manualDirty || Boolean(manualDraftId) : uploadDirty || Boolean(uploadDraftId)
 
     return (
       <div className="flex flex-wrap items-center justify-end gap-2 pt-4 shrink-0">
-        <button
-          type="button"
-          disabled={!marksApiAvailable()}
-          onClick={() => void confirmDraft()}
-          className="border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary disabled:opacity-40"
-        >
-          Draft
-        </button>
         <button
           type="button"
           disabled={!canPublish || !marksApiAvailable()}
@@ -928,12 +1021,32 @@ export function TutorMarksPage() {
         </button>
         <button
           type="button"
-          disabled={!canCancel}
-          onClick={() => void confirmCancel()}
+          disabled={!canSaveDraft || !marksApiAvailable()}
+          onClick={() => void confirmDraft()}
           className="border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary disabled:opacity-40"
         >
-          Cancel
+          Save as draft
         </button>
+        {editingDraftId ? (
+          <button
+            type="button"
+            disabled={!canDiscard}
+            onClick={() => void confirmCancel()}
+            className="inline-flex items-center gap-1.5 border border-rose/30 text-rose px-4 py-2 rounded-md text-sm hover:bg-rose/5 disabled:opacity-40"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Discard
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={!canDiscard}
+            onClick={() => void confirmCancel()}
+            className="border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary disabled:opacity-40"
+          >
+            Cancel
+          </button>
+        )}
       </div>
     )
   }
@@ -943,7 +1056,7 @@ export function TutorMarksPage() {
       <PageHeader
         eyebrow="Marks management"
         title="Marks"
-        sub="Enter or upload offline exam marks here. Saved marks flow into Reports together with in-app assessment results. Export matches the spreadsheet layout."
+        sub="Enter or upload offline exam marks here. Save as draft to your account (like Gmail), or Publish to store marks and generate reports."
       />
 
       {!marksApiAvailable() && (
@@ -1056,7 +1169,9 @@ export function TutorMarksPage() {
             <h2 className="font-display text-lg text-foreground">Mark sheet drafts</h2>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            Resume unfinished manual or upload sheets. Published entries appear under Recent activity.
+            {marksApiAvailable()
+              ? 'Saved to your account — available on any device until you publish or discard.'
+              : 'These are not published yet. Continue to edit, then publish when ready.'}
           </p>
 
           {loadingMarks ? (
@@ -1065,7 +1180,7 @@ export function TutorMarksPage() {
             </div>
           ) : sortedDrafts.length === 0 ? (
             <div className="rounded-lg border border-border py-10 text-center text-muted-foreground text-sm">
-              No drafts yet. Save a Draft from Manual entry or Upload to continue later.
+              No drafts yet. Use Save as draft from Manual entry or Upload to continue later.
             </div>
           ) : (
             <div className="space-y-2">
@@ -1073,7 +1188,8 @@ export function TutorMarksPage() {
                 <MarksDraftRow
                   key={draft.id}
                   draft={draft}
-                  onResume={() => resumeDraft(draft)}
+                  onContinue={() => resumeDraft(draft)}
+                  onDiscard={() => void requestDiscardDraft(draft.id)}
                 />
               ))}
             </div>
@@ -1082,7 +1198,7 @@ export function TutorMarksPage() {
       )}
 
       {tab === 'upload' && (
-        <AppCard className="flex flex-col">
+        <AppCard key={`upload-form-${uploadFormEpoch}`} className="flex flex-col">
           <div className="flex flex-wrap items-end gap-3 mb-4">
             <div className="w-full sm:w-48 shrink-0">
               <AppDropdown
@@ -1090,6 +1206,8 @@ export function TutorMarksPage() {
                 value={uploadBatchId}
                 onChange={(value) => {
                   touchUpload()
+                  protectUploadGridRef.current = false
+                  pendingUploadResumeRef.current = null
                   setUploadBatchId(value)
                 }}
                 options={batchOptions}
@@ -1261,7 +1379,7 @@ export function TutorMarksPage() {
       )}
 
       {tab === 'manual' && (
-        <AppCard>
+        <AppCard key={`manual-form-${manualFormEpoch}`}>
           <div className="flex items-center gap-2 mb-2">
             <ClipboardCheck className="w-5 h-5 text-accent" />
             <h2 className="font-display text-lg text-foreground">Manual entry</h2>
@@ -1273,7 +1391,7 @@ export function TutorMarksPage() {
           </div>
           <p className="text-sm text-muted-foreground mb-6">
             Select a batch, set assessment details, then enter marks. Use <strong>Add column</strong>{' '}
-            for multiple subjects in one sheet. Save incomplete work as a draft, or publish when ready.
+            for multiple subjects in one sheet. Save as draft to continue later, or publish when ready.
           </p>
 
           <div className="space-y-4 mb-6">
@@ -1307,6 +1425,8 @@ export function TutorMarksPage() {
               value={batchId}
               onChange={(value) => {
                 touchManual()
+                protectManualGridRef.current = false
+                pendingManualResumeRef.current = null
                 setBatchId(value)
               }}
               options={batchOptions}
@@ -1369,17 +1489,21 @@ export function TutorMarksPage() {
   )
 }
 
-function MarksDraftRow({ draft, onResume }: { draft: MarksDraftApi; onResume: () => void }) {
+function MarksDraftRow({
+  draft,
+  onContinue,
+  onDiscard,
+}: {
+  draft: MarksDraftApi
+  onContinue: () => void
+  onDiscard: () => void
+}) {
   const columnCount = draft.payload?.columns?.length ?? 0
-  const title = draft.assessmentTitle?.trim() || 'Untitled draft'
+  const title = draft.assessmentTitle?.trim() || 'Untitled assessment'
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
-      <button
-        type="button"
-        onClick={onResume}
-        className="w-full flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 bg-card hover:bg-secondary/20 transition-colors text-left"
-      >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-3 bg-card">
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">
             <PenLine className="h-4 w-4" />
@@ -1389,29 +1513,39 @@ function MarksDraftRow({ draft, onResume }: { draft: MarksDraftApi; onResume: ()
             <h3 className="font-display text-base font-semibold text-foreground truncate">{title}</h3>
             <p className="text-xs text-muted-foreground mt-1">
               {draft.batch || 'No batch'}
+              {draft.source === 'upload' ? ' · Upload' : ' · Manual'}
               {columnCount > 0 && (
                 <>
                   <span className="mx-1.5">·</span>
                   {columnCount} column{columnCount === 1 ? '' : 's'}
                 </>
               )}
+              <span className="mx-1.5">·</span>
+              {formatSavedAt(draft.updatedAt || draft.createdAt)}
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0 sm:justify-end">
-          <span className="text-xs text-muted-foreground whitespace-nowrap order-last sm:order-none w-full sm:w-auto">
-            {formatSavedAt(draft.updatedAt || draft.createdAt)}
-          </span>
-          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300">
-            Draft
-          </span>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <SourceBadge source={draft.source === 'upload' ? 'upload' : 'manual'} />
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium min-h-[36px]">
-            Resume
-          </span>
+          <button
+            type="button"
+            onClick={onContinue}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-secondary min-h-[40px] sm:min-h-0"
+          >
+            <PenLine className="w-3.5 h-3.5" />
+            Continue
+          </button>
+          <button
+            type="button"
+            onClick={onDiscard}
+            className="inline-flex items-center gap-1.5 rounded-md border border-rose/30 px-2.5 py-1.5 text-xs font-medium text-rose hover:bg-rose/5 min-h-[40px] sm:min-h-0"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Discard
+          </button>
         </div>
-      </button>
+      </div>
     </div>
   )
 }

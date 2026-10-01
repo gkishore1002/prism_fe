@@ -1,8 +1,9 @@
-export type SubjectCode = 'TAM' | 'ENG' | 'MAT' | 'SCI' | 'SOC'
+export type SubjectCode = 'TAM' | 'ENG' | 'MAT' | 'SCI' | 'SOC' | 'OTH'
 
 export interface GenomeDailyPoint {
   date: string
   subject: SubjectCode
+  subjectName?: string
   score: number
   title?: string
 }
@@ -39,6 +40,7 @@ export interface GenomeLatestAssessment {
 export interface GenomeStudentProfile {
   overall: number
   subj_avg: Partial<Record<SubjectCode, number>>
+  subject_names?: Partial<Record<SubjectCode, string>>
   strongest: SubjectCode
   weakest: SubjectCode
   best_day: { date: string; score: number }

@@ -166,6 +166,8 @@ export interface AssessmentReport {
   submissionId?: string | null
   assessmentTitle: string
   subject: string
+  subjects?: string[]
+  batchName?: string | null
   score: number
   maxScore: number
   accuracy: number

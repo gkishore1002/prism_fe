@@ -10,6 +10,7 @@ export const SUBJECT_COLORS: Record<SubjectCode, string> = {
   MAT: '#9B4437',
   SCI: '#3A6191',
   SOC: '#7A5197',
+  OTH: '#6B7280',
 }
 
 export function subjectColorForName(name: string | undefined | null): string {
@@ -17,9 +18,21 @@ export function subjectColorForName(name: string | undefined | null): string {
   if (n.includes('tamil') || n === 'tam') return SUBJECT_COLORS.TAM
   if (n.includes('english') || n === 'eng') return SUBJECT_COLORS.ENG
   if (n.includes('math') || n === 'mat') return SUBJECT_COLORS.MAT
-  if (n.includes('social') || n === 'soc') return SUBJECT_COLORS.SOC
-  if (n.includes('sci')) return SUBJECT_COLORS.SCI
-  return SUBJECT_COLORS.TAM
+  if (n.includes('social') || n === 'soc' || n.includes('history') || n.includes('geography')) {
+    return SUBJECT_COLORS.SOC
+  }
+  if (
+    n.includes('sci') ||
+    n.includes('physics') ||
+    n.includes('chemistry') ||
+    n.includes('biology')
+  ) {
+    return SUBJECT_COLORS.SCI
+  }
+  if (n === 'oth' || n.includes('other') || n.includes('computer') || n.includes('hindi')) {
+    return SUBJECT_COLORS.OTH
+  }
+  return SUBJECT_COLORS.OTH
 }
 
 export const SUBJECT_FULL: Record<SubjectCode, string> = {
@@ -28,7 +41,22 @@ export const SUBJECT_FULL: Record<SubjectCode, string> = {
   MAT: 'Mathematics',
   SCI: 'Science',
   SOC: 'Social Science',
+  OTH: 'Other',
 }
+
+/** Prefer live subject label from the report payload; fall back to canonical name. */
+export function subjectFullLabel(
+  code: SubjectCode | string | undefined | null,
+  names?: Partial<Record<SubjectCode, string>> | null,
+): string {
+  if (!code) return 'Subject'
+  const key = code as SubjectCode
+  const fromPayload = names?.[key]
+  if (fromPayload && fromPayload.trim()) return fromPayload.trim()
+  return SUBJECT_FULL[key] ?? String(code)
+}
+
+export const SUBJECT_CODES: SubjectCode[] = ['TAM', 'ENG', 'MAT', 'SCI', 'SOC', 'OTH']
 
 export const CLUSTER_META: Record<string, { color: string; desc: string }> = {
   'High Performers': {
@@ -71,7 +99,7 @@ export function cohortSubjectMeasures(data: LearningGenomeDataset): {
   predicted: number
   color: string
 }[] {
-  const codes: SubjectCode[] = ['TAM', 'ENG', 'MAT', 'SCI', 'SOC']
+  const codes: SubjectCode[] = ['TAM', 'ENG', 'MAT', 'SCI', 'SOC', 'OTH']
   const names = Object.keys(data.students)
   if (!names.length) return []
 
@@ -79,10 +107,12 @@ export function cohortSubjectMeasures(data: LearningGenomeDataset): {
     .map((code) => {
       const masteryVals: number[] = []
       const predictedVals: number[] = []
+      let displayName = SUBJECT_FULL[code]
       for (const name of names) {
         const s = data.students[name]
         const m = s.subj_avg[code]
         if (m != null && m > 0) masteryVals.push(m)
+        if (s.subject_names?.[code]) displayName = s.subject_names[code] as string
         // Blend subject mastery with student predicted for subject outlook
         if (m != null && m > 0) {
           const lift = (s.predicted - s.overall) * 0.5
@@ -96,7 +126,7 @@ export function cohortSubjectMeasures(data: LearningGenomeDataset): {
       )
       return {
         code,
-        name: SUBJECT_FULL[code],
+        name: displayName,
         mastery,
         predicted,
         color: SUBJECT_COLORS[code],

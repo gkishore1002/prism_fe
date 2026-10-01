@@ -25,6 +25,7 @@ import { PrismMathKeyboard } from '@/components/math/PrismMathKeyboard'
 import { isMathematicsSubject } from '@/lib/mathSubject'
 import type { MathInsertTarget } from '@/lib/mathlive/mathTarget'
 import { mapQuestionTopics } from '@/lib/api/syllabusBooksApi'
+import * as questionsApi from '@/lib/api/questionsApi'
 import { ApiError, isApiEnabled } from '@/lib/apiClient'
 import { boardsMatch, getCurriculumSubjects } from '@/lib/academicScope'
 import { cn } from '@/lib/cn'
@@ -170,6 +171,32 @@ function snapshotKey(
     paperGrade,
     questions: questions.map(({ clientId: _c, ...rest }) => rest),
   })
+}
+
+/** True when the user entered real work (not just default board/grade shell). */
+function hasCreateWork(paperName: string, questions: ManualPaperDraftQuestion[]): boolean {
+  if (paperName.trim()) return true
+  if (questions.length > 1) return true
+  return questions.some(
+    (q) =>
+      Boolean(q.subject.trim()) ||
+      Boolean(q.chapter.trim()) ||
+      Boolean(q.topic.trim()) ||
+      Boolean(q.text.trim()) ||
+      Boolean(q.textImageKey) ||
+      Boolean(q.optionA?.trim()) ||
+      Boolean(q.optionB?.trim()) ||
+      Boolean(q.optionC?.trim()) ||
+      Boolean(q.optionD?.trim()) ||
+      Boolean(q.optionAImageKey) ||
+      Boolean(q.optionBImageKey) ||
+      Boolean(q.optionCImageKey) ||
+      Boolean(q.optionDImageKey) ||
+      q.difficulty !== 'medium' ||
+      q.marks !== 2 ||
+      q.questionType !== 'mcq' ||
+      (q.correctAnswer != null && q.correctAnswer !== 'A'),
+  )
 }
 
 interface QuestionBlockProps {
@@ -384,7 +411,7 @@ function ManualPreviewTable({
       <div className="px-4 sm:px-5 py-3 border-b border-border">
         <h3 className="font-display text-base text-foreground">Preview</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Review stem, academic path, and topics before Draft or Publish. Edit topics inline if needed.
+          Review stem, academic path, and topics before Save as draft or Publish. Edit topics inline if needed.
         </p>
       </div>
       <div className="overflow-x-auto max-h-[480px]">
@@ -481,11 +508,13 @@ export interface ManualQuestionEntryHandle {
 export interface ManualQuestionEntryProps {
   initialPaperId?: string
   onPublished?: (paper: QuestionPaper) => void
+  /** Called after Save as draft — parent should show Drafts list. */
+  onDraftSaved?: (paper: QuestionPaper) => void
   onDirtyChange?: (dirty: boolean) => void
 }
 
 export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQuestionEntryProps>(
-  function ManualQuestionEntry({ initialPaperId, onPublished, onDirtyChange }, ref) {
+  function ManualQuestionEntry({ initialPaperId, onPublished, onDraftSaved, onDirtyChange }, ref) {
     const { curriculum, ensureLoaded } = useCurriculum()
     const {
       addPaperFromManualQuestions,
@@ -532,7 +561,9 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
       label: g.grade,
     }))
 
-    const isDirty = snapshotKey(paperName, paperBoard, paperGrade, questions) !== cleanSnapshot
+    const hasWork = Boolean(draftId) || hasCreateWork(paperName, questions)
+    const isDirty =
+      hasWork && snapshotKey(paperName, paperBoard, paperGrade, questions) !== cleanSnapshot
 
     const blankTopicQuestions = useMemo(
       () => questions.filter((q) => !q.topic.trim() && (q.text.trim() || q.textImageKey)),
@@ -567,6 +598,8 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
       setDraftSavedAt(null)
       setShowPreview(false)
       setMappedIds([])
+      setMessage(null)
+      hydratedRef.current = null
       markFormClean('', board, grade, next)
     }, [boards, curriculum, markFormClean])
 
@@ -605,26 +638,46 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
       )
     }, [curriculum, paperBoard, paperGrade])
 
-    // Resume from server draft or optional local cache
+    // Resume from server draft — fetch fresh paper + questions so Continue always hydrates.
     useEffect(() => {
       let cancelled = false
       async function hydrate() {
-        if (initialPaperId) {
-          if (hydratedRef.current === initialPaperId) return
-          hydratedRef.current = initialPaperId
+        if (!initialPaperId) {
+          hydratedRef.current = null
+          return
+        }
+        if (hydratedRef.current === initialPaperId) return
+
+        try {
           await ensurePapersLoaded()
           if (cancelled) return
+
           let paper = getPaper(initialPaperId)
-          if (!paper) {
+          let bankQs = paper ? getQuestionsByIds(paper.questionIds) : []
+
+          // Always re-fetch when bank is missing rows — context can be stale after draft save.
+          if (!paper || (paper.questionIds.length > 0 && bankQs.length !== paper.questionIds.length)) {
+            const [qs, papers] = await Promise.all([
+              questionsApi.fetchQuestions(),
+              questionsApi.fetchQuestionPapers({ status: 'all' }),
+            ])
+            if (cancelled) return
             await refresh()
             if (cancelled) return
-            paper = getPaper(initialPaperId)
+            paper = papers.find((p) => p.id === initialPaperId) ?? getPaper(initialPaperId)
+            if (paper) {
+              const byId = new Map(qs.map((q) => [q.id, q]))
+              bankQs = paper.questionIds
+                .map((id) => byId.get(id))
+                .filter((q): q is QuestionBankEntry => Boolean(q))
+            }
           }
+
           if (!paper) {
             setMessage('Could not load that draft paper.')
             return
           }
-          const bankQs = getQuestionsByIds(paper.questionIds)
+
           const draftQs =
             bankQs.length > 0
               ? bankQs.map(bankEntryToDraftQuestion)
@@ -637,6 +690,7 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
                 ]
           const board = draftQs[0]?.board || paper.board || ''
           const grade = draftQs[0]?.grade || paper.grade || ''
+          if (cancelled) return
           setPaperName(paper.name)
           setPaperBoard(board)
           setPaperGrade(grade)
@@ -644,25 +698,21 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
           setDraftId(paper.id)
           markFormClean(paper.name, board, grade, draftQs)
           setDraftSavedAt(paper.createdAt || new Date().toISOString())
-          setMessage(`Resumed draft "${paper.name}".`)
-          return
+          setMessage(
+            bankQs.length > 0
+              ? `Resumed draft "${paper.name}" (${bankQs.length} question${bankQs.length === 1 ? '' : 's'}).`
+              : `Resumed draft "${paper.name}". Add questions, then Draft or Publish.`,
+          )
+          hydratedRef.current = initialPaperId
+        } catch {
+          if (!cancelled) setMessage('Could not load that draft paper.')
         }
-
-        // No local cache restore — Create always starts blank unless Resume was chosen.
       }
       void hydrate()
       return () => {
         cancelled = true
       }
-    }, [
-      initialPaperId,
-      ensurePapersLoaded,
-      getPaper,
-      getQuestionsByIds,
-      markFormClean,
-      refresh,
-      curriculum,
-    ])
+    }, [initialPaperId, ensurePapersLoaded, getPaper, getQuestionsByIds, markFormClean, refresh])
 
     // Drop any leftover browser-local draft caches once.
     useEffect(() => {
@@ -671,6 +721,8 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
 
     // Clear subject if it is no longer valid for the selected board/grade.
     useEffect(() => {
+      // Don't wipe subjects while curriculum scope is still empty (loading / unmatched).
+      if (subjects.length === 0) return
       setQuestions((prev) => {
         let changed = false
         const next = prev.map((q) => {
@@ -795,11 +847,12 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
           status: 'draft',
           paperId: draftId ?? undefined,
         })
-        setDraftId(paper.id)
-        setQuestions(scoped)
-        markFormClean(paperName.trim(), paperBoard, paperGrade, scoped)
-        setDraftSavedAt(new Date().toISOString())
-        setMessage(`Draft saved (${questions.length} question${questions.length === 1 ? '' : 's'}).`)
+        skipNextTabLeaveRef.current = true
+        resetForm()
+        setMessage(
+          `Draft saved (${questions.length} question${questions.length === 1 ? '' : 's'}). Form cleared — use Continue in Drafts to edit again.`,
+        )
+        onDraftSaved?.(paper)
       } catch (err) {
         setMessage(err instanceof Error ? err.message : 'Failed to save draft')
         throw err
@@ -809,11 +862,12 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
     }, [
       addPaperFromManualQuestions,
       draftId,
-      markFormClean,
+      onDraftSaved,
       paperBoard,
       paperGrade,
       paperName,
       questions,
+      resetForm,
     ])
 
     const publishNow = useCallback(async () => {
@@ -848,7 +902,6 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
         }
         skipNextTabLeaveRef.current = true
         resetForm()
-        setMessage(`Published "${savedName}" with ${payload.length} question(s).`)
         onPublished?.(paper)
       } catch (err) {
         setMessage(err instanceof Error ? err.message : 'Failed to publish paper')
@@ -894,7 +947,8 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
         onCancel: cancelNow,
         modalOptions: {
           title: 'Unsaved question paper',
-          message: 'Save a draft, publish, or discard before leaving.',
+          message: 'Save a draft, publish, or discard before leaving this page.',
+          cancelLabel: 'Discard & leave',
         },
       })
 
@@ -915,6 +969,7 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
     )
 
     const canCancel = isDirty || Boolean(draftId)
+    const canSaveActions = hasCreateWork(paperName, questions) || Boolean(draftId)
     const canUpdateTopics = blankTopicWithChapter.length > 0 && !busy && !mappingTopics
 
     return (
@@ -928,7 +983,7 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
               </h3>
               <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
                 Set board and grade once for the paper. Add questions, then fill chapter/topic or use
-                Update topics. Preview before you Draft or Publish.
+                Update topics. Preview before you Save as draft or Publish.
               </p>
             </div>
             {draftId && draftSavedAt && (
@@ -1056,11 +1111,11 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                disabled={busy || mappingTopics}
+                disabled={busy || mappingTopics || !canSaveActions}
                 onClick={() => void confirmDraft()}
                 className="border border-border px-4 py-2 rounded-md text-sm hover:bg-secondary disabled:opacity-40"
               >
-                Draft
+                Save as draft
               </button>
               <button
                 type="button"
@@ -1077,7 +1132,7 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
               </button>
               <button
                 type="button"
-                disabled={busy || mappingTopics}
+                disabled={busy || mappingTopics || !canSaveActions}
                 onClick={() => void confirmPublish()}
                 className="btn btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm disabled:opacity-40"
               >
@@ -1114,6 +1169,7 @@ export const ManualQuestionEntry = forwardRef<ManualQuestionEntryHandle, ManualQ
           <p className="text-xs text-muted-foreground mt-3">
             Chapter is required to publish; topic is optional — use Update topics from syllabus books.
             Draft soft-saves to the server. Cancel resets and deletes any open draft.
+            Use Save as draft to continue later from Drafts.
           </p>
         </AppCard>
       </div>

@@ -557,7 +557,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
             {debouncedSearch
               ? 'No staff found.'
               : activeYear
-                ? `No staff assigned for ${activeYear.name} yet. Add staff or set this year’s placement.`
+                ? `No staff yet for ${activeYear.name}. Add staff or assign placements for this year.`
                 : 'No staff yet.'}
           </p>
         ) : (
@@ -593,7 +593,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
                               city: '',
                             },
                           )
-                        : '—'}
+                        : 'Unassigned'}
                       {member.assignmentStatus && member.assignmentStatus !== 'active' ? (
                         <span className="ml-1 text-[10px] uppercase tracking-wide">
                           ({member.assignmentStatus})

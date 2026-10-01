@@ -18,7 +18,7 @@ import {
   cohortSubjectMeasures,
   deriveRiskLevel,
   rankedStudentNames,
-  SUBJECT_FULL,
+  subjectFullLabel,
 } from '@/modules/tutor/lib/learningGenomeData'
 import type { LearningGenomeDataset } from '@/modules/tutor/lib/learningGenomeTypes'
 import { TrendMark } from './GenomeCharts'
@@ -69,7 +69,7 @@ export function LearningGenomeCohortReport({
 }: LearningGenomeCohortReportProps) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { students: curriculumStudents, batches, loading: curriculumLoading, ensureLoaded } =
+  const { students: curriculumStudents, batches, ensureLoaded } =
     useCurriculum()
   const [activeCluster, setActiveCluster] = useState<string | null>(null)
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
@@ -87,6 +87,7 @@ export function LearningGenomeCohortReport({
     batchStudentCount?: number
     scoredStudentCount?: number
     batchName?: string | null
+    computedAt?: string
   }>({})
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -158,6 +159,7 @@ export function LearningGenomeCohortReport({
           batchStudentCount: report.meta.batchStudentCount,
           scoredStudentCount: report.meta.scoredStudentCount,
           batchName: report.batchName,
+          computedAt: report.computedAt,
         })
         const idMap = new Map<string, string>()
         for (const [name, profile] of Object.entries(report.students)) {
@@ -256,7 +258,7 @@ export function LearningGenomeCohortReport({
     [batches],
   )
 
-  const waitingForBatches = !dataProp && (!batchesReady || curriculumLoading)
+  const waitingForBatches = !dataProp && !batchesReady
   const hasReportData = dataSource === 'live' && names.length > 0
   const selectedBatch = batches.find((b) => b.id === batchId)
   const batchLabel = selectedBatch
@@ -284,9 +286,12 @@ export function LearningGenomeCohortReport({
                 {reportMeta.savedMarksCount === 1 ? '' : 's'} ·{' '}
                 {reportMeta.scoredStudentCount ?? 0} of {reportMeta.batchStudentCount ?? 0}{' '}
                 students scored
+                {reportMeta.computedAt ? (
+                  <> · updated {new Date(reportMeta.computedAt).toLocaleString()}</>
+                ) : null}
               </>
             ) : (
-              <>Class insights are shown for one batch at a time.</>
+              <>Class insights load from stored reports — regenerated when marks or tests are added.</>
             )}
           </p>
         </div>
@@ -499,8 +504,8 @@ export function LearningGenomeCohortReport({
                           <div className="lg-mini-bar-fill" style={{ width: `${s.overall}%` }} />
                         </div>
                       </td>
-                      <td>{SUBJECT_FULL[s.strongest]}</td>
-                      <td>{SUBJECT_FULL[s.weakest]}</td>
+                      <td>{subjectFullLabel(s.strongest, s.subject_names)}</td>
+                      <td>{subjectFullLabel(s.weakest, s.subject_names)}</td>
                       <td>
                         <TrendMark trend={s.trend} velocity={s.velocity} />
                       </td>

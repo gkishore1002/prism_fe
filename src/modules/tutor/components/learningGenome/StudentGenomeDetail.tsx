@@ -1,9 +1,10 @@
 import type { GenomeStudentProfile } from '@/modules/tutor/lib/learningGenomeTypes'
 import type { ConceptNotMastered } from '@/modules/tutor/lib/learningGenomeConcepts'
 import {
+  SUBJECT_CODES,
   SUBJECT_COLORS,
-  SUBJECT_FULL,
   deriveRiskLevel,
+  subjectFullLabel,
 } from '@/modules/tutor/lib/learningGenomeData'
 import { buildStudentNarrative } from '@/modules/tutor/lib/learningGenomeNarrative'
 import { DailyCurveChart, GenomeFingerprintChart, TrendMark } from './GenomeCharts'
@@ -13,17 +14,21 @@ import { useReportLabels } from '@/lib/useReportLabels'
 import { ReportNarrative } from '@/components/reports/ReportLanguageToggle'
 import { KnowledgeChapterTopicBars } from '@/modules/reports/learningGenome/KnowledgeDistribution'
 
-const SUBJECT_ORDER_LIST = ['TAM', 'ENG', 'MAT', 'SCI', 'SOC'] as const
-
-function AffinityBars({ subjAvg }: { subjAvg: GenomeStudentProfile['subj_avg'] }) {
+function AffinityBars({
+  subjAvg,
+  subjectNames,
+}: {
+  subjAvg: GenomeStudentProfile['subj_avg']
+  subjectNames?: GenomeStudentProfile['subject_names']
+}) {
   return (
     <>
-      {SUBJECT_ORDER_LIST.map((code) => {
+      {SUBJECT_CODES.map((code) => {
         const value = subjAvg[code]
         if (value === undefined) return null
         return (
           <div key={code} className="lg-affinity-row">
-            <div className="sname">{SUBJECT_FULL[code]}</div>
+            <div className="sname">{subjectFullLabel(code, subjectNames)}</div>
             <div className="lg-affinity-track">
               <div
                 className="lg-affinity-fill"
@@ -78,7 +83,7 @@ export function StudentGenomeDetail({
     fallbackGenomeNarrativeTa(name, profile.overall, profile.rank, totalStudents)
   const risk = deriveRiskLevel(profile, {}, name)
   const weakTopics = [...topicMastery].sort((a, b) => a.masteryPct - b.masteryPct).slice(0, 5)
-  const genomeSummary = `${name}'s five-point subject fingerprint is strongest in ${SUBJECT_FULL[profile.strongest]} (${(profile.subj_avg[profile.strongest] ?? 0).toFixed(0)}%) and has the most room to grow in ${SUBJECT_FULL[profile.weakest]} (${(profile.subj_avg[profile.weakest] ?? 0).toFixed(0)}%).`
+  const genomeSummary = `${name}'s subject fingerprint is strongest in ${subjectFullLabel(profile.strongest, profile.subject_names)} (${(profile.subj_avg[profile.strongest] ?? 0).toFixed(0)}%) and has the most room to grow in ${subjectFullLabel(profile.weakest, profile.subject_names)} (${(profile.subj_avg[profile.weakest] ?? 0).toFixed(0)}%).`
 
   const content = (
     <>
@@ -134,7 +139,7 @@ export function StudentGenomeDetail({
         <div className="lg-detail-grid">
           <div className="lg-panel-block">
             <h4>{L.subjectAffinity}</h4>
-            <AffinityBars subjAvg={profile.subj_avg} />
+            <AffinityBars subjAvg={profile.subj_avg} subjectNames={profile.subject_names} />
           </div>
           <div className="lg-panel-block">
             <h4>{L.examPerformanceTrend}</h4>
@@ -235,12 +240,12 @@ export function StudentGenomeDetail({
         <div className="lg-kl-grid lg-kl-grid-pair" style={{ marginTop: '0.85rem' }}>
           <div className="lg-kl-card">
             <h4>Subject mastery</h4>
-            {SUBJECT_ORDER_LIST.map((code) => {
+            {SUBJECT_CODES.map((code) => {
               const pct = profile.subj_avg[code]
               if (pct == null) return null
               return (
                 <div key={code} className="lg-kl-bar-row">
-                  <span className="n">{SUBJECT_FULL[code]}</span>
+                  <span className="n">{subjectFullLabel(code, profile.subject_names)}</span>
                   <div className="lg-kl-bar-track">
                     <div
                       className="lg-kl-bar-fill"

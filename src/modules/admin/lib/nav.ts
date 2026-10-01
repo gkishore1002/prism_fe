@@ -12,6 +12,7 @@ export const adminNav: NavItem[] = [
   { label: 'Dashboard', href: '/admin', icon: 'LayoutDashboard' },
   { label: 'Manage', href: '/admin/manage', icon: 'Users' },
   { label: 'Assessments', href: '/admin/assessments', icon: 'ClipboardList' },
+  { label: 'Marks', href: '/admin/marks', icon: 'ClipboardCheck' },
   { label: 'Question Bank', href: '/admin/question-bank', icon: 'Database' },
   { label: 'Reports', href: '/admin/reports', icon: 'BarChart3' },
   { label: 'Curriculum Setup', href: '/admin/curriculum', icon: 'Network' },

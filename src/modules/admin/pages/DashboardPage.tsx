@@ -9,6 +9,7 @@ import {
   BarChart3,
   Database,
   ClipboardList,
+  ClipboardCheck,
   Sparkles,
   AlertTriangle,
   ShieldCheck,
@@ -1622,6 +1623,7 @@ export function AdminDashboardPage() {
                 { to: '/admin/curriculum', icon: Network, label: 'Curriculum setup' },
                 { to: '/admin/question-bank', icon: Database, label: 'Question bank' },
                 { to: '/admin/assessments', icon: ClipboardList, label: 'Assessments' },
+                { to: '/admin/marks', icon: ClipboardCheck, label: 'Marks' },
               ]
             : [
                 { to: '/admin/manage', icon: Users, label: 'Manage students, staff & branches' },
@@ -1629,6 +1631,7 @@ export function AdminDashboardPage() {
                 { to: '/admin/curriculum', icon: Network, label: 'Curriculum setup' },
                 { to: '/admin/question-bank', icon: Database, label: 'Question bank' },
                 { to: '/admin/assessments', icon: ClipboardList, label: 'Assessments' },
+                { to: '/admin/marks', icon: ClipboardCheck, label: 'Marks' },
                 { to: '/admin/settings', icon: ShieldCheck, label: 'Organization settings' },
               ]
           ).map(({ to, icon: Icon, label }) => (

@@ -1,13 +1,13 @@
 import type { GenomeStudentProfile } from './learningGenomeTypes'
-import { SUBJECT_FULL } from './learningGenomeData'
+import { subjectFullLabel } from './learningGenomeData'
 
 export function buildStudentNarrative(
   name: string,
   profile: GenomeStudentProfile,
   totalStudents: number,
 ): string {
-  const strongName = SUBJECT_FULL[profile.strongest]
-  const weakName = SUBJECT_FULL[profile.weakest]
+  const strongName = subjectFullLabel(profile.strongest, profile.subject_names)
+  const weakName = subjectFullLabel(profile.weakest, profile.subject_names)
   const parts: string[] = []
 
   parts.push(
