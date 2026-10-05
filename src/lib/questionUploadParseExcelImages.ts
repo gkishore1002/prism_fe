@@ -5,13 +5,18 @@
  * Preferred authoring: Insert → Pictures → Place in Cell on those columns.
  * Floating "Place over Cells" images are best-effort via anchor mapping.
  */
-import ExcelJS from 'exceljs'
+import type { Worksheet } from 'exceljs'
 import type { QuestionUploadRow } from '@/types'
 import {
   isQuestionUploadFileName,
   parseQuestionUploadFile,
   validateQuestionUploadRow,
 } from '@/lib/questionUploadParse'
+
+async function loadExcelJs() {
+  const mod = await import('exceljs')
+  return mod.default
+}
 
 type ImageField =
   | 'textImageBlob'
@@ -59,18 +64,20 @@ function normalizeHeader(value: unknown): string {
     .replace(/[^a-z0-9]+/g, '')
 }
 
-function bufferToBlob(buffer: ExcelJS.Buffer, extension?: string): Blob {
-  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer as ArrayBuffer)
+function bufferToBlob(buffer: ArrayBuffer | Uint8Array, extension?: string): Blob {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
   const mime =
     extension === 'png'
       ? 'image/png'
       : extension === 'gif'
         ? 'image/gif'
         : 'image/jpeg'
-  return new Blob([bytes], { type: mime })
+  const copy = new Uint8Array(bytes.byteLength)
+  copy.set(bytes)
+  return new Blob([copy], { type: mime })
 }
 
-type SheetImage = ReturnType<ExcelJS.Worksheet['getImages']>[number]
+type SheetImage = ReturnType<Worksheet['getImages']>[number]
 
 function anchorRowCol(img: SheetImage): { row0: number; col0: number } | null {
   const tl = img.range?.tl as
@@ -97,6 +104,7 @@ export async function parseQuestionUploadExcelWithImages(
 ): Promise<{ rows: QuestionUploadRow[]; meta: ExcelImageParseMeta; suggestedName?: string }> {
   const warnings: string[] = []
   const buffer = await file.arrayBuffer()
+  const ExcelJS = await loadExcelJs()
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(buffer)
 
@@ -173,7 +181,7 @@ function applyImage(
   rows: QuestionUploadRow[],
   sheetRowZeroBased: number,
   colNumber: number,
-  media: { buffer: ExcelJS.Buffer; extension?: string },
+  media: { buffer: ArrayBuffer | Uint8Array; extension?: string },
   colToField: Map<number, ImageField>,
   warnings: string[],
 ): boolean {

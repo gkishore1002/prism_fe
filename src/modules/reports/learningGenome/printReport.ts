@@ -1,5 +1,14 @@
-import html2canvas from 'html2canvas'
-import { jsPDF } from 'jspdf'
+async function loadHtml2Canvas() {
+  const mod = await import('html2canvas')
+  return mod.default
+}
+
+async function loadJsPdf() {
+  const mod = await import('jspdf')
+  return mod.jsPDF
+}
+
+type JsPDF = InstanceType<Awaited<ReturnType<typeof loadJsPdf>>>
 
 const PDF_MARGIN_MM = 10
 const PDF_PAGE_WIDTH_MM = 210
@@ -146,6 +155,7 @@ async function rasterizeLiveChartsIntoClone(sourceRoot: HTMLElement, clone: HTML
     const src = sourceCharts[i]
     const dst = cloneCharts[i]
     try {
+      const html2canvas = await loadHtml2Canvas()
       const canvas = await html2canvas(src, {
         scale: 2,
         useCORS: true,
@@ -358,6 +368,7 @@ async function captureElement(
   backgroundColor: string = PARCHMENT_BG,
 ): Promise<HTMLCanvasElement> {
   await waitForLayout()
+  const html2canvas = await loadHtml2Canvas()
   return html2canvas(el, {
     scale,
     useCORS: true,
@@ -482,7 +493,7 @@ function sliceCanvas(
 }
 
 interface PdfLayoutState {
-  pdf: jsPDF
+  pdf: JsPDF
   pageOpen: boolean
   yMm: number
 }
@@ -667,7 +678,8 @@ export async function buildReportPdfBlob(
       items.push({ kind: 'element', el: clone })
     }
 
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const JsPDF = await loadJsPdf()
+    const pdf = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const state: PdfLayoutState = { pdf, pageOpen: false, yMm: 0 }
     const scale = 2
 

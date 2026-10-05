@@ -1,7 +1,10 @@
-import * as XLSX from 'xlsx'
 import type { QuestionUploadRow } from '@/types'
 import { QUESTION_UPLOAD_TEMPLATE_ROWS } from '@/lib/questionUploadTemplate'
 import { getCurriculumSubjects, mapSubjectLabelToCurriculum } from '@/lib/academicScope'
+
+async function loadXlsx() {
+  return import('xlsx')
+}
 
 const QUESTION_FILE_RE = /\.(xlsx|xls|csv|json)$/i
 
@@ -298,7 +301,8 @@ function parseDelimitedText(text: string): string[][] {
   return rows
 }
 
-function readExcelMatrix(buffer: ArrayBuffer): string[][] {
+async function readExcelMatrix(buffer: ArrayBuffer): Promise<string[][]> {
+  const XLSX = await loadXlsx()
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheetName = workbook.SheetNames[0]
   if (!sheetName) return []
@@ -401,7 +405,7 @@ export async function parseQuestionUploadFile(file: File): Promise<QuestionUploa
     }
 
     const buffer = await file.arrayBuffer()
-    const records = matrixToRecords(readExcelMatrix(buffer))
+    const records = matrixToRecords(await readExcelMatrix(buffer))
     if (records.length === 0) {
       return { ok: false, error: 'No question rows found in the spreadsheet.' }
     }
@@ -431,9 +435,10 @@ function templateSampleRows(): string[][] {
   ])
 }
 
-export function downloadQuestionExcelTemplate(
+export async function downloadQuestionExcelTemplate(
   filename = 'prism-question-upload-template.xlsx',
-): void {
+): Promise<void> {
+  const XLSX = await loadXlsx()
   const aoa = [Array.from(QUESTION_UPLOAD_COLUMNS), ...templateSampleRows()]
   const sheet = XLSX.utils.aoa_to_sheet(aoa)
   const workbook = XLSX.utils.book_new()

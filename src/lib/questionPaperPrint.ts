@@ -1,6 +1,3 @@
-import html2canvas from 'html2canvas'
-import { jsPDF } from 'jspdf'
-
 const PDF_MARGIN_MM = 12
 const PDF_PAGE_WIDTH_MM = 210
 const PDF_PAGE_HEIGHT_MM = 297
@@ -8,6 +5,16 @@ const PDF_CONTENT_WIDTH_MM = PDF_PAGE_WIDTH_MM - PDF_MARGIN_MM * 2
 const PDF_CONTENT_HEIGHT_MM = PDF_PAGE_HEIGHT_MM - PDF_MARGIN_MM * 2
 
 export const QUESTION_PAPER_PRINT_ROOT_ID = 'question-paper-print-root'
+
+async function loadHtml2Canvas() {
+  const mod = await import('html2canvas')
+  return mod.default
+}
+
+async function loadJsPdf() {
+  const mod = await import('jspdf')
+  return mod.jsPDF
+}
 
 function safeFilename(title: string): string {
   const cleaned = title
@@ -69,6 +76,8 @@ export async function downloadQuestionPaperPdf(options?: {
   }
 
   const title = options?.title ?? 'Question_Paper'
+  const html2canvas = await loadHtml2Canvas()
+  const JsPDF = await loadJsPdf()
 
   if (document.fonts?.ready) {
     await document.fonts.ready
@@ -88,7 +97,7 @@ export async function downloadQuestionPaperPdf(options?: {
     windowHeight: root.scrollHeight,
   })
 
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const pdf = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const imgWidthMm = PDF_CONTENT_WIDTH_MM
   const imgHeightMm = (canvas.height * imgWidthMm) / canvas.width
   const pageCanvasHeight = Math.floor((PDF_CONTENT_HEIGHT_MM / imgHeightMm) * canvas.height)

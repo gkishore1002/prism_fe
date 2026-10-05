@@ -580,7 +580,7 @@ export const QuestionUploadWorkflow = forwardRef<
       <div className="grid sm:grid-cols-2 gap-3">
       <button
         type="button"
-        onClick={() => downloadQuestionExcelTemplate()}
+        onClick={() => void downloadQuestionExcelTemplate()}
         className="flex items-start gap-3 rounded-[12px] border border-border bg-card p-3.5 text-left hover:border-accent/40 hover:bg-accent/5 transition-colors"
       >
         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink text-paper shrink-0">

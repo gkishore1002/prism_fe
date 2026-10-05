@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import type * as XLSXNS from 'xlsx'
 import {
   applyParsedSpreadsheetToGrid,
   buildSpreadsheetTemplateCsv,
@@ -9,6 +9,10 @@ import {
 } from '@/modules/tutor/lib/marksStorage'
 
 export { applyParsedSpreadsheetToGrid, type ParsedSpreadsheetUpload }
+
+async function loadXlsx(): Promise<typeof XLSXNS> {
+  return import('xlsx')
+}
 
 const MARKS_FILE_RE = /\.(csv|txt|tsv|xlsx|xls)$/i
 
@@ -46,7 +50,8 @@ function parseDelimitedText(text: string): string[][] {
   return parseCsvText(cleaned, delimiter)
 }
 
-function readExcelRows(buffer: ArrayBuffer): string[][] {
+async function readExcelRows(buffer: ArrayBuffer): Promise<string[][]> {
+  const XLSX = await loadXlsx()
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheetName = workbook.SheetNames[0]
   if (!sheetName) return []
@@ -204,7 +209,7 @@ export async function parseMarksUploadFile(file: File): Promise<ParsedSpreadshee
   try {
     if (ext === 'xlsx' || ext === 'xls') {
       const buffer = await file.arrayBuffer()
-      return parseSpreadsheetMarksRows(readExcelRows(buffer))
+      return parseSpreadsheetMarksRows(await readExcelRows(buffer))
     }
     const text = await file.text()
     return parseSpreadsheetMarksRows(parseDelimitedText(text))
@@ -240,14 +245,14 @@ export function downloadSpreadsheetTemplateCsv(
   downloadCsvText(buildSpreadsheetTemplateCsv(students, columns, meta), filename)
 }
 
-export function downloadSpreadsheetTemplateXlsx(
+export async function downloadSpreadsheetTemplateXlsx(
   students: { id: string; name: string }[],
   columns: SpreadsheetColumnDraft[],
   filename: string,
   meta?: { title?: string; batch?: string },
-): void {
+): Promise<void> {
   const rows = buildSpreadsheetTemplateRows(students, columns, meta)
-  writeSpreadsheetWorkbook([{ title: 'Marks', rows }], filename)
+  await writeSpreadsheetWorkbook([{ title: 'Marks', rows }], filename)
 }
 
 function safeSheetTitle(title: string, used: Set<string>): string {
@@ -325,10 +330,11 @@ function sessionToSheetRows(session: {
   return rows
 }
 
-function writeSpreadsheetWorkbook(
+async function writeSpreadsheetWorkbook(
   sheets: Array<{ title: string; rows: (string | number)[][] }>,
   filename: string,
-): void {
+): Promise<void> {
+  const XLSX = await loadXlsx()
   const workbook = XLSX.utils.book_new()
   for (const sheet of sheets) {
     const ws = XLSX.utils.aoa_to_sheet(sheet.rows)
@@ -340,7 +346,7 @@ function writeSpreadsheetWorkbook(
 }
 
 /** Export every saved session into one .xlsx file (one sheet per assessment). */
-export function exportAllMarksSessionsXlsx(
+export async function exportAllMarksSessionsXlsx(
   sessions: Array<{
     assessmentTitle: string
     batch: string
@@ -354,7 +360,7 @@ export function exportAllMarksSessionsXlsx(
     }>
   }>,
   filename = 'prism-marks-export.xlsx',
-): void {
+): Promise<void> {
   if (sessions.length === 0) return
   const used = new Set<string>()
   const sheets = sessions
@@ -364,5 +370,5 @@ export function exportAllMarksSessionsXlsx(
       rows: sessionToSheetRows(session),
     }))
   if (sheets.length === 0) return
-  writeSpreadsheetWorkbook(sheets, filename)
+  await writeSpreadsheetWorkbook(sheets, filename)
 }

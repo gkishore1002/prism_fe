@@ -1,14 +1,35 @@
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { RouterRoot } from '@/components/layout/RouteTransitionOverlay'
-import { LoginPage } from '@/modules/auth/pages/LoginPage'
-import { SetupPage } from '@/modules/auth/pages/SetupPage'
+import { PageLoader } from '@/components/ui/PrismLoader'
 import { GuestRoute, RoleProtectedRoute } from '@/modules/auth/components/ProtectedRoute'
 import { SetupOnlyRoute, SetupRequiredRoute } from '@/modules/auth/components/SetupRoute'
-import { StudentDashboard } from '@/modules/student/StudentDashboard'
-import { TutorDashboard } from '@/modules/tutor/TutorDashboard'
-import { AdminDashboard } from '@/modules/admin/AdminDashboard'
 import { useAuth } from '@/hooks/useAuth'
 import { dashboardPathForRole } from '@/modules/auth/lib/authStorage'
+
+const LoginPage = lazy(() =>
+  import('@/modules/auth/pages/LoginPage').then((m) => ({ default: m.LoginPage })),
+)
+const SetupPage = lazy(() =>
+  import('@/modules/auth/pages/SetupPage').then((m) => ({ default: m.SetupPage })),
+)
+const StudentDashboard = lazy(() =>
+  import('@/modules/student/StudentDashboard').then((m) => ({ default: m.StudentDashboard })),
+)
+const TutorDashboard = lazy(() =>
+  import('@/modules/tutor/TutorDashboard').then((m) => ({ default: m.TutorDashboard })),
+)
+const AdminDashboard = lazy(() =>
+  import('@/modules/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard })),
+)
+
+function RouteFallback() {
+  return <PageLoader label="Loading…" />
+}
+
+function withSuspense(element: React.ReactNode) {
+  return <Suspense fallback={<RouteFallback />}>{element}</Suspense>
+}
 
 function HomeRedirect() {
   const { isAuthenticated, role } = useAuth()
@@ -36,30 +57,30 @@ export const router = createBrowserRouter([
       },
       {
         path: '/setup',
-        element: (
+        element: withSuspense(
           <SetupOnlyRoute>
             <SetupPage />
-          </SetupOnlyRoute>
+          </SetupOnlyRoute>,
         ),
       },
       {
         path: '/login',
-        element: (
+        element: withSuspense(
           <SetupRequiredRoute>
             <GuestRoute>
               <LoginPage />
             </GuestRoute>
-          </SetupRequiredRoute>
+          </SetupRequiredRoute>,
         ),
       },
       {
         path: '/student/*',
-        element: (
+        element: withSuspense(
           <SetupRequiredRoute>
             <RoleProtectedRoute allowed="student">
               <StudentDashboard />
             </RoleProtectedRoute>
-          </SetupRequiredRoute>
+          </SetupRequiredRoute>,
         ),
       },
       {
@@ -68,22 +89,22 @@ export const router = createBrowserRouter([
       },
       {
         path: '/tutor/*',
-        element: (
+        element: withSuspense(
           <SetupRequiredRoute>
             <RoleProtectedRoute allowed="tutor">
               <TutorDashboard />
             </RoleProtectedRoute>
-          </SetupRequiredRoute>
+          </SetupRequiredRoute>,
         ),
       },
       {
         path: '/admin/*',
-        element: (
+        element: withSuspense(
           <SetupRequiredRoute>
             <RoleProtectedRoute allowed="admin">
               <AdminDashboard />
             </RoleProtectedRoute>
-          </SetupRequiredRoute>
+          </SetupRequiredRoute>,
         ),
       },
       {

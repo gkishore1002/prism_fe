@@ -864,7 +864,7 @@ export function TutorMarksPage() {
       batch: uploadBatch.name,
     }
     if (format === 'xlsx') {
-      downloadSpreadsheetTemplateXlsx(
+      void downloadSpreadsheetTemplateXlsx(
         uploadStudents,
         uploadColumns,
         `prism-marks-${slug}-template.xlsx`,
@@ -960,7 +960,7 @@ export function TutorMarksPage() {
       if (marksApiAvailable()) {
         await downloadMarksExport({ format: 'xlsx', filename: 'prism-marks-export.xlsx' })
       } else if (activitySessions.length > 0) {
-        exportAllMarksSessionsXlsx(activitySessions, 'prism-marks-export.xlsx')
+        await exportAllMarksSessionsXlsx(activitySessions, 'prism-marks-export.xlsx')
       } else {
         flash('error', 'No saved marks to export.')
         return
