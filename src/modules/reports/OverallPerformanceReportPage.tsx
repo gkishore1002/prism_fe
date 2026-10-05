@@ -121,8 +121,6 @@ function OverallReportContent({
         subject: t.subject,
         chapter: t.chapter,
         masteryPct: t.masteryPct,
-        correct: t.correct,
-        total: t.total,
       }))
     }
     const fromOverall = report.topicBreakdown.map((t) => ({
