@@ -170,7 +170,7 @@ export function AdminTeachersPage() {
           )}
         </div>
 
-        {accountsLoading ? (
+        {accountsLoading && rows.length === 0 ? (
           <PageLoader label="Loading tutors…" />
         ) : rows.length === 0 ? (
           <div className="text-center py-10">

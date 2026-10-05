@@ -11,7 +11,7 @@ import {
   Eye,
 } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
-import { PageLoader } from '@/components/ui/PrismLoader'
+import { InlineLoader, PageLoader } from '@/components/ui/PrismLoader'
 import { btnClass } from '@/components/ui/Button'
 import { useScrollToError } from '@/hooks/useScrollToError'
 import { ToolbarButton } from '@/components/ui/ListToolbar'
@@ -284,12 +284,21 @@ export function AccessRequestsPanel({ scope = 'tutor' }: { scope?: 'tutor' | 'ad
     }
   }
 
-  if (loading) {
+  if (loading && requests.length === 0) {
     return <PageLoader label="Loading reassignment requests…" />
   }
 
   return (
     <>
+      {loading && requests.length > 0 ? (
+        <div
+          className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-secondary/25 px-3 py-2 text-xs text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <InlineLoader size="xs" label="Refreshing reassignment requests…" />
+        </div>
+      ) : null}
       <AppCard className={`border-2 ${sectionStyles.section}`}>
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
           <div className="flex items-start gap-3">

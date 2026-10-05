@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { PageLoader, DashboardSectionLoader } from '@/components/ui/PrismLoader'
+import { PageLoader, DashboardSectionLoader, InlineLoader } from '@/components/ui/PrismLoader'
 import {
   ArrowRight,
   Users,
@@ -112,7 +112,10 @@ function MetricTile({
 }
 
 export function AdminDashboardPage() {
-  useAnalyticsPage(['adminDashboard', 'adminDashboardHeavy'])
+  const { refreshing: analyticsRefreshing } = useAnalyticsPage([
+    'adminDashboard',
+    'adminDashboardHeavy',
+  ])
   const [staffPage, setStaffPage] = useState(1)
   const [staffLimit, setStaffLimit] = useState(STAFF_LEADERBOARD_LIMIT)
   const {
@@ -466,6 +469,16 @@ export function AdminDashboardPage() {
             : 'Live pulse across people, branches, assessments, and subject performance'
         }
       />
+
+      {analyticsRefreshing ? (
+        <div
+          className="mb-4 flex items-center gap-2 rounded-lg border border-border bg-secondary/25 px-3 py-2 text-xs text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <InlineLoader size="xs" label="Updating analytics for the selected branch and year…" />
+        </div>
+      ) : null}
 
       {/* Hero pulse — compact strip */}
       <motion.div

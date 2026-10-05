@@ -22,7 +22,7 @@ import type { InstitutionCenter, StudentMasterProfile } from '@/types'
 
 export function AdminCenterDetailPage() {
   const { centerId = '' } = useParams()
-  const { canManageTenant, loading: centersLoading, ensureLoaded } = useCenters()
+  const { canManageTenant, loading: centersLoading, centers, ensureLoaded } = useCenters()
   const { organizationScoped } = useAdminPortalContext()
   const { activeYearId, activeYear } = useAcademicYears()
   useAnalyticsPage('adminCenters')
@@ -147,13 +147,13 @@ export function AdminCenterDetailPage() {
     }
   }
 
-  if (centersLoading) return <PageLoader />
+  if (centersLoading && centers.length === 0) return <PageLoader />
 
   if (!organizationScoped || !canManageTenant) {
     return <Navigate to="/admin" replace />
   }
 
-  if (loading) return <PageLoader />
+  if (loading && !center) return <PageLoader />
 
   if (!center) {
     return (

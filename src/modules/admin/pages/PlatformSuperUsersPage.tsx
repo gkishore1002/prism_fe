@@ -67,7 +67,7 @@ export function PlatformSuperUsersPage() {
     }
   }
 
-  if (loading) return <PageLoader label="Loading platform admins…" />
+  if (loading && admins.length === 0) return <PageLoader label="Loading platform admins…" />
 
   return (
     <div className="space-y-6">

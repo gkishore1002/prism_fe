@@ -70,6 +70,8 @@ interface AnalyticsContextValue {
   loading: boolean
   /** True while deferred dashboard chart panels are still fetching. */
   panelsLoading: boolean
+  /** Branch/year scope refetch while prior analytics data is still on screen. */
+  refreshing: boolean
   error: string | null
   load: (key: AnalyticsLoadKey | AnalyticsLoadKey[], force?: boolean) => Promise<void>
   refresh: (key?: AnalyticsLoadKey | AnalyticsLoadKey[]) => Promise<void>
@@ -116,6 +118,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
   const yearId = activeYearId
   const [loading, setLoading] = useState(false)
   const [panelsLoading, setPanelsLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const loadedRef = useRef(new Set<AnalyticsLoadKey>())
 
@@ -404,29 +407,30 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       const critical = pending.filter((k) => !isHeavy(k))
       const deferred = pending.filter(isHeavy)
       const isInitialFetch = critical.some((k) => !loadedRef.current.has(k))
+      const scopeRefresh = force && pending.some((k) => loadedRef.current.has(k))
       if (isInitialFetch) setLoading(true)
+      else if (scopeRefresh) setRefreshing(true)
       setError(null)
       try {
         if (critical.length) {
           await Promise.all(critical.map((key) => runKey(key)))
           critical.forEach((k) => loadedRef.current.add(k))
         }
+
+        if (deferred.length) {
+          setPanelsLoading(true)
+          try {
+            await Promise.all(deferred.map((key) => runKey(key)))
+            deferred.forEach((k) => loadedRef.current.add(k))
+          } finally {
+            setPanelsLoading(false)
+          }
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load analytics')
       } finally {
         if (isInitialFetch) setLoading(false)
-      }
-
-      if (deferred.length) {
-        setPanelsLoading(true)
-        try {
-          await Promise.all(deferred.map((key) => runKey(key)))
-          deferred.forEach((k) => loadedRef.current.add(k))
-        } catch (e) {
-          setError(e instanceof Error ? e.message : 'Failed to load analytics')
-        } finally {
-          setPanelsLoading(false)
-        }
+        if (scopeRefresh) setRefreshing(false)
       }
     },
     [isAuthenticated, runKey],
@@ -456,12 +460,14 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
     loadedRef.current.clear()
     setLoading(false)
     setPanelsLoading(false)
+    setRefreshing(false)
   }, [isAuthenticated])
 
   const value = useMemo(
     () => ({
       loading,
       panelsLoading,
+      refreshing,
       error,
       load,
       refresh,
@@ -499,6 +505,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
     [
       loading,
       panelsLoading,
+      refreshing,
       error,
       load,
       refresh,
@@ -546,7 +553,7 @@ export function useAnalytics() {
 
 /** Call once on mount for the current page's analytics needs. */
 export function useAnalyticsPage(key: AnalyticsLoadKey | AnalyticsLoadKey[]) {
-  const { load, loading, panelsLoading, error } = useAnalytics()
+  const { load, loading, panelsLoading, refreshing, error } = useAnalytics()
   const { activeCenterId, isAllBranches } = useCenters()
   const { activeYearId } = useAcademicYears()
   const branchCenterId = isAllBranches ? undefined : activeCenterId
@@ -564,5 +571,5 @@ export function useAnalyticsPage(key: AnalyticsLoadKey | AnalyticsLoadKey[]) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, keysKey, scopeKey])
 
-  return { loading, panelsLoading, error }
+  return { loading, panelsLoading, refreshing, error }
 }

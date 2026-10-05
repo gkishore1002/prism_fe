@@ -59,7 +59,7 @@ function HierarchyNode({
 export function AdminHierarchyPage() {
   const { curriculum, loading } = useCurriculum()
 
-  if (loading) {
+  if (loading && curriculum.length === 0) {
     return <PageLoader />
   }
 

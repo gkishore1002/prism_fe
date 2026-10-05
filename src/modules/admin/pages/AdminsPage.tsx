@@ -86,7 +86,7 @@ export function AdminAdminsPage() {
     }
   }
 
-  if (loading) return <PageLoader />
+  if (loading && admins.length === 0) return <PageLoader />
 
   if (!canManageTenant) {
     return (

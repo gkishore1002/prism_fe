@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { APP_NAME } from '@/lib/constants'
 import { AppDropdown } from '@/components/ui/AppDropdown'
-import { ReportLoader } from '@/components/ui/PrismLoader'
+import { InlineLoader, ReportLoader } from '@/components/ui/PrismLoader'
 import {
   cohortReportApiAvailable,
   fetchCohortReport,
@@ -331,7 +331,7 @@ export function LearningGenomeCohortReport({
     )
   }
 
-  if (loading) {
+  if (loading && !hasReportData) {
     return (
       <>
         {batchToolbar}
@@ -372,6 +372,16 @@ export function LearningGenomeCohortReport({
       ]}
     >
       {batchToolbar}
+
+      {loading && hasReportData ? (
+        <div
+          className="mb-4 flex items-center gap-2 rounded-lg border border-border bg-secondary/25 px-3 py-2 text-xs text-muted-foreground print:hidden"
+          role="status"
+          aria-live="polite"
+        >
+          <InlineLoader size="xs" label="Updating class insights for this batch…" />
+        </div>
+      ) : null}
 
       <LgHero
         reportKind="AI Academic Profiling Engine"

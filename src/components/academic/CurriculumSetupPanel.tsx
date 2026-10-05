@@ -575,7 +575,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   const existingSubjectNames = gradeData?.subjects.map((s) => s.name) ?? []
   const existingTopicNames = subjectData?.topics.map((t) => t.name) ?? []
 
-  if (loading) {
+  if (loading && curriculum.length === 0) {
     return <PageLoader label="Loading curriculum…" />
   }
 

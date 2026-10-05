@@ -69,7 +69,7 @@ export function PlatformOrganizationPage() {
     }
   }
 
-  if (loading) return <PageLoader label="Loading organization…" />
+  if (loading && !org) return <PageLoader label="Loading organization…" />
 
   if (!org) {
     return (

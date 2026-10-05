@@ -54,7 +54,7 @@ export function PlatformConsolePage() {
     })
   }, [organizations, search, statusFilter])
 
-  if (loading) return <PageLoader label="Loading organizations…" />
+  if (loading && organizations.length === 0) return <PageLoader label="Loading organizations…" />
 
   return (
     <div className="space-y-6">

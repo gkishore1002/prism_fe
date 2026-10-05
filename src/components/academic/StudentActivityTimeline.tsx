@@ -332,7 +332,7 @@ export function StudentActivityTimeline({
   canReview,
   onReviewRequest,
 }: StudentActivityTimelineProps) {
-  if (loading) {
+  if (loading && !tracking) {
     return (
       <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground justify-center">
         <Loader2 className="w-4 h-4 animate-spin" />

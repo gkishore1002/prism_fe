@@ -41,7 +41,7 @@ import {
 } from 'recharts'
 import { PageHeader, AppCard } from '@/components/layout/AppShell'
 import { SyllabusCompletionChart } from '@/components/academic/SyllabusCompletionChart'
-import { PageLoader, DashboardSectionLoader } from '@/components/ui/PrismLoader'
+import { PageLoader, DashboardSectionLoader, InlineLoader } from '@/components/ui/PrismLoader'
 import { HealthBadge } from '@/components/ui/HealthBadge'
 import { Avatar } from '@/components/ui/Avatar'
 import { AppDropdown } from '@/components/ui/AppDropdown'
@@ -126,7 +126,10 @@ function MetricTile({
 }
 
 export function TutorDashboardPage() {
-  useAnalyticsPage(['tutorDashboard', 'tutorDashboardHeavy'])
+  const { refreshing: analyticsRefreshing } = useAnalyticsPage([
+    'tutorDashboard',
+    'tutorDashboardHeavy',
+  ])
   const { batches: tutorBatches, students: tutorStudents, getStudentsForBatch } = useCurriculum()
   const { ensureLoaded: ensureQuestionPapersLoaded } = useQuestionPapers()
   const { activeYear } = useAcademicYears()
@@ -410,6 +413,16 @@ export function TutorDashboardPage() {
           </div>
         }
       />
+
+      {analyticsRefreshing ? (
+        <div
+          className="mb-4 flex items-center gap-2 rounded-lg border border-border bg-secondary/25 px-3 py-2 text-xs text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <InlineLoader size="xs" label="Updating analytics for the selected branch and year…" />
+        </div>
+      ) : null}
 
       <motion.div
         variants={fadeUp}
