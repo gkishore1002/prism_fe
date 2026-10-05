@@ -17,6 +17,7 @@ import { AppDropdown, AppSelectMulti } from '@/components/ui/AppDropdown'
 import { Pagination } from '@/components/ui/Pagination'
 import { FormErrorBanner } from '@/components/ui/FormErrorBanner'
 import { RequiredMark } from '@/components/ui/RequiredMark'
+import { useToast } from '@/components/ui/Toast'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { useConfirmModal } from '@/components/ui/AppModal'
 import { useQuestionPapers } from '@/hooks/useQuestionPapers'
@@ -313,6 +314,7 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
     removeTopic,
   } = useCurriculum()
   const { confirm } = useConfirmModal()
+  const { showToast } = useToast()
   const { questions, ensureLoaded } = useQuestionPapers()
 
   useEffect(() => {
@@ -326,9 +328,6 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
   const [addTarget, setAddTarget] = useState<AddTarget>(null)
   const [editTarget, setEditTarget] = useState<EditTarget>(null)
-  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(
-    null,
-  )
   const [saving, setSaving] = useState(false)
 
   // Batch form (listed separately from curriculum tree; board/grade from curriculum)
@@ -384,14 +383,25 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
     successText: string,
   ): Promise<{ success: boolean; error?: string }> {
     setSaving(true)
-    setActionMessage(null)
     try {
       await action()
-      setActionMessage({ type: 'success', text: successText })
+      showToast({
+        title: 'Saved',
+        message: successText,
+        variant: 'success',
+        placement: 'bottom-right',
+        durationMs: 4000,
+      })
       return { success: true }
     } catch (e) {
       const text = e instanceof Error ? e.message : 'Something went wrong'
-      setActionMessage({ type: 'error', text })
+      showToast({
+        title: 'Couldn’t save',
+        message: text,
+        variant: 'urgent',
+        placement: 'bottom-right',
+        durationMs: 6000,
+      })
       return { success: false, error: text }
     } finally {
       setSaving(false)
@@ -416,7 +426,13 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
   }
 
   function reportDuplicate(name: string) {
-    setActionMessage({ type: 'error', text: `"${name}" already exists — pick a different name or delete the existing one.` })
+    showToast({
+      title: 'Already exists',
+      message: `"${name}" already exists — pick a different name or delete the existing one.`,
+      variant: 'urgent',
+      placement: 'bottom-right',
+      durationMs: 5000,
+    })
   }
 
   useEffect(() => {
@@ -583,19 +599,6 @@ export function CurriculumSetupPanel({ role }: CurriculumSetupPanelProps) {
             : 'Select an existing board and grade, then add subjects, topics, and batches. Boards and grades are managed by your admin.'
         }
       />
-
-      {actionMessage && (
-        <div
-          className={cn(
-            'mb-4 rounded-md px-4 py-3 text-sm',
-            actionMessage.type === 'success'
-              ? 'bg-leaf/10 text-leaf border border-leaf/30'
-              : 'bg-rose/10 text-rose border border-rose/30',
-          )}
-        >
-          {actionMessage.text}
-        </div>
-      )}
 
       {isEmpty && canManageBoardGrade && (
         <AppCard className="mb-6 accent-yellow">
