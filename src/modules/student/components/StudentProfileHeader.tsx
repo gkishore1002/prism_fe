@@ -40,7 +40,13 @@ export function StudentProfileHeader({
           </h1>
         )}
         <div className="flex flex-wrap items-center gap-2 mt-2">
-          <HealthBadge status={profile.status as HealthStatus} score={profile.healthScore} size="sm" />
+          {profile.streak > 0 ? (
+            <HealthBadge status={profile.status as HealthStatus} score={profile.healthScore} size="sm" />
+          ) : (
+            <span className="inline-flex items-center gap-1.5 font-display font-medium rounded-[20px] px-2.5 py-[3px] text-[10.5px] bg-secondary text-muted-foreground">
+              Not assessed yet
+            </span>
+          )}
           <span className="text-xs text-muted-foreground">
             {formatStudentGrade(profile.grade)} · {profile.board}
           </span>

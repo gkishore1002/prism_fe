@@ -162,12 +162,29 @@ export function MarksSpreadsheet({
               <label className="block">
                 <span className="text-xs text-muted-foreground">Out of (max marks)</span>
                 <input
-                  type="number"
-                  min={1}
-                  value={activeColumn.maxMarks || ''}
-                  onChange={(e) =>
-                    onColumnChange?.(activeColumn.id, { maxMarks: Number(e.target.value) || 0 })
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={
+                    activeColumn.maxMarks === 0 || activeColumn.maxMarks == null
+                      ? ''
+                      : String(activeColumn.maxMarks)
                   }
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^\d]/g, '')
+                    if (raw === '') {
+                      onColumnChange?.(activeColumn.id, { maxMarks: 0 })
+                      return
+                    }
+                    const next = Number(raw)
+                    if (!Number.isFinite(next)) return
+                    onColumnChange?.(activeColumn.id, { maxMarks: next })
+                  }}
+                  onBlur={() => {
+                    if (!activeColumn.maxMarks || activeColumn.maxMarks < 1) {
+                      onColumnChange?.(activeColumn.id, { maxMarks: 50 })
+                    }
+                  }}
                   placeholder="e.g. 50"
                   className="mt-1 w-full border border-border rounded-md px-3 py-2 text-sm bg-background font-mono-data"
                 />

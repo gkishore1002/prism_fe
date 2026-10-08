@@ -57,14 +57,63 @@ export interface MarksActivitySessionApi {
   assessmentTitle: string
   description?: string
   batch: string
+  batchId?: string | null
   savedAt: string
   source: MarksSource
+  status?: string
+  studentCount?: number
   entries: MarksRecord[]
+}
+
+export interface MarksSessionStandingRow {
+  studentId: string
+  studentName: string
+  admissionNo: string
+  total: number
+  maxTotal: number
+  percentage: number
+  grade: string
+  division: string
+  result: string
+  rank: number
+  subjects: number
+  updatedAt: string
+}
+
+export interface MarksSessionStandings {
+  sessionId: string
+  assessmentTitle: string
+  description?: string | null
+  batch: string
+  batchId?: string | null
+  savedAt: string
+  source: MarksSource
+  status: string
+  studentCount: number
+  students: MarksSessionStandingRow[]
 }
 
 export async function fetchMarksSessions(batchId?: string): Promise<MarksActivitySessionApi[]> {
   const qs = batchId ? `?batch_id=${encodeURIComponent(batchId)}` : ''
   return apiFetch<MarksActivitySessionApi[]>(`/marks/sessions${qs}`)
+}
+
+export async function fetchMarksSessionStandings(
+  sessionId: string,
+): Promise<MarksSessionStandings> {
+  return apiFetch<MarksSessionStandings>(
+    `/marks/sessions/${encodeURIComponent(sessionId)}/standings`,
+  )
+}
+
+export async function deleteMarksSessionStudent(
+  sessionId: string,
+  studentId: string,
+): Promise<void> {
+  await apiFetch<void>(
+    `/marks/sessions/${encodeURIComponent(sessionId)}/students/${encodeURIComponent(studentId)}`,
+    { method: 'DELETE' },
+  )
 }
 
 export async function fetchMarksDrafts(batchId?: string): Promise<MarksDraftApi[]> {

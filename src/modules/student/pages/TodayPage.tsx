@@ -86,11 +86,16 @@ export function StudentTodayPage() {
 
       <LiveAssessmentPrompt />
 
-      {/* Health + plan rings */}
+      {/* Health + plan rings — hide fake scores until the student has assessed work */}
       {studentHealth && (
         <AppCard className="mb-6">
           <div className="flex items-center justify-around gap-4 py-2">
-            <ScoreRing value={studentHealth.overall} label="Health" color="brand" size={100} />
+            <ScoreRing
+              value={profile.streak > 0 ? studentHealth.overall : 0}
+              label="Health"
+              color="brand"
+              size={100}
+            />
             <div className="w-px h-20 bg-border hidden sm:block" />
             <ScoreRing
               value={recoveryPct}
@@ -100,7 +105,7 @@ export function StudentTodayPage() {
               sublabel={recoveryTotal ? `${recoveryDone}/${recoveryTotal}` : '—'}
             />
           </div>
-          {studentHealth.subjects.length > 0 && (
+          {profile.streak > 0 && studentHealth.subjects.length > 0 && (
             <div className="mt-4 pt-4 border-t border-border">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[11px] font-display font-semibold uppercase tracking-wide text-muted-foreground">
@@ -145,7 +150,12 @@ export function StudentTodayPage() {
       </div>
 
       <div className="grid md:grid-cols-4 gap-4 mb-8">
-        <AppStat label="Academic Health" value={profile.healthScore} unit="/100" tone="accent" />
+        <AppStat
+          label="Academic Health"
+          value={profile.streak > 0 ? profile.healthScore : '—'}
+          unit={profile.streak > 0 ? '/100' : undefined}
+          tone="accent"
+        />
         <AppStat label="Improvement (6m)" value={`+${profile.improvement}%`} tone="leaf" />
         <AppStat label="Readiness" value={`${profile.readiness}%`} />
         <AppStat label="Weak topics" value={weakTopicCount} tone="rose" />

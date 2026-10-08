@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   Activity,
   CheckCircle2,
   ClipboardCheck,
   Download,
   Eye,
+  FileBarChart2,
   FileSpreadsheet,
   PenLine,
   Trash2,
@@ -22,6 +24,7 @@ import {
   type MarksColumnConfig,
   type MarksGrid,
 } from '@/modules/tutor/components/MarksSpreadsheet'
+import { MarksAcademicReports } from '@/modules/tutor/components/MarksAcademicReports'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { useCenters } from '@/hooks/useCenters'
 import { useUnsavedWorkGuard } from '@/hooks/useUnsavedWorkGuard'
@@ -99,11 +102,14 @@ const TABS = [
   { id: 'drafts' as const, label: 'Drafts', icon: ClipboardCheck },
   { id: 'upload' as const, label: 'Upload & template', icon: Upload },
   { id: 'manual' as const, label: 'Manual entry', icon: PenLine },
+  { id: 'reports' as const, label: 'Academic reports', icon: FileBarChart2 },
 ]
 
 type MarksTab = (typeof TABS)[number]['id']
 
 export function TutorMarksPage() {
+  const { pathname } = useLocation()
+  const portalScope = pathname.startsWith('/admin') ? 'admin' : 'tutor'
   const fileInputRef = useRef<HTMLInputElement>(null)
   /** Holds grid data until students load; protect flag blocks later curriculum-triggered resets. */
   const pendingManualResumeRef = useRef<{
@@ -1376,6 +1382,19 @@ export function TutorMarksPage() {
 
           {entryFooter('upload')}
         </AppCard>
+      )}
+
+      {tab === 'reports' && (
+        <MarksAcademicReports
+          batches={batches.map((b) => ({
+            id: b.id,
+            name: b.name,
+            board: b.board,
+            grade: b.grade,
+          }))}
+          initialBatchId={batchId || uploadBatchId || batches[0]?.id || ''}
+          scope={portalScope}
+        />
       )}
 
       {tab === 'manual' && (

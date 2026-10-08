@@ -49,10 +49,22 @@ function studentNames(ids: string[], master: { id: string; name: string }[]) {
     .join(', ')
 }
 
+function assessmentSortKey(a: TutorAssessmentSchedule): number {
+  const raw = a.createdAt || a.scheduledAt || ''
+  const ms = raw ? Date.parse(raw) : NaN
+  if (Number.isFinite(ms)) return ms
+  // Fallback: newer-looking ids (ta-<timestamp>) sort above opaque ids.
+  const fromId = a.id.match(/(\d{10,})/)?.[1]
+  return fromId ? Number(fromId) : 0
+}
+
+/** Newest created first; live before scheduled when timestamps tie. */
 function sortNewestFirst(a: TutorAssessmentSchedule, b: TutorAssessmentSchedule) {
-  const aKey = a.createdAt || a.scheduledAt || a.id
-  const bKey = b.createdAt || b.scheduledAt || b.id
-  return bKey.localeCompare(aKey)
+  const byTime = assessmentSortKey(b) - assessmentSortKey(a)
+  if (byTime !== 0) return byTime
+  if (a.status === 'live' && b.status !== 'live') return -1
+  if (b.status === 'live' && a.status !== 'live') return 1
+  return (b.id || '').localeCompare(a.id || '')
 }
 
 interface AssessmentsPageProps {
@@ -84,16 +96,20 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
   const [completedLimit, setCompletedLimit] = useState(DEFAULT_PAGE_LIMIT)
 
   const liveNow = useMemo(
-    () => assessments.filter((a) => a.status === 'live').sort(sortNewestFirst),
+    () => assessments.filter((a) => a.status === 'live'),
     [assessments],
   )
   const scheduledOnly = useMemo(
-    () => assessments.filter((a) => a.status === 'scheduled').sort(sortNewestFirst),
+    () => assessments.filter((a) => a.status === 'scheduled'),
     [assessments],
   )
+  // Newest first across live + scheduled (do not bury new scheduled under all live).
   const upcomingAndLive = useMemo(
-    () => [...liveNow, ...scheduledOnly],
-    [liveNow, scheduledOnly],
+    () =>
+      assessments
+        .filter((a) => a.status === 'live' || a.status === 'scheduled')
+        .sort(sortNewestFirst),
+    [assessments],
   )
   const completed = useMemo(
     () => assessments.filter((a) => a.status === 'completed').sort(sortNewestFirst),
@@ -157,6 +173,7 @@ export function AssessmentsPage({ role = 'tutor' }: AssessmentsPageProps) {
     }
     try {
       await addAssessment(newAssessment)
+      setUpcomingPage(1)
       setSaveMessage({ type: 'success', text: `Assessment “${newAssessment.title}” scheduled.` })
     } catch (e) {
       setSaveMessage({
