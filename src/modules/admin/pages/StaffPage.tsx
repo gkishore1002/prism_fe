@@ -192,12 +192,7 @@ export function AdminStaffPage({ embedded = false }: { embedded?: boolean }) {
   const tutorRows = useMemo(() => mergeTutorAnalytics(staff, teachers), [staff, teachers])
   // Prefer staff-list role count (year-scoped table). Analytics can omit tutors with no assessment cohort.
   const tutorsInOrg = useMemo(() => {
-    const fromStaff = staff.filter((m) => {
-      const roles = m.roles
-      if (Array.isArray(roles)) return roles.includes('tutor')
-      if (typeof roles === 'string') return roles.split(',').map((r) => r.trim()).includes('tutor')
-      return staffRoleSummary(m).toLowerCase().includes('tutor')
-    }).length
+    const fromStaff = staff.filter((m) => m.roles.includes('tutor')).length
     if (fromStaff > 0) return fromStaff
     return teachers.length
   }, [staff, teachers])
