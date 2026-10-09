@@ -9,12 +9,15 @@ import {
   Download,
   Eye,
   Plus,
+  Sparkles,
   X,
 } from 'lucide-react'
 import { AppCard } from '@/components/layout/AppShell'
 import { AppDropdown } from '@/components/ui/AppDropdown'
 import { useCurriculum } from '@/hooks/useCurriculum'
+import { useCenters } from '@/hooks/useCenters'
 import { AppModal, useConfirmModal } from '@/components/ui/AppModal'
+import { GenerateMcqsFromBook } from '@/components/academic/GenerateMcqsFromBook'
 import {
   deleteSyllabusBook,
   downloadSyllabusBookJson,
@@ -41,6 +44,8 @@ function chaptersFromBook(book: SyllabusBook): SyllabusChapterDraft[] {
 
 export function SyllabusBooksPanel() {
   const { curriculum, ensureLoaded, refresh: refreshCurriculum } = useCurriculum()
+  const { organization } = useCenters()
+  const premiumAiMcq = Boolean(organization?.aiMcqFromBooks)
   const { confirm } = useConfirmModal()
   const fileRef = useRef<HTMLInputElement>(null)
   const [books, setBooks] = useState<SyllabusBook[]>([])
@@ -52,6 +57,7 @@ export function SyllabusBooksPanel() {
   const [outlineBook, setOutlineBook] = useState<SyllabusBook | null>(null)
   const [outlineDraft, setOutlineDraft] = useState<SyllabusChapterDraft[]>([])
   const [outlineSaving, setOutlineSaving] = useState(false)
+  const [generateBook, setGenerateBook] = useState<SyllabusBook | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [board, setBoard] = useState('')
   const [grade, setGrade] = useState('')
@@ -318,8 +324,9 @@ export function SyllabusBooksPanel() {
           <h2 className="font-display text-lg">Syllabus books</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
-          Upload a textbook PDF for a board, grade, and subject. When summarization finishes, chapters
-          and topics are imported into curriculum automatically (existing topics are skipped).
+          Upload a textbook PDF or TXT for a board, grade, and subject. When summarization finishes,
+          chapters and topics import into curriculum automatically. Analyzed uploads are available
+          under Auto questions for AI MCQ generation.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
           <AppDropdown
@@ -441,6 +448,22 @@ export function SyllabusBooksPanel() {
                       onClick={() => void openBookSummary(book)}
                     >
                       {openingId === book.id ? 'Opening…' : 'Edit outline'}
+                    </button>
+                  )}
+                  {book.status === 'analyzed' && premiumAiMcq && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs border border-accent/40 bg-accent/10 text-foreground hover:bg-accent/20 disabled:opacity-40"
+                      disabled={!book.hasSourceText}
+                      title={
+                        book.hasSourceText
+                          ? 'Generate MCQs with AI'
+                          : 'Re-upload this book to enable AI MCQ generation'
+                      }
+                      onClick={() => setGenerateBook(book)}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Generate MCQs
                     </button>
                   )}
                   {book.status === 'analyzed' && (
@@ -631,6 +654,18 @@ export function SyllabusBooksPanel() {
           </div>
         )}
       </AppModal>
+
+      <GenerateMcqsFromBook
+        book={generateBook}
+        open={Boolean(generateBook)}
+        onClose={() => setGenerateBook(null)}
+        onSaved={(saved, status) => {
+          setImportMessage({
+            id: generateBook?.id ?? '',
+            text: `✓ Saved ${saved} AI MCQ${saved === 1 ? '' : 's'} as ${status === 'draft' ? 'drafts' : 'active'}`,
+          })
+        }}
+      />
     </div>
   )
 }

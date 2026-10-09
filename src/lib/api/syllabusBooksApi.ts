@@ -15,6 +15,45 @@ export interface SyllabusBook {
   createdAt: string
   chapterCount: number
   topicCount: number
+  hasSourceText?: boolean
+}
+
+export type McqDifficulty = 'easy' | 'medium' | 'hard'
+
+export interface GeneratedMcq {
+  text: string
+  optionA: string
+  optionB: string
+  optionC: string
+  optionD: string
+  correctAnswer: 'A' | 'B' | 'C' | 'D'
+  marks: number
+  difficulty: McqDifficulty
+  chapter: string
+  topic: string
+}
+
+export interface McqTopicSelection {
+  chapter: string
+  topic: string
+}
+
+export interface GenerateMcqsResult {
+  bookId: string
+  board: string
+  grade: string
+  subject: string
+  chapter: string
+  topic: string
+  difficulty: McqDifficulty
+  questions: GeneratedMcq[]
+  selections?: McqTopicSelection[]
+}
+
+export interface ApproveMcqsResult {
+  saved: number
+  questionIds: string[]
+  status: 'draft' | 'active'
 }
 
 export async function fetchSyllabusBooks(): Promise<SyllabusBook[]> {
@@ -127,4 +166,45 @@ export async function mapQuestionTopics(
     method: 'POST',
     body: JSON.stringify({ questions }),
   })
+}
+
+export async function generateMcqsFromBook(
+  bookId: string,
+  body: {
+    selections: McqTopicSelection[]
+    difficulty: McqDifficulty
+    count: number
+    avoidStems?: string[]
+    /** @deprecated Prefer selections */
+    chapter?: string
+    /** @deprecated Prefer selections */
+    topic?: string
+  },
+): Promise<GenerateMcqsResult> {
+  return apiFetch<GenerateMcqsResult>(
+    `/syllabus-books/${encodeURIComponent(bookId)}/generate-mcqs`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  )
+}
+
+export async function approveMcqsFromBook(
+  bookId: string,
+  body: {
+    difficulty: McqDifficulty
+    status: 'draft' | 'active'
+    questions: GeneratedMcq[]
+    chapter?: string
+    topic?: string
+  },
+): Promise<ApproveMcqsResult> {
+  return apiFetch<ApproveMcqsResult>(
+    `/syllabus-books/${encodeURIComponent(bookId)}/approve-mcqs`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  )
 }

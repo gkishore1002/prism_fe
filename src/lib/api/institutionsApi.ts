@@ -10,6 +10,7 @@ export interface BranchContextResponse {
     code?: string | null
     type: string
     boardIds: string[]
+    aiMcqFromBooks?: boolean
   }
   role?: string
   isOwner: boolean
@@ -48,6 +49,7 @@ export async function fetchBranchContext(): Promise<{
       boardIds: data.organization.boardIds,
       studentCount: 0,
       tutorCount: 0,
+      aiMcqFromBooks: Boolean(data.organization.aiMcqFromBooks),
     },
     role: data.role,
     isOwner: data.isOwner,

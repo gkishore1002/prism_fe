@@ -17,6 +17,7 @@ import {
   type QuestionUploadWorkflowHandle,
 } from '@/components/academic/QuestionUploadWorkflow'
 import { SyllabusBooksPanel } from '@/components/academic/SyllabusBooksPanel'
+import { AutoQuestionGeneratorPanel } from '@/components/academic/AutoQuestionGeneratorPanel'
 import {
   ManualQuestionEntry,
   type ManualQuestionEntryHandle,
@@ -40,7 +41,7 @@ interface QuestionBankPageProps {
   readOnly?: boolean
 }
 
-type WorkspaceTab = 'library' | 'drafts' | 'create' | 'import' | 'books'
+type WorkspaceTab = 'library' | 'drafts' | 'create' | 'import' | 'books' | 'auto-questions'
 
 const SOURCE_LABEL: Record<string, string> = {
   upload: 'Imported',
@@ -274,6 +275,7 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
     { id: 'create', label: 'Create', hide: readOnly },
     { id: 'import', label: 'Import', hide: readOnly },
     { id: 'books', label: 'Books', hide: readOnly },
+    { id: 'auto-questions', label: 'Auto questions', hide: readOnly },
   ]
 
   return (
@@ -724,6 +726,12 @@ export function QuestionBankPage({ role = 'tutor', readOnly = false }: QuestionB
       {tab === 'books' && !readOnly && (
         <section>
           <SyllabusBooksPanel />
+        </section>
+      )}
+
+      {tab === 'auto-questions' && !readOnly && (
+        <section>
+          <AutoQuestionGeneratorPanel onGoToBooks={() => void handleTabChange('books')} />
         </section>
       )}
     </>

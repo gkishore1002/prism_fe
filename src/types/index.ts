@@ -414,6 +414,8 @@ export interface Institution {
   boardIds: string[]
   studentCount: number
   tutorCount: number
+  /** Super Admin premium: AI MCQ generation from syllabus books. */
+  aiMcqFromBooks?: boolean
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

@@ -21,6 +21,7 @@ export function PlatformOrganizationPage() {
   const [name, setName] = useState('')
   const [type, setType] = useState<Institution['type']>('coaching')
   const [isActive, setIsActive] = useState(true)
+  const [aiMcqFromBooks, setAiMcqFromBooks] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -36,6 +37,7 @@ export function PlatformOrganizationPage() {
       setName(data.name)
       setType(data.type as Institution['type'])
       setIsActive(data.isActive)
+      setAiMcqFromBooks(Boolean(data.aiMcqFromBooks))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load organization')
       setOrg(null)
@@ -59,6 +61,7 @@ export function PlatformOrganizationPage() {
         name: name.trim(),
         type,
         isActive,
+        aiMcqFromBooks,
       })
       setOrg((prev) => (prev ? { ...prev, ...updated } : prev))
       setSuccess('Organization settings saved.')
@@ -79,7 +82,11 @@ export function PlatformOrganizationPage() {
     )
   }
 
-  const dirty = name.trim() !== org.name || type !== org.type || isActive !== org.isActive
+  const dirty =
+    name.trim() !== org.name ||
+    type !== org.type ||
+    isActive !== org.isActive ||
+    aiMcqFromBooks !== Boolean(org.aiMcqFromBooks)
 
   return (
     <div className="space-y-6">
@@ -132,6 +139,17 @@ export function PlatformOrganizationPage() {
                 Active — inactive organizations cannot sign in at login
               </span>
             </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={aiMcqFromBooks}
+                onChange={(e) => setAiMcqFromBooks(e.target.checked)}
+                className="rounded border-border"
+              />
+              <span>
+                Premium: AI MCQ from books — tutors can generate MCQs from uploaded syllabus books
+              </span>
+            </label>
             <div className="flex gap-2 pt-2">
               <Button type="submit" variant="primary" size="sm" disabled={saving || !dirty}>
                 {saving ? 'Saving…' : 'Save changes'}
@@ -145,6 +163,7 @@ export function PlatformOrganizationPage() {
                   setName(org.name)
                   setType(org.type as Institution['type'])
                   setIsActive(org.isActive)
+                  setAiMcqFromBooks(Boolean(org.aiMcqFromBooks))
                 }}
               >
                 Reset

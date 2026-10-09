@@ -7,6 +7,7 @@ export interface PlatformOrganization {
   schemaName: string
   type: string
   isActive: boolean
+  aiMcqFromBooks?: boolean
   adminCount: number
 }
 
@@ -68,7 +69,7 @@ export async function createPlatformOrganization(body: {
 
 export async function updatePlatformOrganization(
   code: string,
-  patch: { name?: string; type?: string; isActive?: boolean },
+  patch: { name?: string; type?: string; isActive?: boolean; aiMcqFromBooks?: boolean },
 ): Promise<PlatformOrganization> {
   return apiFetch<PlatformOrganization>(`/platform/organizations/${encodeURIComponent(code)}`, {
     method: 'PATCH',
